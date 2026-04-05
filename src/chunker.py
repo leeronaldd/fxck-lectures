@@ -703,16 +703,14 @@ def _llm_sub_chunk(chunk: dict) -> list[dict] | None:
     Returns a list of sub-chunks, or None if the call fails.
     """
     try:
-        import vertexai
-        from vertexai.generative_models import GenerativeModel
+        from google import genai
         from src.config import GCP_PROJECT_ID, GCP_LOCATION, CHUNKER_FALLBACK_MODEL
 
         if not GCP_PROJECT_ID:
             print("WARNING: GCP_PROJECT_ID not set. Skipping LLM sub-chunking.")
             return None
 
-        vertexai.init(project=GCP_PROJECT_ID, location=GCP_LOCATION)
-        model = GenerativeModel(CHUNKER_FALLBACK_MODEL)
+        client = genai.Client(vertexai=True, project=GCP_PROJECT_ID, location=GCP_LOCATION)
 
         prompt = f"""You are splitting a lecture transcript chunk into separate sub-topics.
 This chunk covers multiple distinct concepts that each need their own explanation.
@@ -739,7 +737,7 @@ Rules:
 - Minimum 3 sub-topics, maximum 10
 """
 
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(model=CHUNKER_FALLBACK_MODEL, contents=prompt)
         response_text = response.text.strip()
 
         # Parse JSON from response
@@ -814,6 +812,9 @@ def chunk_transcript(text: str, use_llm: bool = True) -> list[Chunk]:
     # Step 2c: Detect multi-concept chunks and sub-chunk them
     raw_chunks = detect_multi_concept_chunks(raw_chunks)
     raw_chunks = sub_chunk_with_llm(raw_chunks, use_llm=use_llm)
+
+    # Step 2d: Merge any tiny sub-chunks created by LLM splitting
+    raw_chunks = merge_tiny_chunks(raw_chunks, min_words=80)
 
     # Step 3: Map prerequisites across all chunks
     prereq_map = map_prerequisites(raw_chunks)
