@@ -10,7 +10,7 @@ Usage:
     python run_stage1.py "data/transcripts/Bad Professor transcript.txt"
 
     # From video (auto-transcribes first)
-    python run_stage1.py "Bad Professor Lecture.mp4"
+    python run_stage1.py "data/input/Bad Professor Lecture.mp4"
 
     # From audio
     python run_stage1.py lecture.mp3 --terms "icosahedral,peptidoglycan"

@@ -2,9 +2,9 @@
 CLI entry point for Stage 1.5b: Screenshot Extractor.
 
 Usage:
-    python run_screenshots.py "Bad Professor Lecture.mp4" data/output/final_chunks_v5.json --preview
-    python run_screenshots.py "Bad Professor Lecture.mp4" data/output/final_chunks_v5.json -o data/output/screenshots.json
-    python run_screenshots.py "Bad Professor Lecture.mp4" data/output/final_chunks_v5.json --skip-describe --preview
+    python run_screenshots.py "data/input/Bad Professor Lecture.mp4" data/output/final_chunks_v5.json --preview
+    python run_screenshots.py "data/input/Bad Professor Lecture.mp4" data/output/final_chunks_v5.json -o data/output/screenshots.json
+    python run_screenshots.py "data/input/Bad Professor Lecture.mp4" data/output/final_chunks_v5.json --skip-describe --preview
 """
 
 import argparse

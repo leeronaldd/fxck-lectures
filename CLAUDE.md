@@ -138,8 +138,10 @@ Estimated token budget per lecture (~8 chunks):
 
 ### Factual Accuracy Strategy (implemented)
 - **Generation-time grounding**: Gemini Pro has Google Search enabled during generation — it verifies claims while writing, not after
-- **Post-generation verification**: Flash + Google Search reads the entire output per section, flags errors against reputable medical sources (NIH, PubMed, NCBI, .edu)
-- **Flag-only for now**: errors reported in verification_report.json, not auto-corrected (Stage 3 evaluator will handle corrections)
+- **Textbook RAG during generation**: relevant OpenStax chapter fetched and included as primary factual context in the generation prompt. Hardcoded URL lookup table (100% reliable). Rule: "textbook wins on facts, professor wins on scope"
+- **Post-generation verification**: Flash + Google Search reads the entire output per section, flags errors against textbook + reputable medical sources (NIH, PubMed, NCBI, .edu)
+- **Pro correction loop**: surgically rewrites flagged paragraphs while maintaining colloquial tone. Conditional — only runs when errors found
+- Error rate: 11 → 1 across 6 prompt iterations + textbook RAG
 
 ### Textbook RAG (planned — not yet implemented)
 The gold standard for accuracy: use the student's prescribed textbook as the primary knowledge source.
@@ -153,7 +155,7 @@ The gold standard for accuracy: use the student's prescribed textbook as the pri
 
 ```bash
 # Stage 0+1: From video (transcribes then chunks)
-python run_stage1.py "Bad Professor Lecture.mp4" --preview
+python run_stage1.py "data/input/Bad Professor Lecture.mp4" --preview
 python run_stage1.py lecture.mp4 --terms "icosahedral,peptidoglycan" --preview
 
 # Stage 1: From transcript (existing behavior)
@@ -204,10 +206,12 @@ src/
   slide_chunker.py         # Slide-based chunking (legacy, superseded by concept grouper)
   concept_grouper.py       # Merge/reorder/skip pass on Stage 1 chunks
   generator.py             # Stage 2: system prompt + Gemini Pro generation
+  fact_checker.py            # Textbook RAG + Google Search verification + Pro correction loop
   completeness_checker.py  # Grep + slide-term coverage check + auto-fix
-  slide_inserter.py        # Post-processing slide references
+  slide_inserter.py        # Post-processing slide references (companion doc only, inline done in assembly)
+  json_repair.py           # Robust JSON extraction from truncated Flash responses
   models.py                # Pydantic models
-  config.py                # Vertex AI + Groq config
+  config.py                # Vertex AI + Groq config (env-var switchable models)
 run_stage1.py              # CLI: Stage 0+1 (accepts video/audio OR transcript)
 run_transcribe.py          # CLI: standalone transcription
 run_ci_scorer.py           # CLI: CI% scoring
@@ -215,10 +219,13 @@ run_screenshots.py         # CLI: screenshot extraction
 run_slide_chunker.py       # CLI: slide-based chunking
 run_stage2.py              # CLI: full V4 pipeline
 data/
-  transcripts/             # Input .txt transcript files
-  output/                  # All pipeline outputs (JSON, markdown)
-  screenshots/             # Extracted lecture slide images
+  input/                   # Raw lecture files (video, audio)
+  transcripts/             # Transcribed .txt files (from Stage 0 or manual)
+  output/                  # Pipeline outputs (JSON, markdown)
+    screenshots/           # Extracted lecture slide images
+    _archive/              # Old iterations (kept for reference, not used by pipeline)
 docs/
+  reference/               # Gold standard examples (anatomy slides, Studley output)
   anatomy-style-analysis.md  # Deep analysis of anatomy professor's teaching patterns
 ```
 
