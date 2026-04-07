@@ -7,3 +7,4 @@ data/screenshots/
 *.mp4
 slide-*.jpg
 frontend/public/data/
+.claude/
