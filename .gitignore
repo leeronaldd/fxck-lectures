@@ -1,5 +1,9 @@
 __pycache__/
 *.pyc
 .env
+.env.local
 data/output/
+data/screenshots/
 *.mp4
+slide-*.jpg
+frontend/public/data/

@@ -63,24 +63,55 @@ EMPHASIS_NEGATIVE = [
     (re.compile(r"\bwe\s+won'?t\s+(?:worry|go\s+into)\b", re.IGNORECASE), "won't worry about"),
 ]
 
-# Common microbiology/biology technical terms for prerequisite mapping
+# Biomedical science technical terms for prerequisite mapping.
+# Broad coverage across microbiology, anatomy, physiology, pharmacology, pathology.
 # This list bootstraps the term extractor — it also learns terms from context.
 SEED_TERMS = {
-    "virus", "virion", "capsid", "capsomere", "nucleocapsid", "envelope",
+    # --- General biology / cell biology ---
     "genome", "nucleic acid", "dna", "rna", "mrna", "messenger rna",
     "double stranded", "single stranded", "positive sense", "negative sense",
-    "icosahedral", "helical", "complex", "morphology",
+    "replication", "transcription", "translation", "gene expression",
+    "protein", "enzyme", "receptor", "ligand", "substrate", "cofactor",
+    "cell membrane", "cytoplasm", "nucleus", "mitochondria", "ribosome",
+    "endoplasmic reticulum", "golgi apparatus", "lysosome", "vesicle",
+    "atp", "metabolism", "catabolism", "anabolism", "glycolysis", "krebs cycle",
+    "oxidative phosphorylation", "electron transport chain",
+    # --- Microbiology ---
+    "virus", "virion", "capsid", "capsomere", "nucleocapsid", "envelope",
     "spike protein", "glycoprotein", "lipid bilayer", "lipid envelope",
     "bacteriophage", "phage", "lytic", "lysogenic", "prophage", "temperate",
-    "replication", "transcription", "translation", "assembly",
-    "host cell", "receptor", "adsorption", "penetration",
-    "endocytosis", "membrane fusion", "budding", "lysis",
-    "baltimore classification", "taxonomy", "classification",
-    "oncogene", "oncogenesis", "latent", "persistent", "acute",
-    "plaque assay", "pcr", "serology", "electron microscopy",
+    "host cell", "adsorption", "penetration", "budding", "lysis",
+    "baltimore classification", "taxonomy", "classification", "morphology",
     "peptidoglycan", "cell wall", "cytoplasmic membrane",
+    "endotoxin", "exotoxin", "gram positive", "gram negative",
+    "biofilm", "conjugation", "transduction", "transformation",
+    "antibiotic", "antimicrobial", "resistance", "plasmid",
+    # --- Anatomy / Physiology ---
+    "muscle", "contraction", "isotonic", "isometric", "concentric", "eccentric",
+    "bone", "cartilage", "tendon", "ligament", "joint", "synovial",
+    "neuron", "synapse", "axon", "dendrite", "neurotransmitter",
+    "action potential", "depolarization", "repolarization",
+    "cardiac", "vascular", "artery", "vein", "capillary",
+    "ventricle", "atrium", "systole", "diastole", "blood pressure",
+    "respiratory", "alveoli", "bronchi", "diaphragm", "ventilation",
+    "immune system", "antibody", "antigen", "lymphocyte", "phagocyte",
+    "inflammation", "cytokine", "complement", "innate", "adaptive",
+    # --- Pharmacology ---
+    "agonist", "antagonist", "partial agonist", "inverse agonist",
+    "dose response", "efficacy", "potency", "therapeutic index",
+    "pharmacokinetics", "pharmacodynamics", "half life",
+    "absorption", "distribution", "metabolism", "excretion",
+    "first pass", "bioavailability", "volume of distribution",
+    # --- Pathology ---
+    "inflammation", "necrosis", "apoptosis", "edema", "fibrosis",
+    "hyperplasia", "hypertrophy", "atrophy", "metaplasia", "dysplasia",
+    "neoplasm", "benign", "malignant", "metastasis", "carcinoma",
+    # --- Lab techniques ---
+    "plaque assay", "pcr", "rt-pcr", "serology", "electron microscopy",
+    "elisa", "western blot", "gel electrophoresis", "flow cytometry",
+    "histology", "biopsy", "culture", "staining", "microscopy",
     "reverse transcriptase", "rna polymerase", "dna polymerase",
-    "lysozyme", "neuraminidase", "endotoxin", "exotoxin",
+    "lysozyme", "neuraminidase",
 }
 
 
@@ -302,39 +333,94 @@ def polish_topic_name(name: str, key_terms: list[str], text: str) -> str:
     return name
 
 
-def _derive_topic_from_content(text: str, key_terms: list[str]) -> str | None:
-    """Derive a topic name by looking at what the text is actually about."""
+def _name_topic_with_flash(text: str) -> str:
+    """Use Gemini Flash to name a topic from transcript content — any discipline."""
+    from google import genai
+    from src.config import GCP_PROJECT_ID, GCP_LOCATION, CHUNKER_FALLBACK_MODEL
+
+    prompt = (
+        "What is the main topic of this lecture transcript excerpt? "
+        "Give a short, descriptive topic name (2-5 words) suitable as a section heading. "
+        "Examples: 'Muscle Contraction Types', 'Cell Membrane Structure', "
+        "'Drug-Receptor Interactions', 'Inflammatory Response'.\n\n"
+        "Return ONLY the topic name, nothing else.\n\n"
+        f"TRANSCRIPT:\n\"\"\"\n{text[:1000]}\n\"\"\""
+    )
+
+    client = genai.Client(vertexai=True, project=GCP_PROJECT_ID, location=GCP_LOCATION)
+    response = client.models.generate_content(
+        model=CHUNKER_FALLBACK_MODEL,
+        contents=prompt,
+        config={"temperature": 0.1, "max_output_tokens": 50},
+    )
+    name = response.text.strip().strip('"').strip("'")
+    if 2 <= len(name.split()) <= 6 and len(name) < 60:
+        return name
+    raise ValueError(f"Flash returned invalid topic name: {name}")
+
+
+def _derive_topic_from_content(text: str, key_terms: list[str], use_llm: bool = True) -> str | None:
+    """Derive a topic name by looking at what the text is actually about.
+
+    Primary: Uses Gemini Flash for topic naming — works for ANY discipline.
+    Fallback: Uses regex pattern matching.
+    """
+    # Try LLM first — it can name topics in any medical discipline
+    if use_llm:
+        try:
+            return _name_topic_with_flash(text)
+        except Exception:
+            pass  # fall through to regex
+
     text_lower = text[:2000].lower()  # only scan the beginning
 
-    # Check for known topic patterns in the content (order matters — more specific first)
+    # Topic patterns for ANY biomedical lecture (not just microbiology).
+    # General patterns first, then discipline-specific ones.
+    # The chunker also uses LLM fallback for topic naming when these don't match.
     topic_patterns = [
-        # Very specific patterns first
-        (r"class\s+(?:one|1)\s+.*?class\s+(?:one|1)\s+.*?double\s+stranded\s+DNA", "Baltimore Classes (1-7 Detail)"),
-        (r"class\s+(?:one|two|three|four|five|six|seven|1|2|3|4|5|6|7)\s+.*?(?:class|stranded)", "Baltimore Classes (1-7 Detail)"),
+        # --- Course structure (any lecture) ---
+        (r"(?:structure|function)\s+of\s+\w+", "Course Overview"),
+        (r"module\s+(?:one|two|three|four|1|2|3|4)", "Module Overview"),
+        (r"(?:overall|general)\s+(?:process|overview|introduction)", "Overview"),
+
+        # --- General biology patterns (any biomedical lecture) ---
+        (r"classification\s+(?:system|of|criteria)", "Classification System"),
+        (r"how\s+(?:do\s+)?we\s+classify", "Classification Criteria"),
+        (r"naming\s+(?:conventions?|of)", "Naming Conventions"),
+        (r"(?:life|replication|reproductive)\s+cycle", "Life Cycles"),
+        (r"(?:infection|entry)\s+(?:process|mechanism)", "Infection Mechanism"),
+        (r"(?:structure|anatomy)\s+of", "Structure & Anatomy"),
+        (r"(?:function|role)\s+of", "Function & Role"),
+        (r"types?\s+of\s+\w+", "Types & Classification"),
+        (r"(?:evolution|origin)s?\s+(?:of|and)", "Evolution & Origins"),
+        (r"(?:size|morphology)\s+(?:of|and|range)", "Size & Morphology"),
+
+        # --- Microbiology-specific ---
         (r"baltimore\s+classification", "Baltimore Classification System"),
-        (r"genome\s+sense|positive\s+sense.*?negative\s+sense", "Genome Sense & Orientation"),
-        (r"(?:step|criteria)\s+of\s+classification", "Virus Classification Criteria"),
-        (r"classification\s+(?:system|of\s+virus)", "Virus Classification"),
-        (r"how\s+(?:do\s+)?we\s+classify", "Virus Classification Criteria"),
-        (r"naming\s+(?:of\s+)?virus", "Virus Naming Conventions"),
-        (r"virus(?:es)?\s+in\s+general", "Viruses: General Characteristics"),
-        (r"envelope\s+virus", "Envelope Viruses"),
-        (r"sizes?\s+of\s+virus", "Virus Size Range"),
-        (r"viral\s+evolution", "Viral Evolution & Origins"),
-        (r"viral\s+multiplication|lytic\s+cycle.*?lysogenic|lysogenic\s+cycle", "Viral Multiplication & Life Cycles"),
-        (r"lytic\s+(?:cycle|vs)", "Lytic vs Lysogenic Cycles"),
-        (r"lysogenic", "Lytic vs Lysogenic Cycles"),
+        (r"lytic\s+.*?lysogenic|lysogenic\s+.*?lytic", "Lytic vs Lysogenic Cycles"),
         (r"bacteriophage|phage\s+infect", "Bacteriophage Infection"),
-        (r"(?:infection\s+process|typical\s+infection).*?(?:bacteria|proariots?|prokaryot)", "Prokaryotic Virus Infection"),
-        (r"proariots?\s+first|prokaryot", "Prokaryotic Virus Infection"),
-        (r"animal\s+virus\s+(?:infect|entry|bind)", "Animal Virus Entry & Infection"),
-        (r"move\s+on\s+to\s+animal\s+virus", "Animal Virus Families"),
-        (r"animal\s+virus", "Animal Virus Families"),
-        (r"dna\s+virus(?:es)?", "DNA Virus Families"),
-        (r"rna\s+virus(?:es)?", "RNA Virus Families"),
-        (r"(?:structure|function)\s+of\s+microbes", "Course Overview: Structure & Function"),
-        (r"module\s+(?:one|two|1|2)", "Module Overview"),
-        (r"(?:overall|general)\s+process", "Viral Replication Overview"),
+        (r"envelope\s+virus", "Envelope Viruses"),
+        (r"(?:animal|human)\s+virus", "Animal Virus Families"),
+        (r"(?:dna|rna)\s+virus(?:es)?", "Virus Families"),
+
+        # --- Anatomy/physiology-specific ---
+        (r"muscle\s+contraction", "Muscle Contraction"),
+        (r"(?:skeletal|cardiac|smooth)\s+muscle", "Muscle Types"),
+        (r"(?:action|resting)\s+potential", "Membrane Potential"),
+        (r"(?:blood|cardiac)\s+(?:flow|cycle|output)", "Cardiovascular Function"),
+        (r"(?:nerve|neural)\s+(?:impulse|signal|pathway)", "Neural Signaling"),
+        (r"(?:respiratory|gas)\s+exchange", "Respiratory Function"),
+        (r"immune\s+(?:response|system|defense)", "Immune Response"),
+
+        # --- Pharmacology-specific ---
+        (r"(?:drug|receptor)\s+(?:binding|interaction)", "Drug-Receptor Interaction"),
+        (r"(?:pharmacokinetics|absorption.*?distribution)", "Pharmacokinetics"),
+        (r"(?:dose|therapeutic)\s+(?:response|index)", "Dose-Response"),
+
+        # --- Pathology-specific ---
+        (r"(?:inflammation|inflammatory)\s+(?:response|process)", "Inflammatory Response"),
+        (r"(?:neoplasia|tumor|cancer)\s+(?:development|growth)", "Neoplasia"),
+        (r"(?:necrosis|apoptosis|cell\s+death)", "Cell Death Mechanisms"),
     ]
 
     for pattern, name in topic_patterns:
@@ -427,10 +513,15 @@ def extract_emphasis(text: str) -> tuple[str, list[EmphasisSignal]]:
 
     # Check if this is a complex/mechanism topic (these need deep understanding)
     text_lower = text.lower()
+    # Detect complex topics across ANY biomedical discipline
+    # These keywords signal multi-step mechanisms that need deep understanding
     is_complex_topic = any(kw in text_lower for kw in [
-        "class one", "class two", "class 1", "class 2", "baltimore",
         "mechanism", "pathway", "cycle", "process", "cascade",
-        "positive sense", "negative sense", "reverse transcriptase",
+        "classification", "categories", "types of", "classes of",
+        "step one", "step two", "step 1", "step 2", "first step",
+        "phase one", "phase two", "phase 1", "phase 2",
+        "positive sense", "negative sense", "depolarization",
+        "feedback loop", "signal transduction", "replication",
     ])
 
     # Score based on signals
@@ -472,31 +563,66 @@ def extract_emphasis(text: str) -> tuple[str, list[EmphasisSignal]]:
 # Term extraction and prerequisite mapping (zero tokens)
 # ---------------------------------------------------------------------------
 
-def extract_technical_terms(text: str) -> list[str]:
+def extract_technical_terms(text: str, use_llm: bool = True) -> list[str]:
     """Extract technical/scientific terms from text.
 
-    Uses seed terms + heuristics to find domain-specific vocabulary.
+    Primary: Uses Gemini Flash to extract exam-relevant medical/scientific terms.
+    Fallback: Uses seed terms + heuristics if LLM fails.
+    Flash cost: ~100 tokens per chunk — negligible.
     """
+    if use_llm:
+        try:
+            return _extract_terms_with_flash(text)
+        except Exception as e:
+            print(f"  Flash term extraction failed, falling back to heuristic: {e}")
+
+    # Fallback: seed terms + regex heuristics
+    return _extract_terms_heuristic(text)
+
+
+def _extract_terms_with_flash(text: str) -> list[str]:
+    """Use Gemini Flash to extract technical terms — works for ANY medical discipline."""
+    from google import genai
+    from src.config import GCP_PROJECT_ID, GCP_LOCATION, CHUNKER_FALLBACK_MODEL
+    import json as _json
+
+    prompt = (
+        "Extract the technical and medical terms from this lecture transcript excerpt "
+        "that a student would need to know for an exam. Include scientific names, "
+        "processes, structures, classifications, techniques, and diseases.\n\n"
+        "Return ONLY a JSON array of strings, e.g.: [\"mitochondria\", \"action potential\", \"endocytosis\"]\n\n"
+        f"TRANSCRIPT:\n\"\"\"\n{text[:2000]}\n\"\"\""
+    )
+
+    client = genai.Client(vertexai=True, project=GCP_PROJECT_ID, location=GCP_LOCATION)
+    response = client.models.generate_content(
+        model=CHUNKER_FALLBACK_MODEL,
+        contents=prompt,
+        config={"temperature": 0.1, "max_output_tokens": 512},
+    )
+    from src.json_repair import extract_json
+    terms = extract_json(response.text, expect_array=True)
+    return sorted(set(str(t).lower().strip() for t in terms if t))
+
+
+def _extract_terms_heuristic(text: str) -> list[str]:
+    """Fallback: extract terms using seed list + regex patterns."""
     text_lower = text.lower()
     found = []
 
-    # Check seed terms
     for term in SEED_TERMS:
         if term in text_lower:
             found.append(term)
 
     # Heuristic: find capitalized multi-word phrases that look technical
-    # e.g., "Baltimore classification", "Tobacco mosaic virus"
     tech_phrases = re.findall(r'[A-Z][a-z]+(?:\s+[a-z]+){0,2}(?:\s+[A-Z][a-z]+)*', text)
     for phrase in tech_phrases:
         p_lower = phrase.lower()
         if len(p_lower) > 4 and p_lower not in {"okay", "well", "yeah", "right", "sorry"}:
-            # Check if it looks like a technical term (contains bio/sci words)
-            if any(w in p_lower for w in ["virus", "phage", "protein", "acid", "cell", "gene",
+            if any(w in p_lower for w in ["protein", "acid", "cell", "gene",
                                            "membrane", "cycle", "ase", "osis", "tion", "ular"]):
                 found.append(p_lower)
 
-    # Deduplicate and sort
     return sorted(set(found))
 
 
@@ -738,17 +864,8 @@ Rules:
 """
 
         response = client.models.generate_content(model=CHUNKER_FALLBACK_MODEL, contents=prompt)
-        response_text = response.text.strip()
-
-        # Parse JSON from response
-        import json
-        # Handle markdown code blocks
-        if "```" in response_text:
-            response_text = response_text.split("```")[1]
-            if response_text.startswith("json"):
-                response_text = response_text[4:]
-
-        splits = json.loads(response_text.strip())
+        from src.json_repair import extract_json
+        splits = extract_json(response.text, expect_array=True)
 
         if not isinstance(splits, list) or len(splits) < 2:
             return None

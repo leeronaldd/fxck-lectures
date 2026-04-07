@@ -1,0 +1,200 @@
+@import "tailwindcss";
+
+:root {
+  --bg-primary: #0D0D0D;
+  --bg-surface: #1A1A1A;
+  --bg-elevated: #242424;
+  --border: #2A2A2A;
+  --border-hover: #3A3A3A;
+  --text-primary: #F5F5F5;
+  --text-secondary: #999999;
+  --text-muted: #666666;
+  --accent: #FF6B35;
+  --accent-hover: #FF8555;
+  --accent-dim: rgba(255, 107, 53, 0.15);
+  --ci-critical: #FF4444;
+  --ci-high: #FFB020;
+  --ci-medium: #666666;
+  --ci-low: #333333;
+  --exam-bg: rgba(255, 176, 32, 0.1);
+  --exam-border: rgba(255, 176, 32, 0.3);
+  --skip-bg: rgba(255, 255, 255, 0.03);
+  --skip-border: #2A2A2A;
+}
+
+@theme inline {
+  --color-background: var(--bg-primary);
+  --color-foreground: var(--text-primary);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* scroll-behavior handled in JS for reliability */
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-hover);
+}
+
+/* Document content typography */
+.doc-content {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 18px;
+  line-height: 1.75;
+  color: var(--text-primary);
+}
+
+.doc-content h2 {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin-top: 3rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+}
+
+.doc-content h3 {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+  color: var(--text-primary);
+}
+
+.doc-content p {
+  margin-bottom: 1.25rem;
+}
+
+.doc-content strong {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.doc-content em {
+  color: var(--text-secondary);
+}
+
+.doc-content ul, .doc-content ol {
+  margin-bottom: 1.25rem;
+  padding-left: 1.5rem;
+}
+
+.doc-content li {
+  margin-bottom: 0.75rem;
+}
+
+.doc-content li strong {
+  color: var(--accent);
+}
+
+.doc-content hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2.5rem 0;
+}
+
+.doc-content img {
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin: 1.5rem 0;
+  max-width: 100%;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.doc-content img:hover {
+  border-color: var(--accent);
+}
+
+/* Skip line styling */
+.skip-line {
+  background: var(--skip-bg);
+  border: 1px solid var(--skip-border);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin: 1.5rem 0;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.skip-line .ci-badge {
+  background: var(--ci-low);
+  color: var(--text-secondary);
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Exam alert styling */
+.exam-alert {
+  background: var(--exam-bg);
+  border-left: 3px solid var(--exam-border);
+  border-radius: 0 8px 8px 0;
+  padding: 1rem 1.25rem;
+  margin: 1.5rem 0;
+}
+
+/* TOC active section */
+.toc-item {
+  transition: all 0.15s ease;
+}
+
+.toc-item.active {
+  background: var(--accent-dim);
+  border-left-color: var(--accent);
+}
+
+/* Lightbox */
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.9);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  animation: fadeIn 0.2s ease;
+}
+
+.lightbox-overlay img {
+  max-width: 90vw;
+  max-height: 90vh;
+  border-radius: 8px;
+  border: none;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Trust bar */
+.trust-bar {
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border);
+}
