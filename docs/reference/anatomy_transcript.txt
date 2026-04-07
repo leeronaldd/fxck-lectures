@@ -1,0 +1,77 @@
+Topic 2.5b The physiology of muscle contraction
+
+Slide 1
+Acknowledgement of country
+
+Slide 2
+Welcome back to Module 2 of 1016MSC - 'the muscular system'. This is the last of the minilectures for this module. In this lecture, topic 2.5 part B, we will finish discussing the physiology of muscle contraction.
+
+Slide 3
+The learning outcomes for topic 2.5b are to be able to:
+- Define a 'motor unit'.
+- Outline the difference between hypertrophy and hyperplasia with respect to skeletal muscle enlargement
+- Briefly describe 3 biochemical pathways for skeletal muscle to generate ATP
+- Name 3 types of muscle fibres and describe how they rely on different cellular processes to obtain ATP.
+
+Slide 4
+What is a motor unit? A motor unit is the motor nerve or motor neuron and all of the muscle fibres that the motor neuron innervates. All muscle fibres are innervated by only one motor neuron, but one motor neuron may branch and innervate many muscle fibres. Motor units are all different sizes. Some motor units may only innervate 4 fibres, whereas other motor units may innervate 300 muscle fibres. Large motor units innervate a large number of muscle fibres. An example of this is the quadriceps muscle in the thigh. The quadriceps is a large muscle that creates a lot of power. Smaller motor units innervate a small number of muscle fibres. Smaller motor units are used for very small, delicate movements, such as those executed by the fingers during manipulative tasks. So large motor units are utilised for their strength and small unit motor units are used for fine control.
+
+Slide 5
+What might affect muscle contraction? There are 4 main factors:
+
+1. Increasing the frequency of the stimulus will cause the muscle to produce a greater force. This is because there is more calcium surrounding the muscle fibre, already available to participate in forming the next cross bridge cycle to stimulate the next contraction. Each time the muscle contracts, it doesn't always fully relax, but instead builds or piggybacks on the last one.
+
+2. Recruitment of motor units. The size principle states that the smallest motor units will be recruited first, producing small forces. Progressively, larger motor units are recruited to produce larger forces. If the stimulus is small, only a few motor units will be recruited to activate the muscle. However, in the case of a bigger stimulus or action potential, a larger number of units will be recruited to provide a greater contractile force.
+
+3. The size of the muscle fibres. Large muscle fibres will produce more tension and therefore a more forceful contraction. Regular resistance exercise can increase the size of a muscle and therefore the force it can produce. This process is called the treppe effect. The strength of the stimulus will also affect the force of contraction. The greater the strength of the stimulus, the greater the force output.
+
+4. The last factor to consider that affects muscle contraction is the degree of muscle stretch. If a muscle is stretched to its optimum before contraction, which is slightly beyond its resting length, it will produce a more forceful contraction. Think about the overlapping of actin and myosin in the sarcomeres. If a muscle is stretched so much that there is no overlap of the filaments the myosin heads have nothing to attach to and can't generate tension. On the other hand, if the sarcomeres are so compressed that the thin filaments interfere with each other, very little shortening can occur. Ideally, the muscle should be slightly stretched so that actin and myosin overlap, but there is room for more cross-bridge formation to occur and more forceful tension to develop.
+
+Slide 6
+What impact does exercise affect our muscles? Aerobic exercise improves oxygen delivery and utilisation by cells. With regular exercise training, more capillaries develop around the muscle fibres, optimising oxygen delivery. Aerobic exercise improves metabolism and promotes the production of more mitochondria in the cells, and myoglobin, a protein that carries oxygen in the muscle cell. All in all, aerobic training leads to more efficient muscle metabolism. An example of aerobic exercise is long distance running or endurance sports. Resistance exercise is more high intensity. It doesn't build stamina, but it does build strength and increase the size of the muscles. Hypertrophy refers to an increase in the size of individual muscle fibres (not the number of individual muscle fibres). The muscle fibres split a little bit and they branch out. There are more myofilaments, more myofibrils and connective tissue within those muscle cells, which result in them becoming larger. Hyperplasia refers to an increase in cell number, not cell size. This may occur for example as a result of a neoplasm, or a tumorous growth, but does not occur as a result of resistance exercise. Atrophy of a muscle means it gets smaller in size, which often happens if the muscle is not used. You've heard the saying 'if you don't use it, you lose it'! That's muscle atrophy! At the end of the day, any exercise is better than none. Prolonged periods of sitting and undertaking activities such as gaming or device use develops a sedentary lifestyle! So, it is important to incorporate regular movement breaks into your day!
+
+Slide 7
+There are different types of muscle contraction that we will consider.
+
+Muscle tone relates to the underlying tension within the muscle that exists even at rest. If a muscle contracts, and results in a change in the length of the muscle, it is called an isotonic contraction. Isotonic refers to a change in length of the muscle, but the tension remains the same. Muscles can change in length in 2 different ways. They can shorten or they can lengthen during an isotonic contraction. Let's use the sit up as an example, our abdominal muscles shorten during the sit-up phase - this is considered a concentric contraction. When we lay back down again, our muscles are still under tension, but the muscle is lengthening, not shortening - this is considered an eccentric contraction. Eccentric contractions cause micro tears in the muscle fibre which can result in some delayed muscle soreness after exercise (commonly referred to as DOMS). Both concentric and eccentric contractions are isotonic contractions: the muscle shortens or lengthens, while tension is maintained. In an isometric contraction does not change muscle length during the contraction, even though tension is developed. The myofilaments do bind and form cross bridges and create tension, but they do not slide past each other. So, the muscle neither shortens nor lengthens. An isometric contraction occurs if the load is greater than the force the muscle is able to develop. For example, trying to lift a car with one hand would create an isometric contraction in the biceps muscle.
+
+Slide 8
+Let's briefly discuss metabolism. Metabolism is how the body uses energy. ATP (adenosine triphosphate) is the only energy source used directly for contractile activities of a muscle. ATP is important for muscles as it powers the sliding filaments as well as the calcium and the sodium-potassium pumps. Skeletal muscle has a very high requirement for ATP and therefore needs a lot of ATP to be produced.
+
+ATP production is vital, as muscles store very limited reserves. There are 3 potential sources of ATP to power skeletal muscle contraction. These include,
+
+1. Direct phosphorylation of ADP by creatine phosphate. Creatine phosphate, a high energy molecule presents in muscles, regenerates ATP by transferring a phosphate group from creatine phosphate to ADP to create one molecule of ATP energy. This reaction takes place in the presence of creatine kinase, an enzyme that removes the phosphate molecule from creatine phosphate and adds it to ADP. As long as we have enough creatine kinase, we can produce these molecules of ATP. This source of ATP production can provide for maximum muscle power for around 15s (the same as a 100m race)
+
+2. As stored ATP & CP are exhausted, more ATP is produced anaerobically via the breakdown of glucose (either in the blood or stored in muscle) via a pathway called glycolysis. Glucose undergoes a stepwise process that produces pyruvic acid and 2 ATP molecules. This happens in all muscles when there is no oxygen available and only produces small amounts of energy. In addition to ATP, pyruvic acid is also produced. If there is no oxygen around to utilise the pyruvic acid it gets converted into lactic acid and is released into the blood where it might contribute to muscle soreness. The anaerobic pathway may be inefficient at producing ATP - but it is very quick so is ideal for moderate periods of exercise (between 30-40s).
+
+3. The 3rd process is via aerobic metabolism or aerobic cellular respiration, involving the production of 38 molecules of ATP in the presence of oxygen. Glucose and pyruvic acid and fatty acids and amino acids all come into the mitochondria and can be converted into ATP, but the one thing that is necessary for this process to occur is oxygen. This is aerobic respiration. So, in the first instance, for about the first 15 seconds of exercise, creatine phosphate is utilised to produce energy. If the exercise bout is a little bit longer, we need to utilise a different system, and this is glycolysis. Up to about 60 seconds of vigorous exercise utilises the stored ATP, plus the creatine phosphate and glycolysis. However, any exercise bout longer than about 1 minute will utilise aerobic respiration, requiring oxygen for the production of energy. The muscles that require glycolysis for energy production produce a huge amount of force, whereas the muscles that are utilised in aerobic respiration are used more for endurance activities and produce less force.
+
+Slide 9
+This slide outlines 3 processes utilised for creating energy for muscle contraction. The 1st few seconds of vigorous exercise, for example during a sprint, utilises the stored ATP molecules within the muscle. Beyond this, for up to 10 seconds of exercise, ATP is formed from creatine phosphate and ADP in the process of direct phosphorylation. If the exercise continues up to about a minute, glycogen stored in muscles is broken down to produce glucose in a process called anaerobic glycolysis. And finally, during prolonged duration exercise, for example going for a long run or bike ride, ATP is generated via the breakdown of several nutrient energy sources in the presence of oxygen via the aerobic pathway.
+
+Slide 10
+Image: Muscle metabolism
+
+Slide 11
+This slide shows the different fibre types that are present within a muscle. FO stands for fast oxidative, pink-coloured fibres, SO are slow oxidative, red coloured fibres and FG are the fast glycolytic fibres, or white fibres seen in a muscle cell. The colour of these muscle fibre types indicates the type of energy utilisation. Fast glycolytic fibres rely mostly on ATP to give them their energy. They rely on glycolysis, and they are white as they don't have a lot of capillaries surrounding them and therefore no oxygen to provide their energy. They are bigger, wider fibres that provide greater force. The slow oxidative fibres are red. They have lots of myoglobin, which is an oxygen carrying molecule, and lots of capillaries so they utilise oxygen to provide energy for endurance. The pink coloured muscle fibres lie in between as they share some of the characteristics of the other 2 muscle fibre types. These are the fast oxidative muscle fibres. A sprinter would have a higher proportion of fast glycolytic fibres whereas a marathon runner would have a higher proportion of slow oxidative fibres.
+
+Slide 12
+Let's summarise muscle fibre types:
+1. White fibres are fast twitch-glycolytic and are fatigable.
+2. Red fibres are slow-oxidative and fatigue resistant.
+3. While in between, we have pink fibres that are fast-oxidative.
+Different combinations are recruited for different actions or activities. Fast glycolytic fibres increase contractile velocity, whereas the slow oxidative fibres increase contractile duration. If only a small load is required to be lifted, a proportion of both fibres will be utilised.
+
+Slide 13
+The important concepts to understand from this table are the metabolic and structural characteristics that separate the different fibre types. Speed of contraction and myosin ATPase activity are what makes fast glycolytic fibres fast and slow oxidative fibres slow. ATPase is the enzyme that breaks that cross-bridge cycle so we can continue to contract faster. The primary pathway of ATP synthesis relates to whether or not the process utilises oxygen. Thus, slow oxidative and fast oxidative fibres produce ATP via aerobic respiration, and fast glycolytic fibres produce ATP via anaerobic glycolysis, in the absence of oxygen. Speed of contraction and the primary pathway of ATP synthesis is important to note here. If you can associate the structural features to suit the function you will have already learned everything on this table!
+
+Slide 14
+Activity: Review & Learn
+
+Slide 15
+Summary of key concepts
+- Define hypertrophy, atrophy and hyperplasia with respect to skeletal muscle.
+- 3 types of muscle fibres (fast glycolytic, slow oxidative, and fast oxidative) rely on different cellular processes to obtain ATP.
+- Cellular processes include use of direct phosphorylation, anaerobic pathway, and the aerobic pathway to produce ATP.
+- FG (white) fibres are engaged in short duration activities (FG - fast glycolytic)
+- SO (red) fibres are engaged in long duration activities (SO - slow oxidative)
