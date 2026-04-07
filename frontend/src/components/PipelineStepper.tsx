@@ -49,7 +49,7 @@ export default function PipelineStepper({
     } else if (stages[i].status === "running") {
       // Partial progress for running stage
       if (stages[i].hasSubProgress && stages[i].subTotal) {
-        completedWeight += (subProgress / stages[i].subTotal) * stages[i].weight;
+        completedWeight += (subProgress / (stages[i].subTotal ?? 1)) * stages[i].weight;
       } else {
         completedWeight += stages[i].weight * 0.5; // estimate 50%
       }

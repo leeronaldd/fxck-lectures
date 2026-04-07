@@ -93,7 +93,7 @@ export default function SettingsModal({ settings, onUpdate, onClose }: SettingsM
           </label>
           <div
             className="rounded-lg border px-3 divide-y"
-            style={{ borderColor: "var(--border)", divideColor: "var(--border)" }}
+            style={{ borderColor: "var(--border)" }}
           >
             <Toggle
               label="CI% Scoring"
