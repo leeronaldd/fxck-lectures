@@ -45,10 +45,11 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
   const components: Components = {
     // Fix image paths and add lightbox
     img: ({ src, alt, ...props }) => {
-      const fixedSrc = src?.replace(
+      const rawSrc = typeof src === "string" ? src : "";
+      const fixedSrc = rawSrc.replace(
         /^screenshots\//,
         "/data/screenshots/"
-      ) || "";
+      );
       return (
         // eslint-disable-next-line @next/next/no-img-element
         <img
