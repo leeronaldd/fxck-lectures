@@ -3,29 +3,79 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
+import { createClient } from "@/lib/supabase";
+import type { Provider } from "@supabase/supabase-js";
 
 type Tab = "signin" | "signup" | "magic";
 
 export default function SignInPage() {
   const router = useRouter();
-  const { signIn } = useAppStore();
+  const { user } = useAppStore();
   const [tab, setTab] = useState<Tab>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleOAuth = (provider: string) => {
-    signIn(`${provider} User`, `user@${provider.toLowerCase()}.com`);
+  // Redirect if already logged in
+  if (user.isLoggedIn) {
     router.push("/");
+    return null;
+  }
+
+  const handleOAuth = async (provider: Provider) => {
+    setError(null);
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: `${window.location.origin}/`,
+      },
+    });
+    if (error) setError(error.message);
   };
 
-  const handleEmailSignIn = (e: React.FormEvent) => {
+  const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email) {
-      signIn(email.split("@")[0], email);
-      router.push("/");
+    if (!email) return;
+    setError(null);
+    setMessage(null);
+    setLoading(true);
+
+    const supabase = createClient();
+
+    if (tab === "magic") {
+      const { error } = await supabase.auth.signInWithOtp({ email });
+      setLoading(false);
+      if (error) {
+        setError(error.message);
+      } else {
+        setMessage("Check your email for the magic link!");
+      }
+      return;
     }
+
+    if (tab === "signup") {
+      const { error } = await supabase.auth.signUp({ email, password });
+      setLoading(false);
+      if (error) {
+        setError(error.message);
+      } else {
+        setMessage("Check your email to confirm your account!");
+      }
+      return;
+    }
+
+    // Sign in
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setLoading(false);
+    if (error) {
+      setError(error.message);
+    }
+    // onAuthStateChange in AuthProvider handles redirect
   };
 
   return (
@@ -67,7 +117,7 @@ export default function SignInPage() {
               {(["signin", "signup", "magic"] as Tab[]).map((t) => (
                 <button
                   key={t}
-                  onClick={() => setTab(t)}
+                  onClick={() => { setTab(t); setError(null); setMessage(null); }}
                   className="flex-1 py-2 text-sm font-medium transition-colors"
                   style={{
                     background: tab === t ? "var(--accent)" : "transparent",
@@ -79,13 +129,30 @@ export default function SignInPage() {
               ))}
             </div>
 
+            {/* Error / Success messages */}
+            {error && (
+              <div
+                className="mb-4 px-3 py-2 rounded-lg text-sm"
+                style={{ background: "rgba(255,68,68,0.1)", color: "#FF4444", border: "1px solid rgba(255,68,68,0.2)" }}
+              >
+                {error}
+              </div>
+            )}
+            {message && (
+              <div
+                className="mb-4 px-3 py-2 rounded-lg text-sm"
+                style={{ background: "rgba(34,197,94,0.1)", color: "#22C55E", border: "1px solid rgba(34,197,94,0.2)" }}
+              >
+                {message}
+              </div>
+            )}
+
             {/* OAuth buttons — hidden on Magic Link tab */}
             {tab !== "magic" && (
               <>
                 <div className="space-y-2.5 mb-5">
-                  <OAuthButton icon="G" label="Sign in with Google" onClick={() => handleOAuth("Google")} />
-                  <OAuthButton icon="M" label="Sign in with Microsoft" onClick={() => handleOAuth("Microsoft")} />
-                  <OAuthButton icon="A" label="Sign in with Apple" onClick={() => handleOAuth("Apple")} />
+                  <OAuthButton icon="G" label="Sign in with Google" onClick={() => handleOAuth("google")} />
+                  <OAuthButton icon="M" label="Sign in with Microsoft" onClick={() => handleOAuth("azure")} />
                 </div>
 
                 <div className="flex items-center gap-3 mb-5">
@@ -166,10 +233,17 @@ export default function SignInPage() {
 
               <button
                 type="submit"
-                className="w-full py-2.5 rounded-lg text-sm font-semibold transition-colors"
+                disabled={loading}
+                className="w-full py-2.5 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
                 style={{ background: "var(--accent)", color: "#fff" }}
               >
-                {tab === "signin" ? "Sign In" : tab === "signup" ? "Create Account" : "Send Magic Link"}
+                {loading
+                  ? "Please wait..."
+                  : tab === "signin"
+                    ? "Sign In"
+                    : tab === "signup"
+                      ? "Create Account"
+                      : "Send Magic Link"}
               </button>
             </form>
 
@@ -209,8 +283,8 @@ function OAuthButton({
     >
       <span className="w-5 h-5 flex items-center justify-center text-xs font-bold rounded"
         style={{
-          background: icon === "G" ? "#4285F4" : icon === "M" ? "#00A4EF" : "#fff",
-          color: icon === "A" ? "#000" : "#fff",
+          background: icon === "G" ? "#4285F4" : "#00A4EF",
+          color: "#fff",
         }}
       >
         {icon}

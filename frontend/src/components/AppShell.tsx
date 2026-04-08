@@ -1,16 +1,33 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAppStore } from "@/lib/store";
 import AppSidebar from "./AppSidebar";
 
+const PROTECTED_PATHS = ["/processing", "/reader"];
+
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, toggleSidebar, sidebarOpen, settings, updateSettings } = useAppStore();
+  const { user, authLoading, toggleSidebar, sidebarOpen, settings, updateSettings } = useAppStore();
 
   const isSignInPage = pathname === "/signin";
   const isReaderPage = pathname === "/reader";
+
+  // Route protection
+  useEffect(() => {
+    if (authLoading) return;
+    // Redirect logged-in users away from sign-in
+    if (user.isLoggedIn && isSignInPage) {
+      router.push("/");
+      return;
+    }
+    // Protect processing/reader pages — guests must sign in
+    if (!user.isLoggedIn && PROTECTED_PATHS.includes(pathname)) {
+      router.push("/signin");
+    }
+  }, [user.isLoggedIn, authLoading, pathname, isSignInPage, router]);
 
   // Don't show app shell on sign-in page
   if (isSignInPage) {

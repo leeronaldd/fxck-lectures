@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
+import { createClient } from "@/lib/supabase";
 
 export default function AppSidebar() {
   const router = useRouter();
-  const { user, sessions, signOut, sidebarOpen } = useAppStore();
+  const { user, sessions, sidebarOpen } = useAppStore();
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
 
   if (!sidebarOpen) return null;
@@ -80,8 +81,9 @@ export default function AppSidebar() {
                   <div className="border-t border-[var(--border)]" />
                   <MenuItem
                     label="Log Out"
-                    onClick={() => {
-                      signOut();
+                    onClick={async () => {
+                      const supabase = createClient();
+                      await supabase.auth.signOut();
                       setAccountMenuOpen(false);
                     }}
                   />

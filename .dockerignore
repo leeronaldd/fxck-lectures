@@ -1,0 +1,15 @@
+frontend/
+node_modules/
+.git/
+.claude/
+dev-logs/
+docs/
+*.mp4
+*.wav
+*.mp3
+__pycache__/
+*.pyc
+.env*
+data/input/
+data/transcripts/
+data/output/_archive/

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { ConceptGroup, VerificationClaim, TrustStats } from "./types";
 import { computeTrustStats } from "./data";
+import { uploadFile, startProcessing, getJobStatus, getSessionOutput } from "./api";
 
 export interface PipelineStage {
   name: string;
@@ -25,6 +26,7 @@ export interface AppSettings {
 
 export interface UserState {
   isLoggedIn: boolean;
+  id: string;
   name: string;
   email: string;
   avatar: string | null;
@@ -40,8 +42,10 @@ export interface Session {
 interface AppState {
   // User
   user: UserState;
-  signIn: (name: string, email: string) => void;
-  signOut: () => void;
+  authLoading: boolean;
+  setUser: (user: UserState) => void;
+  clearUser: () => void;
+  setAuthLoading: (loading: boolean) => void;
 
   // Sessions
   sessions: Session[];
@@ -63,6 +67,7 @@ interface AppState {
   subProgress: number;
   isProcessing: boolean;
   isDone: boolean;
+  pipelineError: string | null;
   startPipeline: () => void;
   cancelPipeline: () => void;
 
@@ -108,16 +113,16 @@ const DEFAULT_SETTINGS: AppSettings = {
   dryRun: false,
 };
 
-let pipelineTimer: ReturnType<typeof setTimeout> | null = null;
-let subProgressTimer: ReturnType<typeof setInterval> | null = null;
+let pollTimer: ReturnType<typeof setInterval> | null = null;
 
 export const useAppStore = create<AppState>((set, get) => ({
   // User
-  user: { isLoggedIn: false, name: "Guest", email: "", avatar: null },
-  signIn: (name, email) =>
-    set({ user: { isLoggedIn: true, name, email, avatar: null } }),
-  signOut: () =>
-    set({ user: { isLoggedIn: false, name: "Guest", email: "", avatar: null } }),
+  user: { isLoggedIn: false, id: "", name: "Guest", email: "", avatar: null },
+  authLoading: true,
+  setUser: (user) => set({ user }),
+  clearUser: () =>
+    set({ user: { isLoggedIn: false, id: "", name: "Guest", email: "", avatar: null } }),
+  setAuthLoading: (loading) => set({ authLoading: loading }),
 
   // Sessions
   sessions: MOCK_SESSIONS,
@@ -139,81 +144,118 @@ export const useAppStore = create<AppState>((set, get) => ({
   subProgress: 0,
   isProcessing: false,
   isDone: false,
+  pipelineError: null,
 
   startPipeline: () => {
     const stages = DEFAULT_STAGES.map((s) => ({ ...s, status: "pending" as const }));
-    set({ stages, currentStageIndex: 0, subProgress: 0, isProcessing: true, isDone: false });
+    set({ stages, currentStageIndex: 0, subProgress: 0, isProcessing: true, isDone: false, pipelineError: null });
 
-    const runStage = (index: number) => {
-      if (index >= stages.length) {
-        // All done — load output
-        set({ isProcessing: false, isDone: true });
-        // Load existing v4 files as "output"
-        Promise.all([
-          fetch("/data/v4_lecture_replacement.md").then((r) => r.text()),
-          fetch("/data/v4_concept_groups.json").then((r) => r.json()),
-          fetch("/data/v4_verification_report.json").then((r) => r.json()),
-        ]).then(([md, groups, claims]) => {
-          get().setOutput(md, groups, claims);
-        });
-        return;
-      }
+    const file = get().transcriptFile || get().videoFile;
+    if (!file) {
+      set({ isProcessing: false, pipelineError: "No file selected" });
+      return;
+    }
 
-      // Mark current stage as running
-      set((state) => {
-        const newStages = [...state.stages];
-        newStages[index] = { ...newStages[index], status: "running" };
-        return { stages: newStages, currentStageIndex: index, subProgress: 0 };
-      });
-
-      // Simulate sub-progress for generation stage
-      if (stages[index].hasSubProgress) {
-        const subTotal = stages[index].subTotal || 8;
-        const interval = stages[index].mockDuration / subTotal;
-        let sub = 0;
-        subProgressTimer = setInterval(() => {
-          sub++;
-          set({ subProgress: sub });
-          if (sub >= subTotal && subProgressTimer) {
-            clearInterval(subProgressTimer);
-            subProgressTimer = null;
-          }
-        }, interval);
-      }
-
-      // Complete stage after mock duration
-      pipelineTimer = setTimeout(() => {
-        if (subProgressTimer) {
-          clearInterval(subProgressTimer);
-          subProgressTimer = null;
-        }
-
+    // Upload → process → poll
+    (async () => {
+      try {
+        // Upload file
         set((state) => {
-          const newStages = [...state.stages];
-          newStages[index] = {
-            ...newStages[index],
-            status: "done",
-            result: newStages[index].mockResult,
-          };
-          return { stages: newStages };
+          const s = [...state.stages];
+          s[0] = { ...s[0], status: "running" };
+          return { stages: s, currentStageIndex: 0 };
         });
 
-        // Run next stage
-        runStage(index + 1);
-      }, stages[index].mockDuration);
-    };
+        const { file_id } = await uploadFile(file);
 
-    runStage(0);
+        // Start processing
+        const { job_id } = await startProcessing(file_id, file.name);
+
+        // Poll for status
+        const poll = setInterval(async () => {
+          try {
+            const status = await getJobStatus(job_id);
+
+            // Map backend stage name to frontend stage index
+            const stageMap: Record<string, number> = {
+              "Chunking transcript": 0,
+              "Scoring exam importance": 1,
+              "Transcribing lecture": 2,
+              "Grouping concepts": 3,
+              "Generating explanations": 4,
+              "Verifying sources": 5,
+              "Checking completeness": 6,
+              "Inserting slide references": 7,
+              "Assembling final document": 8,
+              "Done": 8,
+            };
+
+            const stageIndex = status.current_stage ? (stageMap[status.current_stage] ?? -1) : -1;
+
+            // Update stages
+            set((state) => {
+              const newStages = [...state.stages];
+              for (let i = 0; i < newStages.length; i++) {
+                if (i < stageIndex) {
+                  newStages[i] = { ...newStages[i], status: "done" };
+                } else if (i === stageIndex) {
+                  newStages[i] = { ...newStages[i], status: "running" };
+                }
+              }
+              return { stages: newStages, currentStageIndex: stageIndex, subProgress: status.progress };
+            });
+
+            if (status.status === "done") {
+              clearInterval(poll);
+              pollTimer = null;
+
+              // Mark all stages done
+              set((state) => {
+                const newStages = state.stages.map((s) => ({ ...s, status: "done" as const }));
+                return { stages: newStages, isProcessing: false, isDone: true };
+              });
+
+              // Fetch output
+              try {
+                const output = await getSessionOutput(job_id);
+                get().setOutput(
+                  output.markdown,
+                  (output.concept_groups || []) as ConceptGroup[],
+                  (output.verification_report || []) as VerificationClaim[],
+                );
+              } catch {
+                // Fall back to static files
+                const [md, groups, claims] = await Promise.all([
+                  fetch("/data/v4_lecture_replacement.md").then((r) => r.text()),
+                  fetch("/data/v4_concept_groups.json").then((r) => r.json()),
+                  fetch("/data/v4_verification_report.json").then((r) => r.json()),
+                ]);
+                get().setOutput(md, groups, claims);
+              }
+            } else if (status.status === "error") {
+              clearInterval(poll);
+              pollTimer = null;
+              set({ isProcessing: false, pipelineError: status.error || "Pipeline failed" });
+            }
+          } catch {
+            // Polling error — continue trying
+          }
+        }, 2000);
+
+        pollTimer = poll;
+      } catch (err) {
+        set({ isProcessing: false, pipelineError: err instanceof Error ? err.message : "Upload failed" });
+      }
+    })();
   },
 
   cancelPipeline: () => {
-    if (pipelineTimer) clearTimeout(pipelineTimer);
-    if (subProgressTimer) clearInterval(subProgressTimer);
-    pipelineTimer = null;
-    subProgressTimer = null;
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = null;
     set({
       isProcessing: false,
       isDone: false,
+      pipelineError: null,
       currentStageIndex: -1,
       stages: DEFAULT_STAGES.map((s) => ({ ...s })),
     });
@@ -237,8 +279,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // Reset
   reset: () => {
-    if (pipelineTimer) clearTimeout(pipelineTimer);
-    if (subProgressTimer) clearInterval(subProgressTimer);
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = null;
     set({
       transcriptFile: null,
       videoFile: null,

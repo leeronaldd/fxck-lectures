@@ -15,7 +15,14 @@ export default function UploadPage() {
     startPipeline,
   } = useAppStore();
 
+  const { user } = useAppStore();
+
   const handleGenerate = () => {
+    // Guest users must sign in before processing
+    if (!user.isLoggedIn) {
+      router.push("/signin");
+      return;
+    }
     startPipeline();
     router.push("/processing");
   };

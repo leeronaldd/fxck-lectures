@@ -7,7 +7,7 @@ import PipelineStepper from "@/components/PipelineStepper";
 
 export default function ProcessingPage() {
   const router = useRouter();
-  const { stages, currentStageIndex, subProgress, isProcessing, isDone, cancelPipeline } =
+  const { stages, currentStageIndex, subProgress, isProcessing, isDone, pipelineError, cancelPipeline } =
     useAppStore();
 
   // Redirect to reader when done
@@ -18,12 +18,12 @@ export default function ProcessingPage() {
     }
   }, [isDone, router]);
 
-  // Redirect to home only if pipeline was never started
+  // Redirect to home only if pipeline was never started (and no error)
   useEffect(() => {
-    if (!isProcessing && !isDone && currentStageIndex === -1) {
+    if (!isProcessing && !isDone && !pipelineError && currentStageIndex === -1) {
       router.replace("/");
     }
-  }, [isProcessing, isDone, currentStageIndex, router]);
+  }, [isProcessing, isDone, pipelineError, currentStageIndex, router]);
 
   const handleCancel = () => {
     cancelPipeline();
@@ -36,14 +36,16 @@ export default function ProcessingPage() {
         <div className="text-center mb-8">
           <h1
             className="text-xl font-bold mb-1"
-            style={{ color: "var(--text-primary)", fontFamily: "system-ui, sans-serif" }}
+            style={{ color: pipelineError ? "#FF4444" : "var(--text-primary)", fontFamily: "system-ui, sans-serif" }}
           >
-            {isDone ? "Ready!" : "Transforming your lecture..."}
+            {pipelineError ? "Something went wrong" : isDone ? "Ready!" : "Transforming your lecture..."}
           </h1>
           <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-            {isDone
-              ? "Your lecture replacement is ready to read."
-              : "This usually takes a few minutes. You can watch the progress below."}
+            {pipelineError
+              ? pipelineError
+              : isDone
+                ? "Your lecture replacement is ready to read."
+                : "This usually takes a few minutes. You can watch the progress below."}
           </p>
         </div>
 
@@ -59,7 +61,16 @@ export default function ProcessingPage() {
         </div>
 
         <div className="mt-6 flex justify-center gap-3">
-          {!isDone && (
+          {pipelineError && (
+            <button
+              onClick={() => { cancelPipeline(); router.push("/"); }}
+              className="px-6 py-2.5 text-sm font-semibold rounded-xl transition-colors"
+              style={{ background: "var(--accent)", color: "#fff" }}
+            >
+              Try Again
+            </button>
+          )}
+          {!isDone && !pipelineError && (
             <button
               onClick={handleCancel}
               className="px-4 py-2 text-sm rounded-lg border transition-colors hover:bg-[var(--bg-surface)]"
