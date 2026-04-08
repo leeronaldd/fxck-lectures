@@ -76,7 +76,7 @@ def run_pipeline(input_path: str) -> Generator[dict, None, None]:
 
         # --- Step 4: Load groups with transcripts ---
         from src.concept_grouper import load_groups_with_transcripts
-        groups_with_text = load_groups_with_transcripts(str(groups_path), chunks)
+        groups_with_text = load_groups_with_transcripts(str(groups_path), str(chunks_path))
 
         # --- Step 5: Generation ---
         yield {"status": "running", "stage": "Generating explanations", "progress": 35}
