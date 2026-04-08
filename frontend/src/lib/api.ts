@@ -8,16 +8,34 @@ async function getToken(): Promise<string> {
   return session?.access_token || "";
 }
 
-export async function uploadFile(file: File): Promise<{ file_id: string; filename: string }> {
+export async function uploadFile(
+  file: File,
+  onProgress?: (percent: number) => void,
+): Promise<{ file_id: string; filename: string }> {
   const token = await getToken();
+  console.log("[Upload] Starting upload, token length:", token.length, "file:", file.name, file.size);
+
+  if (onProgress) onProgress(10);
+
   const formData = new FormData();
   formData.append("file", file);
+
   const res = await fetch(`${API_URL}/api/upload`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: formData,
   });
-  if (!res.ok) throw new Error(`Upload failed: ${res.statusText}`);
+
+  if (onProgress) onProgress(90);
+  console.log("[Upload] Response:", res.status, res.statusText);
+
+  if (!res.ok) {
+    const body = await res.text();
+    console.error("[Upload] Error body:", body);
+    throw new Error(`Upload failed: ${res.status} ${res.statusText}`);
+  }
+
+  if (onProgress) onProgress(100);
   return res.json();
 }
 
