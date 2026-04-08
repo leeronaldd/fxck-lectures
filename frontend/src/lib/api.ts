@@ -1,11 +1,24 @@
 import { createClient } from "./supabase";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/+$/, "");
+if (typeof window !== "undefined") {
+  console.log("[API] URL:", API_URL);
+}
 
 async function getToken(): Promise<string> {
-  const supabase = createClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  return session?.access_token || "";
+  try {
+    const supabase = createClient();
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) {
+      console.error("[Auth] getSession error:", error.message);
+      return "";
+    }
+    console.log("[Auth] Got token, length:", session?.access_token?.length || 0);
+    return session?.access_token || "";
+  } catch (e) {
+    console.error("[Auth] getToken crashed:", e);
+    return "";
+  }
 }
 
 export async function uploadFile(
