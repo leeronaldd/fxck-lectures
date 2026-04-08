@@ -24,7 +24,7 @@ export default function ReaderPage() {
   });
   const [loading, setLoading] = useState(true);
 
-  // Auto-collapse app sidebar on reader page
+  // Auto-collapse app sidebar on reader page (user can re-open with hamburger)
   useEffect(() => {
     store.setSidebarOpen(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -33,7 +33,7 @@ export default function ReaderPage() {
   // Load data — from store if available, fallback to static files
   useEffect(() => {
     async function load() {
-      if (store.markdown && store.groups.length > 0) {
+      if (store.markdown) {
         setMarkdown(store.markdown);
         setGroups(store.groups);
         setTrustStats(store.trustStats);
@@ -78,7 +78,7 @@ export default function ReaderPage() {
     <div className="flex flex-1 overflow-x-hidden">
       {/* Document */}
       <div className="flex-1 min-w-0 overflow-x-hidden">
-        <div className="max-w-[720px] mx-auto px-6 lg:px-12 py-8 pb-16 overflow-hidden">
+        <div className="max-w-[820px] mx-auto px-6 lg:px-16 py-8 pb-16 overflow-hidden">
           <MarkdownRenderer content={markdown} />
         </div>
       </div>
