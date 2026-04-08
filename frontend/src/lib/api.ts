@@ -8,18 +8,27 @@ async function authFetch(path: string, options: RequestInit = {}): Promise<Respo
     data: { session },
   } = await supabase.auth.getSession();
 
-  const headers: Record<string, string> = {
-    ...(options.headers as Record<string, string>),
-  };
+  const headers: Record<string, string> = {};
+
+  // Only spread non-FormData headers (don't override Content-Type for file uploads)
+  if (options.headers) {
+    Object.assign(headers, options.headers);
+  }
 
   if (session?.access_token) {
     headers["Authorization"] = `Bearer ${session.access_token}`;
   }
 
-  return fetch(`${API_URL}${path}`, {
+  const url = `${API_URL}${path}`;
+  console.log(`[API] ${options.method || "GET"} ${url}`, { hasToken: !!session?.access_token });
+
+  const res = await fetch(url, {
     ...options,
     headers,
   });
+
+  console.log(`[API] Response: ${res.status} ${res.statusText}`);
+  return res;
 }
 
 export async function uploadFile(file: File): Promise<{ file_id: string; filename: string }> {

@@ -244,6 +244,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
         pollTimer = poll;
       } catch (err) {
+        console.error("[Pipeline] Error:", err);
         set({ isProcessing: false, pipelineError: err instanceof Error ? err.message : "Upload failed" });
       }
     })();
