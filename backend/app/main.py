@@ -1,8 +1,10 @@
 """FastAPI backend for Fxck Lectures — wraps the Python pipeline as REST API."""
 
+import asyncio
 import json
 import os
 import shutil
+import threading
 import uuid
 from pathlib import Path
 
@@ -59,27 +61,62 @@ async def run_pipeline_stream(
 ):
     """Run the pipeline and stream progress via SSE.
 
-    The pipeline runs synchronously inside this request — the SSE connection
-    keeps Cloud Run alive for the entire duration (up to 900s timeout).
+    The pipeline runs in a background thread. The async generator sends
+    keepalive comments every 10 seconds to prevent Cloud Run from killing
+    the instance during long-running stages (e.g., Gemini generation).
     """
-    # Find the uploaded file
     matching = list(UPLOAD_DIR.glob(f"{file_id}.*"))
     if not matching:
         raise HTTPException(status_code=404, detail="File not found")
 
     input_path = str(matching[0])
 
-    def event_stream():
+    # Shared state between pipeline thread and async generator
+    events: list[dict] = []
+    finished = False
+    lock = threading.Lock()
+
+    def pipeline_worker():
+        nonlocal finished
         from app.pipeline import run_pipeline
 
         for progress in run_pipeline(input_path):
-            data = json.dumps({
-                "status": progress.get("status", "running"),
-                "current_stage": progress.get("stage"),
-                "progress": progress.get("progress", 0),
-                "error": progress.get("error"),
-                "output": progress.get("output"),
-            })
-            yield f"data: {data}\n\n"
+            with lock:
+                events.append(progress)
+        with lock:
+            finished = True
+
+    # Start pipeline in background thread
+    thread = threading.Thread(target=pipeline_worker, daemon=True)
+    thread.start()
+
+    async def event_stream():
+        sent = 0
+        while True:
+            with lock:
+                new_events = events[sent:]
+                is_finished = finished
+
+            for progress in new_events:
+                data = json.dumps({
+                    "status": progress.get("status", "running"),
+                    "current_stage": progress.get("stage"),
+                    "progress": progress.get("progress", 0),
+                    "error": progress.get("error"),
+                    "output": progress.get("output"),
+                })
+                yield f"data: {data}\n\n"
+                sent += 1
+
+                # Stop if done or error
+                if progress.get("status") in ("done", "error"):
+                    return
+
+            if is_finished:
+                return
+
+            # Send keepalive comment every iteration to prevent Cloud Run timeout
+            yield ": keepalive\n\n"
+            await asyncio.sleep(5)
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
