@@ -110,10 +110,27 @@ def run_pipeline(input_path: str) -> Generator[dict, None, None]:
         # --- Step 8: Assembly ---
         yield {"status": "running", "stage": "Assembling final document", "progress": 95}
 
-        # Read outputs
-        markdown = Path(output_path).read_text(encoding="utf-8") if Path(output_path).exists() else ""
-        concept_groups = json.loads(groups_path.read_text(encoding="utf-8")) if groups_path.exists() else []
-        verification = json.loads(verification_path.read_text(encoding="utf-8")) if verification_path.exists() else []
+        # Read outputs — the generator saves JSON, so assemble markdown from explanation_text fields
+        markdown = ""
+        concept_groups = []
+        verification = []
+
+        if Path(output_path).exists():
+            raw = json.loads(Path(output_path).read_text(encoding="utf-8"))
+            # Assemble markdown from explanation_text fields
+            md_parts = []
+            for exp in raw:
+                if isinstance(exp, dict):
+                    text = exp.get("explanation_text", "")
+                    topic = exp.get("topic_name", "")
+                    if text and not exp.get("was_skipped", False):
+                        md_parts.append(f"## {topic}\n\n{text}")
+            markdown = "\n\n---\n\n".join(md_parts)
+
+        if groups_path.exists():
+            concept_groups = json.loads(groups_path.read_text(encoding="utf-8"))
+        if verification_path.exists():
+            verification = json.loads(verification_path.read_text(encoding="utf-8"))
 
         yield {
             "status": "done",
