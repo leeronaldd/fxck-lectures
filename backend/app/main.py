@@ -1,5 +1,7 @@
 """FastAPI backend for Fxck Lectures — wraps the Python pipeline as REST API."""
 
+import asyncio
+import json
 import os
 import shutil
 import uuid
@@ -7,6 +9,7 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 from app.auth import get_current_user
 from app.models import (
@@ -99,6 +102,43 @@ async def get_status(
         progress=job.get("progress", 0),
         error=job.get("error"),
     )
+
+
+@app.get("/api/stream/{job_id}")
+async def stream_status(
+    job_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """SSE stream of pipeline progress. Keeps the connection alive until done/error."""
+    from fastapi import HTTPException
+
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job["user_id"] != user["id"]:
+        raise HTTPException(status_code=403, detail="Not your job")
+
+    async def event_stream():
+        while True:
+            job = get_job(job_id)
+            if not job:
+                break
+
+            data = json.dumps({
+                "job_id": job_id,
+                "status": job["status"],
+                "current_stage": job.get("stage"),
+                "progress": job.get("progress", 0),
+                "error": job.get("error"),
+            })
+            yield f"data: {data}\n\n"
+
+            if job["status"] in ("done", "error"):
+                break
+
+            await asyncio.sleep(2)
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 @app.get("/api/sessions", response_model=list[SessionSummary])

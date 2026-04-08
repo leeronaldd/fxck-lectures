@@ -66,6 +66,73 @@ export async function getJobStatus(jobId: string): Promise<JobStatusResponse> {
   return res.json();
 }
 
+export function streamJobStatus(
+  jobId: string,
+  onUpdate: (status: JobStatusResponse) => void,
+  onError: (error: string) => void,
+  onDone: () => void,
+): () => void {
+  let cancelled = false;
+
+  (async () => {
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || "";
+
+      const res = await fetch(`${API_URL}/api/stream/${jobId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) {
+        onError(`Stream failed: ${res.statusText}`);
+        return;
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) {
+        onError("No response body");
+        return;
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (!cancelled) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const data = JSON.parse(line.slice(6)) as JobStatusResponse;
+            onUpdate(data);
+
+            if (data.status === "done") {
+              onDone();
+              return;
+            }
+            if (data.status === "error") {
+              onError(data.error || "Pipeline failed");
+              return;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      if (!cancelled) {
+        onError(e instanceof Error ? e.message : "Stream connection lost");
+      }
+    }
+  })();
+
+  // Return cancel function
+  return () => { cancelled = true; };
+}
+
 export async function getSessions(): Promise<
   { id: string; name: string; created_at: string; status: string; groups_count: number }[]
 > {

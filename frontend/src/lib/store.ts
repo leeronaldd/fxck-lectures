@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { ConceptGroup, VerificationClaim, TrustStats } from "./types";
 import { computeTrustStats } from "./data";
-import { uploadFile, startProcessing, getJobStatus, getSessionOutput } from "./api";
+import { uploadFile, startProcessing, streamJobStatus, getSessionOutput } from "./api";
 
 export interface PipelineStage {
   name: string;
@@ -113,7 +113,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   dryRun: false,
 };
 
-let pollTimer: ReturnType<typeof setInterval> | null = null;
+let cancelStream: (() => void) | null = null;
 
 export const useAppStore = create<AppState>((set, get) => ({
   // User
@@ -156,10 +156,22 @@ export const useAppStore = create<AppState>((set, get) => ({
       return;
     }
 
-    // Upload → process → poll
+    const stageMap: Record<string, number> = {
+      "Chunking transcript": 0,
+      "Scoring exam importance": 1,
+      "Transcribing lecture": 2,
+      "Grouping concepts": 3,
+      "Generating explanations": 4,
+      "Verifying sources": 5,
+      "Checking completeness": 6,
+      "Inserting slide references": 7,
+      "Assembling final document": 8,
+      "Done": 8,
+    };
+
+    // Upload → process → stream status via SSE
     (async () => {
       try {
-        // Upload file
         set((state) => {
           const s = [...state.stages];
           s[0] = { ...s[0], status: "running" };
@@ -167,32 +179,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         });
 
         const { file_id } = await uploadFile(file);
-
-        // Start processing
         const { job_id } = await startProcessing(file_id, file.name);
 
-        // Poll for status
-        const poll = setInterval(async () => {
-          try {
-            const status = await getJobStatus(job_id);
-
-            // Map backend stage name to frontend stage index
-            const stageMap: Record<string, number> = {
-              "Chunking transcript": 0,
-              "Scoring exam importance": 1,
-              "Transcribing lecture": 2,
-              "Grouping concepts": 3,
-              "Generating explanations": 4,
-              "Verifying sources": 5,
-              "Checking completeness": 6,
-              "Inserting slide references": 7,
-              "Assembling final document": 8,
-              "Done": 8,
-            };
-
+        // Stream progress via SSE (keeps Cloud Run connection alive)
+        cancelStream = streamJobStatus(
+          job_id,
+          // onUpdate
+          (status) => {
             const stageIndex = status.current_stage ? (stageMap[status.current_stage] ?? -1) : -1;
-
-            // Update stages
             set((state) => {
               const newStages = [...state.stages];
               for (let i = 0; i < newStages.length; i++) {
@@ -204,45 +198,38 @@ export const useAppStore = create<AppState>((set, get) => ({
               }
               return { stages: newStages, currentStageIndex: stageIndex, subProgress: status.progress };
             });
+          },
+          // onError
+          (error) => {
+            cancelStream = null;
+            set({ isProcessing: false, pipelineError: error });
+          },
+          // onDone
+          async () => {
+            cancelStream = null;
+            set((state) => {
+              const newStages = state.stages.map((s) => ({ ...s, status: "done" as const }));
+              return { stages: newStages, isProcessing: false, isDone: true };
+            });
 
-            if (status.status === "done") {
-              clearInterval(poll);
-              pollTimer = null;
-
-              // Mark all stages done
-              set((state) => {
-                const newStages = state.stages.map((s) => ({ ...s, status: "done" as const }));
-                return { stages: newStages, isProcessing: false, isDone: true };
-              });
-
-              // Fetch output
-              try {
-                const output = await getSessionOutput(job_id);
-                get().setOutput(
-                  output.markdown,
-                  (output.concept_groups || []) as ConceptGroup[],
-                  (output.verification_report || []) as VerificationClaim[],
-                );
-              } catch {
-                // Fall back to static files
-                const [md, groups, claims] = await Promise.all([
-                  fetch("/data/v4_lecture_replacement.md").then((r) => r.text()),
-                  fetch("/data/v4_concept_groups.json").then((r) => r.json()),
-                  fetch("/data/v4_verification_report.json").then((r) => r.json()),
-                ]);
-                get().setOutput(md, groups, claims);
-              }
-            } else if (status.status === "error") {
-              clearInterval(poll);
-              pollTimer = null;
-              set({ isProcessing: false, pipelineError: status.error || "Pipeline failed" });
+            // Fetch output
+            try {
+              const output = await getSessionOutput(job_id);
+              get().setOutput(
+                output.markdown,
+                (output.concept_groups || []) as ConceptGroup[],
+                (output.verification_report || []) as VerificationClaim[],
+              );
+            } catch {
+              const [md, groups, claims] = await Promise.all([
+                fetch("/data/v4_lecture_replacement.md").then((r) => r.text()),
+                fetch("/data/v4_concept_groups.json").then((r) => r.json()),
+                fetch("/data/v4_verification_report.json").then((r) => r.json()),
+              ]);
+              get().setOutput(md, groups, claims);
             }
-          } catch {
-            // Polling error — continue trying
-          }
-        }, 2000);
-
-        pollTimer = poll;
+          },
+        );
       } catch (err) {
         console.error("[Pipeline] Error:", err);
         set({ isProcessing: false, pipelineError: err instanceof Error ? err.message : "Upload failed" });
@@ -251,8 +238,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   cancelPipeline: () => {
-    if (pollTimer) clearInterval(pollTimer);
-    pollTimer = null;
+    if (cancelStream) cancelStream();
+    cancelStream = null;
     set({
       isProcessing: false,
       isDone: false,
@@ -280,8 +267,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // Reset
   reset: () => {
-    if (pollTimer) clearInterval(pollTimer);
-    pollTimer = null;
+    if (cancelStream) cancelStream();
+    cancelStream = null;
     set({
       transcriptFile: null,
       videoFile: null,
