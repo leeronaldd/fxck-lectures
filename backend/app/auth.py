@@ -28,8 +28,7 @@ async def _get_jwks() -> dict:
 async def get_current_user(request: Request) -> dict:
     """Extract and verify Supabase JWT from Authorization header.
 
-    Uses Supabase's JWKS endpoint to get the public key for RS256 verification.
-    Falls back to HS256 with SUPABASE_JWT_SECRET if set.
+    Uses Supabase's JWKS endpoint for verification. Supports ES256, RS256, and HS256.
     """
     auth_header = request.headers.get("authorization", "")
     if not auth_header.startswith("Bearer "):
@@ -37,41 +36,27 @@ async def get_current_user(request: Request) -> dict:
 
     token = auth_header.split(" ", 1)[1]
 
-    # Try HS256 with legacy secret first (if configured)
-    legacy_secret = os.environ.get("SUPABASE_JWT_SECRET", "")
-    if legacy_secret:
-        try:
-            payload = jwt.decode(
-                token,
-                legacy_secret,
-                algorithms=["HS256"],
-                audience="authenticated",
-            )
-            return {"id": payload["sub"], "email": payload.get("email", "")}
-        except JWTError:
-            pass  # Fall through to JWKS
-
-    # Use JWKS (new system)
+    # Use JWKS (supports ES256 and RS256)
     try:
         jwks = await _get_jwks()
-        # Get the key ID from the token header
         unverified_header = jwt.get_unverified_header(token)
         kid = unverified_header.get("kid")
+        alg = unverified_header.get("alg", "RS256")
 
         # Find matching key
-        rsa_key = None
+        signing_key = None
         for key in jwks.get("keys", []):
             if key.get("kid") == kid:
-                rsa_key = key
+                signing_key = key
                 break
 
-        if not rsa_key:
+        if not signing_key:
             raise HTTPException(status_code=401, detail="No matching key found")
 
         payload = jwt.decode(
             token,
-            rsa_key,
-            algorithms=["RS256"],
+            signing_key,
+            algorithms=[alg],
             audience="authenticated",
         )
         return {"id": payload["sub"], "email": payload.get("email", "")}
