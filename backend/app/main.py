@@ -119,4 +119,11 @@ async def run_pipeline_stream(
             yield ": keepalive\n\n"
             await asyncio.sleep(5)
 
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # Disable nginx/proxy buffering
+        },
+    )
