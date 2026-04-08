@@ -1,16 +1,12 @@
-"""Pipeline runner — wraps the existing CLI pipeline as a background job."""
+"""Pipeline runner — runs the pipeline as a generator that yields progress."""
 
 import json
 import sys
-import threading
-import uuid
 from pathlib import Path
-
-# In-memory job tracking (replace with Supabase DB in production)
-jobs: dict[str, dict] = {}
+from typing import Generator
 
 # Project root — one level up from backend/
-PROJECT_ROOT = Path(__file__).parent.parent.parent
+PROJECT_ROOT = Path(__file__).parent.parent
 
 
 def _ensure_imports():
@@ -20,22 +16,14 @@ def _ensure_imports():
         sys.path.insert(0, root_str)
 
 
-def _update_job(job_id: str, **kwargs):
-    """Thread-safe job status update."""
-    if job_id in jobs:
-        jobs[job_id].update(kwargs)
+def run_pipeline(input_path: str) -> Generator[dict, None, None]:
+    """Run the v4 pipeline, yielding progress dicts at each stage.
 
-
-def run_pipeline(job_id: str, input_path: str, user_id: str):
-    """Run the v4 pipeline in a background thread.
-
-    Updates jobs[job_id] with progress as it runs.
+    Each yield is a dict with: status, stage, progress, error, output.
+    The caller (SSE endpoint) sends these to the client.
     """
     _ensure_imports()
 
-    _update_job(job_id, status="running", stage="chunking", progress=0)
-
-    # Ensure output directory exists
     output_dir = PROJECT_ROOT / "data" / "output"
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -44,114 +32,99 @@ def run_pipeline(job_id: str, input_path: str, user_id: str):
         from src.chunker import chunk_transcript
 
         # --- Step 1: Chunking ---
-        _update_job(job_id, stage="Chunking transcript", progress=5)
+        yield {"status": "running", "stage": "Chunking transcript", "progress": 5}
 
         input_file = Path(input_path)
         if input_file.suffix == ".txt":
-            # Transcript file — chunk directly
             text = input_file.read_text(encoding="utf-8")
             chunks = chunk_transcript(text)
         else:
-            # For now, only support transcript files
-            _update_job(job_id, status="error", error="Only .txt transcript files supported for now")
+            yield {"status": "error", "stage": "Chunking transcript", "progress": 5,
+                   "error": "Only .txt transcript files supported for now"}
             return
 
-        chunks_path = PROJECT_ROOT / "data" / "output" / f"job_{job_id}_chunks.json"
+        job_id = Path(input_path).stem
+        chunks_path = output_dir / f"{job_id}_chunks.json"
         with open(chunks_path, "w", encoding="utf-8") as f:
             json.dump([c.model_dump() for c in chunks], f, indent=2)
 
+        yield {"status": "running", "stage": "Chunking transcript", "progress": 10,
+               "result": f"{len(chunks)} chunks"}
+
         # --- Step 2: CI% Scoring ---
-        _update_job(job_id, stage="Scoring exam importance", progress=15)
+        yield {"status": "running", "stage": "Scoring exam importance", "progress": 15}
         from src.ci_scorer import score_all
-        ci_output = str(PROJECT_ROOT / "data" / "output" / f"job_{job_id}_ci.json")
-        ci_scores = score_all(str(chunks_path), output_path=ci_output)
-        ci_map = {s.chunk_index: s for s in ci_scores}
+        ci_output = str(output_dir / f"{job_id}_ci.json")
+        try:
+            ci_scores = score_all(str(chunks_path), output_path=ci_output)
+            ci_map = {s.chunk_index: s for s in ci_scores}
+        except Exception as e:
+            # CI scoring is non-fatal — continue without scores
+            ci_map = {}
+            yield {"status": "running", "stage": "Scoring exam importance", "progress": 20,
+                   "result": f"Skipped: {e}"}
 
         # --- Step 3: Concept Grouping ---
-        _update_job(job_id, stage="Grouping concepts", progress=25)
+        yield {"status": "running", "stage": "Grouping concepts", "progress": 25}
         from src.concept_grouper import group_chunks_deterministic, save_groups
-        groups = group_chunks_deterministic(chunks, ci_map)
-        groups_path = PROJECT_ROOT / "data" / "output" / f"job_{job_id}_groups.json"
+        groups = group_chunks_deterministic(chunks, ci_map or None)
+        groups_path = output_dir / f"{job_id}_groups.json"
         save_groups(groups, str(groups_path))
+
+        yield {"status": "running", "stage": "Grouping concepts", "progress": 30,
+               "result": f"{len(groups)} groups"}
 
         # --- Step 4: Load groups with transcripts ---
         from src.concept_grouper import load_groups_with_transcripts
         groups_with_text = load_groups_with_transcripts(str(groups_path), chunks)
 
         # --- Step 5: Generation ---
-        _update_job(job_id, stage="Generating explanations", progress=35)
+        yield {"status": "running", "stage": "Generating explanations", "progress": 35}
         from src.generator import generate_from_groups
 
-        output_path = str(PROJECT_ROOT / "data" / "output" / f"job_{job_id}_output.md")
+        output_path = str(output_dir / f"{job_id}_output.md")
         generate_from_groups(
             groups_with_text,
             output_path=output_path,
             dry_run=False,
         )
-        _update_job(job_id, progress=80)
+        yield {"status": "running", "stage": "Generating explanations", "progress": 80}
 
         # --- Step 6: Fact checking ---
-        _update_job(job_id, stage="Verifying sources", progress=85)
-        from src.fact_checker import fact_check_document
-        verification_path = PROJECT_ROOT / "data" / "output" / f"job_{job_id}_verification.json"
+        yield {"status": "running", "stage": "Verifying sources", "progress": 85}
+        verification_path = output_dir / f"{job_id}_verification.json"
         try:
+            from src.fact_checker import fact_check_document
             fact_check_document(output_path, str(verification_path))
         except Exception:
-            pass  # Non-fatal — skip if fact checker fails
+            pass  # Non-fatal
 
         # --- Step 7: Completeness check ---
-        _update_job(job_id, stage="Checking completeness", progress=90)
-        from src.completeness_checker import check_completeness
+        yield {"status": "running", "stage": "Checking completeness", "progress": 90}
         try:
+            from src.completeness_checker import check_completeness
             check_completeness(output_path, str(chunks_path))
         except Exception:
             pass  # Non-fatal
 
         # --- Step 8: Assembly ---
-        _update_job(job_id, stage="Assembling final document", progress=95)
+        yield {"status": "running", "stage": "Assembling final document", "progress": 95}
 
         # Read outputs
         markdown = Path(output_path).read_text(encoding="utf-8") if Path(output_path).exists() else ""
         concept_groups = json.loads(groups_path.read_text(encoding="utf-8")) if groups_path.exists() else []
         verification = json.loads(verification_path.read_text(encoding="utf-8")) if verification_path.exists() else []
 
-        _update_job(
-            job_id,
-            status="done",
-            stage="Done",
-            progress=100,
-            output={
+        yield {
+            "status": "done",
+            "stage": "Done",
+            "progress": 100,
+            "output": {
                 "markdown": markdown,
                 "concept_groups": concept_groups,
                 "verification_report": verification,
             },
-        )
+        }
 
     except Exception as e:
-        _update_job(job_id, status="error", error=str(e))
-
-
-def start_pipeline(input_path: str, user_id: str) -> str:
-    """Start the pipeline in a background thread. Returns job_id."""
-    job_id = str(uuid.uuid4())
-    jobs[job_id] = {
-        "status": "pending",
-        "stage": None,
-        "progress": 0,
-        "error": None,
-        "user_id": user_id,
-        "output": None,
-    }
-
-    thread = threading.Thread(
-        target=run_pipeline,
-        args=(job_id, input_path, user_id),
-        daemon=True,
-    )
-    thread.start()
-    return job_id
-
-
-def get_job(job_id: str) -> dict | None:
-    """Get job status by ID."""
-    return jobs.get(job_id)
+        yield {"status": "error", "stage": "Pipeline error", "progress": 0, "error": str(e)}

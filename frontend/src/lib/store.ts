@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import { ConceptGroup, VerificationClaim, TrustStats } from "./types";
 import { computeTrustStats } from "./data";
-import { uploadFile, startProcessing, streamJobStatus, getSessionOutput } from "./api";
+import { uploadFile, runPipeline } from "./api";
+import type { PipelineEvent } from "./api";
 
 export interface PipelineStage {
   name: string;
@@ -169,7 +170,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       "Done": 8,
     };
 
-    // Upload → process → stream status via SSE
+    // Upload file, then stream pipeline via SSE
     (async () => {
       try {
         set((state) => {
@@ -179,14 +180,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         });
 
         const { file_id } = await uploadFile(file);
-        const { job_id } = await startProcessing(file_id, file.name);
 
-        // Stream progress via SSE (keeps Cloud Run connection alive)
-        cancelStream = streamJobStatus(
-          job_id,
+        // Run pipeline via SSE — connection stays alive the entire time
+        cancelStream = runPipeline(
+          file_id,
           // onUpdate
-          (status) => {
-            const stageIndex = status.current_stage ? (stageMap[status.current_stage] ?? -1) : -1;
+          (event: PipelineEvent) => {
+            const stageIndex = event.current_stage ? (stageMap[event.current_stage] ?? -1) : -1;
             set((state) => {
               const newStages = [...state.stages];
               for (let i = 0; i < newStages.length; i++) {
@@ -196,7 +196,7 @@ export const useAppStore = create<AppState>((set, get) => ({
                   newStages[i] = { ...newStages[i], status: "running" };
                 }
               }
-              return { stages: newStages, currentStageIndex: stageIndex, subProgress: status.progress };
+              return { stages: newStages, currentStageIndex: stageIndex, subProgress: event.progress };
             });
           },
           // onError
@@ -205,28 +205,19 @@ export const useAppStore = create<AppState>((set, get) => ({
             set({ isProcessing: false, pipelineError: error });
           },
           // onDone
-          async () => {
+          (output) => {
             cancelStream = null;
             set((state) => {
               const newStages = state.stages.map((s) => ({ ...s, status: "done" as const }));
               return { stages: newStages, isProcessing: false, isDone: true };
             });
 
-            // Fetch output
-            try {
-              const output = await getSessionOutput(job_id);
+            if (output) {
               get().setOutput(
                 output.markdown,
                 (output.concept_groups || []) as ConceptGroup[],
                 (output.verification_report || []) as VerificationClaim[],
               );
-            } catch {
-              const [md, groups, claims] = await Promise.all([
-                fetch("/data/v4_lecture_replacement.md").then((r) => r.text()),
-                fetch("/data/v4_concept_groups.json").then((r) => r.json()),
-                fetch("/data/v4_verification_report.json").then((r) => r.json()),
-              ]);
-              get().setOutput(md, groups, claims);
             }
           },
         );
