@@ -35,6 +35,10 @@ def run_pipeline(job_id: str, input_path: str, user_id: str):
 
     _update_job(job_id, status="running", stage="chunking", progress=0)
 
+    # Ensure output directory exists
+    output_dir = PROJECT_ROOT / "data" / "output"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
     try:
         from src.models import Chunk
         from src.chunker import chunk_transcript
