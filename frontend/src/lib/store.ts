@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { toast } from "sonner";
 import { ConceptGroup, VerificationClaim, TrustStats } from "./types";
 import { computeTrustStats } from "./data";
 import { uploadFile, runPipeline } from "./api";
@@ -69,6 +70,8 @@ interface AppState {
   isProcessing: boolean;
   isDone: boolean;
   pipelineError: string | null;
+  uploadProgress: number; // 0-100 upload percentage
+  isUploading: boolean;
   startPipeline: () => void;
   cancelPipeline: () => void;
 
@@ -86,11 +89,8 @@ interface AppState {
   reset: () => void;
 }
 
-const MOCK_SESSIONS: Session[] = [
-  { id: "1", name: "Virology Lecture 3", date: "Apr 7, 2026", groups: 8 },
-  { id: "2", name: "Immunology Lecture 5", date: "Apr 5, 2026", groups: 6 },
-  { id: "3", name: "Anatomy Lecture 12", date: "Apr 3, 2026", groups: 10 },
-];
+// Sessions will be loaded from Supabase DB in the future
+const INITIAL_SESSIONS: Session[] = [];
 
 const DEFAULT_STAGES: PipelineStage[] = [
   { name: "Chunking transcript", weight: 5, mockDuration: 800, mockResult: "14 chunks, 3 need expansion", status: "pending" },
@@ -131,7 +131,7 @@ export const useAppStore = create<AppState>((set, get) => {
   setAuthLoading: (loading) => set({ authLoading: loading }),
 
   // Sessions
-  sessions: MOCK_SESSIONS,
+  sessions: INITIAL_SESSIONS,
 
   // Sidebar
   sidebarOpen: true,
@@ -152,13 +152,17 @@ export const useAppStore = create<AppState>((set, get) => {
   isDone: false,
   pipelineError: null,
 
+  uploadProgress: 0,
+  isUploading: false,
+
   startPipeline: () => {
     const stages = DEFAULT_STAGES.map((s) => ({ ...s, status: "pending" as const }));
-    set({ stages, currentStageIndex: 0, subProgress: 0, isProcessing: true, isDone: false, pipelineError: null });
+    set({ stages, currentStageIndex: 0, subProgress: 0, isProcessing: true, isDone: false, pipelineError: null, uploadProgress: 0, isUploading: true });
 
     const file = get().transcriptFile || get().videoFile;
     if (!file) {
-      set({ isProcessing: false, pipelineError: "No file selected" });
+      set({ isProcessing: false, isUploading: false, pipelineError: "No file selected" });
+      toast.error("No file selected");
       return;
     }
 
@@ -175,16 +179,24 @@ export const useAppStore = create<AppState>((set, get) => {
       "Done": 8,
     };
 
-    // Upload file, then stream pipeline via SSE
+    // Upload file with progress, then stream pipeline via SSE
     (async () => {
       try {
+        toast.loading("Uploading lecture...", { id: "upload" });
+
         set((state) => {
           const s = [...state.stages];
           s[0] = { ...s[0], status: "running" };
           return { stages: s, currentStageIndex: 0 };
         });
 
-        const { file_id } = await uploadFile(file);
+        const { file_id } = await uploadFile(file, (percent) => {
+          set({ uploadProgress: percent });
+        });
+
+        set({ isUploading: false, uploadProgress: 100 });
+        toast.success("Upload complete!", { id: "upload" });
+        toast.loading("Processing lecture...", { id: "pipeline" });
 
         // Run pipeline via SSE — connection stays alive the entire time
         cancelStream = runPipeline(
@@ -208,6 +220,7 @@ export const useAppStore = create<AppState>((set, get) => {
           (error) => {
             cancelStream = null;
             set({ isProcessing: false, pipelineError: error });
+            toast.error(`Pipeline failed: ${error}`, { id: "pipeline" });
           },
           // onDone
           (output) => {
@@ -216,6 +229,7 @@ export const useAppStore = create<AppState>((set, get) => {
               const newStages = state.stages.map((s) => ({ ...s, status: "done" as const }));
               return { stages: newStages, isProcessing: false, isDone: true };
             });
+            toast.success("Your lecture is ready!", { id: "pipeline", duration: 5000 });
 
             if (output) {
               get().setOutput(
@@ -228,7 +242,9 @@ export const useAppStore = create<AppState>((set, get) => {
         );
       } catch (err) {
         console.error("[Pipeline] Error:", err);
-        set({ isProcessing: false, pipelineError: err instanceof Error ? err.message : "Upload failed" });
+        const message = err instanceof Error ? err.message : "Upload failed";
+        set({ isProcessing: false, isUploading: false, pipelineError: message });
+        toast.error(message, { id: "upload" });
       }
     })();
   },
