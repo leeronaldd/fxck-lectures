@@ -1,6 +1,6 @@
 import { createClient } from "./supabase";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/+$/, "");
 
 async function authFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const supabase = createClient();
