@@ -193,7 +193,14 @@ python run_stage2.py data/output/final_chunks_v5.json --v4 --dry-run --no-llm-gr
 - Cheap/fast model: `gemini-3-flash-preview`
 - STT model: `whisper-large-v3-turbo` (Groq)
 - GCP Project: `project-bc1fc31b-94c5-44b0-904`
-- Frontend (future): Supabase + Vercel
+- Frontend: Next.js 16, React 19, Zustand, Tailwind v4, deployed on Vercel
+- Backend: FastAPI on GCP Cloud Run (australia-southeast1)
+- Auth: Supabase (Google OAuth + email/password + magic link)
+- GCP Project: `project-bc1fc31b-94c5-44b0-904`
+- Supabase Project: `husdhmaijvughqezlmjt`
+- Live: https://fxck-lectures.vercel.app
+- API: https://fxck-lectures-api-211270844056.australia-southeast1.run.app
+- Repo: github.com/leeronaldd/fxck-lectures (public, branch: style-transfer-v1)
 
 ## File Structure
 
@@ -224,6 +231,37 @@ data/
   output/                  # Pipeline outputs (JSON, markdown)
     screenshots/           # Extracted lecture slide images
     _archive/              # Old iterations (kept for reference, not used by pipeline)
+backend/
+  app/
+    main.py                # FastAPI app — /api/upload, /api/run/{file_id} (SSE)
+    auth.py                # Supabase JWT verification via JWKS (ES256)
+    pipeline.py            # Pipeline runner — generator yielding progress dicts
+    models.py              # Pydantic request/response schemas
+  requirements.txt
+  deploy.sh                # Cloud Run deploy script
+  Dockerfile               # At project root (not in backend/)
+frontend/
+  src/
+    app/
+      page.tsx             # Upload page (home)
+      reader/page.tsx      # Document reader
+      processing/page.tsx  # Pipeline progress stepper
+      signin/page.tsx      # Auth page (Google/Microsoft OAuth + email)
+      layout.tsx           # Root layout with AuthProvider
+    components/
+      AuthProvider.tsx     # Supabase auth state listener
+      AppShell.tsx         # Top bar + sidebar wrapper + route protection
+      AppSidebar.tsx       # Session list + account menu
+      UploadZone.tsx       # Drag-drop file upload
+      PipelineStepper.tsx  # 9-stage progress display
+      MarkdownRenderer.tsx # Custom markdown with exam alerts, skip lines
+      TrustBar.tsx         # Verification status bar
+    lib/
+      supabase.ts          # Supabase browser client
+      api.ts               # Backend API client (upload + SSE streaming)
+      store.ts             # Zustand state management
+      types.ts             # TypeScript interfaces
+      data.ts              # Static data fetching helpers
 docs/
   reference/               # Gold standard examples (anatomy slides, Studley output)
   anatomy-style-analysis.md  # Deep analysis of anatomy professor's teaching patterns
