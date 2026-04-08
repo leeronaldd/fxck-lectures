@@ -124,6 +124,8 @@ async def run_pipeline_stream(
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",  # Disable nginx/proxy buffering
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+            "Alt-Svc": 'clear',  # Prevent HTTP/3 QUIC upgrade (causes ERR_QUIC_PROTOCOL_ERROR)
         },
     )
