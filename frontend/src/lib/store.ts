@@ -116,7 +116,12 @@ const DEFAULT_SETTINGS: AppSettings = {
 
 let cancelStream: (() => void) | null = null;
 
-export const useAppStore = create<AppState>((set, get) => ({
+export const useAppStore = create<AppState>((set, get) => {
+  // Expose store for debugging (remove in production)
+  if (typeof window !== "undefined") {
+    (window as unknown as Record<string, unknown>).__store = { getState: () => get(), setState: set };
+  }
+  return ({
   // User
   user: { isLoggedIn: false, id: "", name: "Guest", email: "", avatar: null },
   authLoading: true,
@@ -273,4 +278,4 @@ export const useAppStore = create<AppState>((set, get) => ({
       trustStats: { totalClaims: 0, correctClaims: 0, verifiedPercent: 0 },
     });
   },
-}));
+})});
