@@ -33,6 +33,9 @@ app.add_middleware(
 UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", Path(__file__).parent.parent / "data" / "uploads"))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+# Map file_id → original filename (in-memory, lost on restart — acceptable)
+_original_filenames: dict[str, str] = {}
+
 # Supabase config
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://husdhmaijvughqezlmjt.supabase.co")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "sb_publishable_CwLFt3Pfeaeq5iP0foroCA_tMmPucAy")
@@ -132,6 +135,9 @@ async def upload_file(
     with open(file_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
 
+    original = Path(file.filename or "file.txt").stem
+    _original_filenames[file_id] = original
+
     return UploadResponse(file_id=file_id, filename=file.filename or "file.txt")
 
 
@@ -205,7 +211,7 @@ async def run_pipeline_stream(
         raise HTTPException(status_code=404, detail="File not found")
 
     input_path = str(matching[0])
-    original_filename = matching[0].stem
+    original_filename = _original_filenames.get(file_id, matching[0].stem)
 
     # Shared state between pipeline thread and async generator
     events: list[dict] = []
