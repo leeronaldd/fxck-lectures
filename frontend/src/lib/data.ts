@@ -15,7 +15,13 @@ export async function getVerificationReport(): Promise<VerificationClaim[]> {
   return res.json();
 }
 
-export function computeTrustStats(claims: VerificationClaim[]): TrustStats {
+export function computeTrustStats(rawClaims: VerificationClaim[] | Record<string, unknown>): TrustStats {
+  // Handle both flat array and {claims: [...], textbook_sources: [...]} formats
+  const claims: VerificationClaim[] = Array.isArray(rawClaims)
+    ? rawClaims
+    : Array.isArray((rawClaims as Record<string, unknown>)?.claims)
+      ? (rawClaims as Record<string, unknown>).claims as VerificationClaim[]
+      : [];
   const totalClaims = claims.length;
   const correctClaims = claims.filter((c) => c.verdict === "correct").length;
   const verifiedPercent =
