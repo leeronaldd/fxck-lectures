@@ -1,0 +1,7 @@
+<svg width="220" height="44" viewBox="0 0 220 44" xmlns="http://www.w3.org/2000/svg">
+  <!-- Orange K mark in rounded square -->
+  <rect x="0" y="2" width="40" height="40" rx="10" fill="#FF6B35"/>
+  <path d="M12 12 L12 32 M12 22 L28 12 M12 22 L28 32" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- White wordmark for dark backgrounds -->
+  <text x="52" y="32" font-family="Inter, system-ui, -apple-system, sans-serif" font-weight="500" font-size="32" fill="#F5F5F7" letter-spacing="1">Klare</text>
+</svg>

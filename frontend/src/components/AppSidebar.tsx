@@ -9,7 +9,7 @@ import SettingsModal from "@/components/SettingsModal";
 
 export default function AppSidebar() {
   const router = useRouter();
-  const { user, sessions, sidebarOpen, settings, updateSettings } = useAppStore();
+  const { user, sessions, sidebarOpen, settings, updateSettings, loadSession } = useAppStore();
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -70,7 +70,10 @@ export default function AppSidebar() {
             sessions.map((session) => (
               <button
                 key={session.id}
-                onClick={() => router.push("/reader")}
+                onClick={async () => {
+                  await loadSession(session.id);
+                  router.push("/reader");
+                }}
                 className="w-full text-left px-3 py-2.5 rounded-xl mb-0.5 transition-all group"
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = "var(--bg-elevated)";

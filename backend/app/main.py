@@ -8,7 +8,8 @@ import threading
 import uuid
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+import httpx
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
@@ -32,6 +33,86 @@ app.add_middleware(
 UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", Path(__file__).parent.parent / "data" / "uploads"))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+# Supabase config
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://husdhmaijvughqezlmjt.supabase.co")
+SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "sb_publishable_CwLFt3Pfeaeq5iP0foroCA_tMmPucAy")
+
+# Unlimited usage for these emails
+UNLIMITED_EMAILS = {
+    "lee.wang.hong0215@gmail.com",
+    "lee.pak.wai0706@gmail.com",
+}
+FREE_USAGE_LIMIT = 1
+
+
+async def _check_usage(user: dict, request: Request) -> None:
+    """Check if user has remaining usage. Raises 403 if limit exceeded."""
+    email = user.get("email", "")
+    if email in UNLIMITED_EMAILS:
+        return  # Unlimited access
+
+    user_id = user["id"]
+    token = request.headers.get("authorization", "").split(" ", 1)[-1]
+
+    # Query usage count from Supabase
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{SUPABASE_URL}/rest/v1/usage",
+            params={"user_id": f"eq.{user_id}", "select": "id"},
+            headers={
+                "apikey": SUPABASE_ANON_KEY,
+                "Authorization": f"Bearer {token}",
+            },
+        )
+        if resp.status_code == 200:
+            count = len(resp.json())
+            if count >= FREE_USAGE_LIMIT:
+                raise HTTPException(
+                    status_code=403,
+                    detail="You've used your free lecture. Upgrade for unlimited access.",
+                )
+
+
+async def _record_usage(user: dict, request: Request) -> None:
+    """Record a usage entry in Supabase."""
+    token = request.headers.get("authorization", "").split(" ", 1)[-1]
+    async with httpx.AsyncClient() as client:
+        await client.post(
+            f"{SUPABASE_URL}/rest/v1/usage",
+            json={"user_id": user["id"], "email": user.get("email", "")},
+            headers={
+                "apikey": SUPABASE_ANON_KEY,
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+                "Prefer": "return=minimal",
+            },
+        )
+
+
+async def _save_session(user: dict, request: Request, name: str, output: dict) -> str:
+    """Save pipeline output as a session in Supabase. Returns session ID."""
+    token = request.headers.get("authorization", "").split(" ", 1)[-1]
+    session_id = str(uuid.uuid4())
+    async with httpx.AsyncClient() as client:
+        await client.post(
+            f"{SUPABASE_URL}/rest/v1/sessions",
+            json={
+                "id": session_id,
+                "user_id": user["id"],
+                "name": name,
+                "markdown": output.get("markdown", ""),
+                "concept_groups": output.get("concept_groups", []),
+                "verification_report": output.get("verification_report", []),
+            },
+            headers={
+                "apikey": SUPABASE_ANON_KEY,
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+                "Prefer": "return=minimal",
+            },
+        )
+    return session_id
+
 
 @app.get("/api/health")
 async def health():
@@ -54,22 +135,77 @@ async def upload_file(
     return UploadResponse(file_id=file_id, filename=file.filename or "file.txt")
 
 
+@app.get("/api/sessions")
+async def get_sessions(
+    user: dict = Depends(get_current_user),
+    request: Request = None,
+):
+    """Get user's saved sessions."""
+    token = request.headers.get("authorization", "").split(" ", 1)[-1]
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{SUPABASE_URL}/rest/v1/sessions",
+            params={
+                "user_id": f"eq.{user['id']}",
+                "select": "id,name,created_at",
+                "order": "created_at.desc",
+                "limit": "20",
+            },
+            headers={
+                "apikey": SUPABASE_ANON_KEY,
+                "Authorization": f"Bearer {token}",
+            },
+        )
+        if resp.status_code == 200:
+            return resp.json()
+        return []
+
+
+@app.get("/api/sessions/{session_id}")
+async def get_session(
+    session_id: str,
+    user: dict = Depends(get_current_user),
+    request: Request = None,
+):
+    """Get a specific session's full data."""
+    token = request.headers.get("authorization", "").split(" ", 1)[-1]
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{SUPABASE_URL}/rest/v1/sessions",
+            params={
+                "id": f"eq.{session_id}",
+                "user_id": f"eq.{user['id']}",
+                "select": "*",
+                "limit": "1",
+            },
+            headers={
+                "apikey": SUPABASE_ANON_KEY,
+                "Authorization": f"Bearer {token}",
+            },
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            if data:
+                return data[0]
+        raise HTTPException(status_code=404, detail="Session not found")
+
+
 @app.get("/api/run/{file_id}")
 async def run_pipeline_stream(
     file_id: str,
     user: dict = Depends(get_current_user),
+    request: Request = None,
 ):
-    """Run the pipeline and stream progress via SSE.
+    """Run the pipeline and stream progress via SSE."""
+    # Check usage limits before running
+    await _check_usage(user, request)
 
-    The pipeline runs in a background thread. The async generator sends
-    keepalive comments every 10 seconds to prevent Cloud Run from killing
-    the instance during long-running stages (e.g., Gemini generation).
-    """
     matching = list(UPLOAD_DIR.glob(f"{file_id}.*"))
     if not matching:
         raise HTTPException(status_code=404, detail="File not found")
 
     input_path = str(matching[0])
+    original_filename = matching[0].stem
 
     # Shared state between pipeline thread and async generator
     events: list[dict] = []
@@ -108,6 +244,15 @@ async def run_pipeline_stream(
                 yield f"data: {data}\n\n"
                 sent += 1
 
+                # On success, record usage and save session
+                if progress.get("status") == "done" and progress.get("output"):
+                    try:
+                        await _record_usage(user, request)
+                        session_name = original_filename.replace("-", " ").replace("_", " ").title()
+                        await _save_session(user, request, session_name, progress["output"])
+                    except Exception:
+                        pass  # Non-fatal — don't fail the pipeline for tracking issues
+
                 # Stop if done or error
                 if progress.get("status") in ("done", "error"):
                     return
@@ -126,6 +271,6 @@ async def run_pipeline_stream(
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
-            "Alt-Svc": 'clear',  # Prevent HTTP/3 QUIC upgrade (causes ERR_QUIC_PROTOCOL_ERROR)
+            "Alt-Svc": 'clear',
         },
     )

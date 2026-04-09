@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Klare Logo Concepts</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: #0D0D0D;
+    color: #F5F5F5;
+    padding: 40px;
+  }
+
+  h1 { font-size: 14px; color: #666; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 40px; }
+  h2 { font-size: 12px; color: #999; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 32px;
+    margin-bottom: 60px;
+  }
+
+  .card {
+    border: 1px solid #2A2A2A;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .preview {
+    padding: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 160px;
+  }
+
+  .preview.dark { background: #0D0D0D; }
+  .preview.light { background: #FFFFFF; }
+  .preview.accent { background: #FF6B35; }
+
+  .label {
+    padding: 12px 20px;
+    background: #1A1A1A;
+    border-top: 1px solid #2A2A2A;
+    font-size: 12px;
+    color: #999;
+  }
+
+  .favicon-row {
+    display: flex;
+    gap: 24px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .favicon-item {
+    text-align: center;
+  }
+
+  .favicon-item span {
+    display: block;
+    font-size: 10px;
+    color: #666;
+    margin-top: 8px;
+  }
+
+  .size-demo {
+    display: flex;
+    align-items: flex-end;
+    gap: 32px;
+    flex-wrap: wrap;
+  }
+
+  .size-demo > div { text-align: center; }
+  .size-demo span { display: block; font-size: 10px; color: #666; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<h1>Klare — Logo Concepts</h1>
+
+<!-- ============================================ -->
+<!-- CONCEPT 1: Clean Geometric Wordmark -->
+<!-- ============================================ -->
+<h2>Concept 1 — Geometric Wordmark (Cluely-style)</h2>
+<div class="grid">
+  <div class="card">
+    <div class="preview dark">
+      <svg width="160" height="40" viewBox="0 0 160 40">
+        <text x="0" y="32" font-family="Inter, system-ui, sans-serif" font-weight="600" font-size="36" fill="#F5F5F5" letter-spacing="2">Klare</text>
+      </svg>
+    </div>
+    <div class="label">Dark background — White wordmark</div>
+  </div>
+  <div class="card">
+    <div class="preview light">
+      <svg width="160" height="40" viewBox="0 0 160 40">
+        <text x="0" y="32" font-family="Inter, system-ui, sans-serif" font-weight="600" font-size="36" fill="#0D0D0D" letter-spacing="2">Klare</text>
+      </svg>
+    </div>
+    <div class="label">Light background — Black wordmark</div>
+  </div>
+  <div class="card">
+    <div class="preview dark">
+      <svg width="160" height="40" viewBox="0 0 160 40">
+        <text x="0" y="32" font-family="Inter, system-ui, sans-serif" font-weight="600" font-size="36" fill="#FF6B35" letter-spacing="2">Klare</text>
+      </svg>
+    </div>
+    <div class="label">Dark background — Orange accent wordmark</div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- CONCEPT 2: Wordmark + Geometric K Mark -->
+<!-- ============================================ -->
+<h2>Concept 2 — Logomark + Wordmark (Icon + Text)</h2>
+<div class="grid">
+  <div class="card">
+    <div class="preview dark">
+      <svg width="220" height="44" viewBox="0 0 220 44">
+        <!-- K mark: angular geometric K in a rounded square -->
+        <rect x="0" y="2" width="40" height="40" rx="10" fill="#FF6B35"/>
+        <path d="M12 12 L12 32 M12 22 L28 12 M12 22 L28 32" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <!-- Wordmark -->
+        <text x="52" y="32" font-family="Inter, system-ui, sans-serif" font-weight="500" font-size="32" fill="#F5F5F5" letter-spacing="1">Klare</text>
+      </svg>
+    </div>
+    <div class="label">Dark — Orange K mark + White wordmark</div>
+  </div>
+  <div class="card">
+    <div class="preview light">
+      <svg width="220" height="44" viewBox="0 0 220 44">
+        <rect x="0" y="2" width="40" height="40" rx="10" fill="#FF6B35"/>
+        <path d="M12 12 L12 32 M12 22 L28 12 M12 22 L28 32" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <text x="52" y="32" font-family="Inter, system-ui, sans-serif" font-weight="500" font-size="32" fill="#0D0D0D" letter-spacing="1">Klare</text>
+      </svg>
+    </div>
+    <div class="label">Light — Orange K mark + Black wordmark</div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- CONCEPT 3: Dot Accent / Period Style -->
+<!-- ============================================ -->
+<h2>Concept 3 — "Klare." with Period (Leibniz-inspired)</h2>
+<div class="grid">
+  <div class="card">
+    <div class="preview dark">
+      <svg width="180" height="40" viewBox="0 0 180 40">
+        <text x="0" y="32" font-family="Inter, system-ui, sans-serif" font-weight="600" font-size="36" fill="#F5F5F5" letter-spacing="1">Klare</text>
+        <circle cx="152" cy="32" r="5" fill="#FF6B35"/>
+      </svg>
+    </div>
+    <div class="label">Dark — Wordmark with orange period (like Leibniz.)</div>
+  </div>
+  <div class="card">
+    <div class="preview light">
+      <svg width="180" height="40" viewBox="0 0 180 40">
+        <text x="0" y="32" font-family="Inter, system-ui, sans-serif" font-weight="600" font-size="36" fill="#0D0D0D" letter-spacing="1">Klare</text>
+        <circle cx="152" cy="32" r="5" fill="#FF6B35"/>
+      </svg>
+    </div>
+    <div class="label">Light — Wordmark with orange period</div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- CONCEPT 4: Thin Elegant + Spark -->
+<!-- ============================================ -->
+<h2>Concept 4 — Light Weight + Clarity Spark</h2>
+<div class="grid">
+  <div class="card">
+    <div class="preview dark">
+      <svg width="200" height="44" viewBox="0 0 200 44">
+        <!-- Spark/clarity icon -->
+        <path d="M16 6 L16 14 M16 30 L16 38 M6 22 L14 22 M18 22 L26 22 M9 12 L13 16 M19 28 L23 32 M23 12 L19 16 M13 28 L9 32" stroke="#FF6B35" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="16" cy="22" r="3" fill="#FF6B35"/>
+        <text x="38" y="33" font-family="Inter, system-ui, sans-serif" font-weight="300" font-size="34" fill="#F5F5F5" letter-spacing="4">klare</text>
+      </svg>
+    </div>
+    <div class="label">Dark — Lowercase, light weight, clarity spark icon</div>
+  </div>
+  <div class="card">
+    <div class="preview light">
+      <svg width="200" height="44" viewBox="0 0 200 44">
+        <path d="M16 6 L16 14 M16 30 L16 38 M6 22 L14 22 M18 22 L26 22 M9 12 L13 16 M19 28 L23 32 M23 12 L19 16 M13 28 L9 32" stroke="#FF6B35" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="16" cy="22" r="3" fill="#FF6B35"/>
+        <text x="38" y="33" font-family="Inter, system-ui, sans-serif" font-weight="300" font-size="34" fill="#0D0D0D" letter-spacing="4">klare</text>
+      </svg>
+    </div>
+    <div class="label">Light — Lowercase, light weight, clarity spark icon</div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- CONCEPT 5: Bold K + Thin "lare" -->
+<!-- ============================================ -->
+<h2>Concept 5 — Weight Contrast (Bold K + Light rest)</h2>
+<div class="grid">
+  <div class="card">
+    <div class="preview dark">
+      <svg width="170" height="42" viewBox="0 0 170 42">
+        <text x="0" y="34" font-family="Inter, system-ui, sans-serif" font-weight="700" font-size="38" fill="#FF6B35">K</text>
+        <text x="26" y="34" font-family="Inter, system-ui, sans-serif" font-weight="300" font-size="38" fill="#F5F5F5" letter-spacing="1">lare</text>
+      </svg>
+    </div>
+    <div class="label">Dark — Bold orange K + Light white "lare"</div>
+  </div>
+  <div class="card">
+    <div class="preview light">
+      <svg width="170" height="42" viewBox="0 0 170 42">
+        <text x="0" y="34" font-family="Inter, system-ui, sans-serif" font-weight="700" font-size="38" fill="#FF6B35">K</text>
+        <text x="26" y="34" font-family="Inter, system-ui, sans-serif" font-weight="300" font-size="38" fill="#0D0D0D" letter-spacing="1">lare</text>
+      </svg>
+    </div>
+    <div class="label">Light — Bold orange K + Light black "lare"</div>
+  </div>
+  <div class="card">
+    <div class="preview accent">
+      <svg width="170" height="42" viewBox="0 0 170 42">
+        <text x="0" y="34" font-family="Inter, system-ui, sans-serif" font-weight="700" font-size="38" fill="#fff">K</text>
+        <text x="26" y="34" font-family="Inter, system-ui, sans-serif" font-weight="300" font-size="38" fill="#fff" letter-spacing="1">lare</text>
+      </svg>
+    </div>
+    <div class="label">Orange background — All white</div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- FAVICON / APP ICON VARIANTS -->
+<!-- ============================================ -->
+<h2>Favicon & App Icon Variants</h2>
+<div class="grid">
+  <div class="card">
+    <div class="preview dark">
+      <div class="favicon-row">
+        <!-- Simple K in rounded square -->
+        <div class="favicon-item">
+          <svg width="64" height="64" viewBox="0 0 64 64">
+            <rect width="64" height="64" rx="14" fill="#FF6B35"/>
+            <path d="M20 16 L20 48 M20 32 L44 16 M20 32 L44 48" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+          <span>64px</span>
+        </div>
+        <!-- 32px -->
+        <div class="favicon-item">
+          <svg width="32" height="32" viewBox="0 0 32 32">
+            <rect width="32" height="32" rx="7" fill="#FF6B35"/>
+            <path d="M10 8 L10 24 M10 16 L22 8 M10 16 L22 24" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+          <span>32px</span>
+        </div>
+        <!-- 16px -->
+        <div class="favicon-item">
+          <svg width="16" height="16" viewBox="0 0 16 16">
+            <rect width="16" height="16" rx="3" fill="#FF6B35"/>
+            <path d="M5 4 L5 12 M5 8 L11 4 M5 8 L11 12" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+          <span>16px</span>
+        </div>
+
+        <!-- Circle variant -->
+        <div class="favicon-item">
+          <svg width="64" height="64" viewBox="0 0 64 64">
+            <circle cx="32" cy="32" r="32" fill="#FF6B35"/>
+            <path d="M22 16 L22 48 M22 32 L44 16 M22 32 L44 48" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+          <span>Circle 64px</span>
+        </div>
+        <!-- Dark bg variant -->
+        <div class="favicon-item">
+          <svg width="64" height="64" viewBox="0 0 64 64">
+            <rect width="64" height="64" rx="14" fill="#1A1A1A"/>
+            <path d="M20 16 L20 48 M20 32 L44 16 M20 32 L44 48" stroke="#FF6B35" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+          <span>Dark variant</span>
+        </div>
+      </div>
+    </div>
+    <div class="label">App icon / favicon at multiple sizes and variants</div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- SIZE SCALING -->
+<!-- ============================================ -->
+<h2>Scale Test — Concept 5 at Various Sizes</h2>
+<div class="grid">
+  <div class="card">
+    <div class="preview dark">
+      <div class="size-demo">
+        <div>
+          <svg width="50" height="14" viewBox="0 0 170 42">
+            <text x="0" y="34" font-family="Inter, system-ui, sans-serif" font-weight="700" font-size="38" fill="#FF6B35">K</text>
+            <text x="26" y="34" font-family="Inter, system-ui, sans-serif" font-weight="300" font-size="38" fill="#F5F5F5" letter-spacing="1">lare</text>
+          </svg>
+          <span>Navbar</span>
+        </div>
+        <div>
+          <svg width="100" height="28" viewBox="0 0 170 42">
+            <text x="0" y="34" font-family="Inter, system-ui, sans-serif" font-weight="700" font-size="38" fill="#FF6B35">K</text>
+            <text x="26" y="34" font-family="Inter, system-ui, sans-serif" font-weight="300" font-size="38" fill="#F5F5F5" letter-spacing="1">lare</text>
+          </svg>
+          <span>Medium</span>
+        </div>
+        <div>
+          <svg width="200" height="52" viewBox="0 0 170 42">
+            <text x="0" y="34" font-family="Inter, system-ui, sans-serif" font-weight="700" font-size="38" fill="#FF6B35">K</text>
+            <text x="26" y="34" font-family="Inter, system-ui, sans-serif" font-weight="300" font-size="38" fill="#F5F5F5" letter-spacing="1">lare</text>
+          </svg>
+          <span>Hero</span>
+        </div>
+      </div>
+    </div>
+    <div class="label">Scaling from navbar (small) to hero (large)</div>
+  </div>
+</div>
+
+</body>
+</html>

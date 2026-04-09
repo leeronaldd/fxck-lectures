@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase";
 import { useAppStore } from "@/lib/store";
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { setUser, clearUser, setAuthLoading } = useAppStore();
+  const { setUser, clearUser, setAuthLoading, loadSessions } = useAppStore();
 
   useEffect(() => {
     const supabase = createClient();
@@ -21,6 +21,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
           email: u.email || "",
           avatar: u.user_metadata?.avatar_url || null,
         });
+        loadSessions();
       }
       setAuthLoading(false);
     });
@@ -38,6 +39,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
           email: u.email || "",
           avatar: u.user_metadata?.avatar_url || null,
         });
+        loadSessions();
       } else {
         clearUser();
       }
@@ -46,6 +48,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     return () => {
       subscription.unsubscribe();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setUser, clearUser, setAuthLoading]);
 
   return <>{children}</>;

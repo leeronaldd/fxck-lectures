@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { toast } from "sonner";
 import { ConceptGroup, VerificationClaim, TrustStats } from "./types";
 import { computeTrustStats } from "./data";
-import { uploadFile, runPipeline } from "./api";
+import { uploadFile, runPipeline, fetchSessions, fetchSession } from "./api";
 import type { PipelineEvent } from "./api";
 
 export interface PipelineStage {
@@ -50,6 +50,8 @@ interface AppState {
 
   // Sessions
   sessions: Session[];
+  loadSessions: () => void;
+  loadSession: (sessionId: string) => Promise<void>;
 
   // Sidebar
   sidebarOpen: boolean;
@@ -142,6 +144,27 @@ export const useAppStore = create<AppState>((set, get) => {
 
   // Sessions
   sessions: INITIAL_SESSIONS,
+  loadSessions: () => {
+    fetchSessions().then((data) => {
+      const sessions: Session[] = data.map((s) => ({
+        id: s.id,
+        name: s.name,
+        date: new Date(s.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+        groups: 0,
+      }));
+      set({ sessions });
+    }).catch(() => {});
+  },
+  loadSession: async (sessionId: string) => {
+    const data = await fetchSession(sessionId);
+    if (data) {
+      get().setOutput(
+        data.markdown,
+        (data.concept_groups || []) as ConceptGroup[],
+        (data.verification_report || []) as VerificationClaim[],
+      );
+    }
+  },
 
   // Sidebar
   sidebarOpen: true,
@@ -237,6 +260,8 @@ export const useAppStore = create<AppState>((set, get) => {
                 (output.verification_report || []) as VerificationClaim[],
               );
             }
+            // Refresh sessions list
+            get().loadSessions();
           },
         );
       } catch (err) {

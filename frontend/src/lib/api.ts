@@ -70,6 +70,30 @@ export interface PipelineEvent {
  *
  * Returns a cancel function.
  */
+export async function fetchSessions(): Promise<{ id: string; name: string; created_at: string }[]> {
+  const token = await getToken();
+  const res = await fetch(`${API_URL}/api/sessions`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function fetchSession(sessionId: string): Promise<{
+  id: string;
+  name: string;
+  markdown: string;
+  concept_groups: unknown[];
+  verification_report: unknown[];
+} | null> {
+  const token = await getToken();
+  const res = await fetch(`${API_URL}/api/sessions/${sessionId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
 export function runPipeline(
   fileId: string,
   onUpdate: (event: PipelineEvent) => void,
@@ -86,7 +110,12 @@ export function runPipeline(
       });
 
       if (!res.ok) {
-        onError(`Pipeline failed: ${res.statusText}`);
+        if (res.status === 403) {
+          const body = await res.json().catch(() => ({ detail: "Usage limit reached" }));
+          onError(body.detail || "You've used your free lecture. Upgrade for unlimited access.");
+        } else {
+          onError(`Pipeline failed: ${res.statusText}`);
+        }
         return;
       }
 
