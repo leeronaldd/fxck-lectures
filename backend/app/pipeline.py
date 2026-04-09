@@ -31,24 +31,39 @@ def run_pipeline(input_path: str) -> Generator[dict, None, None]:
         from src.models import Chunk
         from src.chunker import chunk_transcript
 
-        # --- Step 1: Chunking ---
-        yield {"status": "running", "stage": "Chunking transcript", "progress": 5}
-
         input_file = Path(input_path)
-        if input_file.suffix == ".txt":
+        job_id = input_file.stem
+        video_extensions = {".mp4", ".mkv", ".avi", ".mov", ".webm"}
+
+        # --- Step 0 (conditional): Transcribe video ---
+        if input_file.suffix in video_extensions:
+            yield {"status": "running", "stage": "Transcribing lecture", "progress": 2}
+            from src.transcriber import transcribe
+            result = transcribe(input_path)
+            text = result["text"]
+
+            # Save transcript for reference
+            transcript_path = output_dir / f"{job_id}_transcript.txt"
+            transcript_path.write_text(text, encoding="utf-8")
+
+            word_count = len(text.split())
+            yield {"status": "running", "stage": "Transcribing lecture", "progress": 10,
+                   "result": f"{word_count:,} words transcribed"}
+        elif input_file.suffix == ".txt":
             text = input_file.read_text(encoding="utf-8")
-            chunks = chunk_transcript(text)
         else:
             yield {"status": "error", "stage": "Chunking transcript", "progress": 5,
-                   "error": "Only .txt transcript files supported for now"}
+                   "error": f"Unsupported file type: {input_file.suffix}. Use .txt, .mp4, .mkv, .avi, .mov, or .webm"}
             return
 
-        job_id = Path(input_path).stem
+        # --- Step 1: Chunking ---
+        yield {"status": "running", "stage": "Chunking transcript", "progress": 12}
+        chunks = chunk_transcript(text)
         chunks_path = output_dir / f"{job_id}_chunks.json"
         with open(chunks_path, "w", encoding="utf-8") as f:
             json.dump([c.model_dump() for c in chunks], f, indent=2)
 
-        yield {"status": "running", "stage": "Chunking transcript", "progress": 10,
+        yield {"status": "running", "stage": "Chunking transcript", "progress": 15,
                "result": f"{len(chunks)} chunks"}
 
         # --- Step 2: CI% Scoring ---

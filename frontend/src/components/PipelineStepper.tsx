@@ -117,27 +117,22 @@ export default function PipelineStepper({
                 {stage.name}
               </p>
 
-              {/* Sub-progress for generation */}
-              {stage.status === "running" && stage.hasSubProgress && stage.subTotal && (
+              {/* Sub-progress bar for generation stage */}
+              {stage.status === "running" && stage.hasSubProgress && (
                 <div className="mt-2">
-                  <div className="flex items-center gap-2">
-                    <Progress.Root
-                      className="relative overflow-hidden rounded-full flex-1 h-1.5"
-                      style={{ background: "var(--bg-elevated)" }}
-                      value={(subProgress / stage.subTotal) * 100}
-                    >
-                      <Progress.Indicator
-                        className="w-full h-full rounded-full transition-transform duration-300 ease-out"
-                        style={{
-                          background: "var(--accent)",
-                          transform: `translateX(-${100 - (subProgress / stage.subTotal) * 100}%)`,
-                        }}
-                      />
-                    </Progress.Root>
-                    <span className="text-xs font-mono shrink-0" style={{ color: "var(--text-muted)" }}>
-                      {subProgress}/{stage.subTotal}
-                    </span>
-                  </div>
+                  <Progress.Root
+                    className="relative overflow-hidden rounded-full w-full h-1.5"
+                    style={{ background: "var(--bg-elevated)" }}
+                    value={overallPercent}
+                  >
+                    <Progress.Indicator
+                      className="w-full h-full rounded-full transition-transform duration-300 ease-out"
+                      style={{
+                        background: "var(--accent)",
+                        transform: `translateX(-${100 - overallPercent}%)`,
+                      }}
+                    />
+                  </Progress.Root>
                 </div>
               )}
 

@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import TrustBar from "@/components/TrustBar";
+import TOCSidebar from "@/components/TOCSidebar";
 import { useAppStore } from "@/lib/store";
 import {
   getMarkdownContent,
@@ -13,6 +15,7 @@ import {
 import { ConceptGroup, TrustStats } from "@/lib/types";
 
 export default function ReaderPage() {
+  const router = useRouter();
   const store = useAppStore();
 
   const [markdown, setMarkdown] = useState<string>("");
@@ -23,6 +26,8 @@ export default function ReaderPage() {
     verifiedPercent: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [tocOpen, setTocOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState("");
 
   // Auto-collapse app sidebar on reader page (user can re-open with hamburger)
   useEffect(() => {
@@ -58,6 +63,31 @@ export default function ReaderPage() {
     load();
   }, [store.markdown, store.groups, store.trustStats]);
 
+  // Track active heading for TOC highlight
+  useEffect(() => {
+    if (!markdown) return;
+    // Small delay to let markdown render
+    const timer = setTimeout(() => {
+      const headings = document.querySelectorAll("h2[id]");
+      if (!headings.length) return;
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (entry.isIntersecting) {
+              setActiveSection(entry.target.id);
+            }
+          }
+        },
+        { rootMargin: "-20% 0px -70% 0px" }
+      );
+
+      headings.forEach((h) => observer.observe(h));
+      return () => observer.disconnect();
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [markdown]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[80vh]">
@@ -74,8 +104,51 @@ export default function ReaderPage() {
     );
   }
 
+  if (!markdown) {
+    return (
+      <div className="flex-1 flex items-center justify-center px-4 py-24">
+        <div className="text-center max-w-md">
+          <div
+            className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6"
+            style={{ background: "var(--accent-dim)", color: "var(--accent)" }}
+          >
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+              <polyline points="14,2 14,8 20,8" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-bold mb-2" style={{ color: "var(--text-primary)" }}>
+            No lecture loaded
+          </h2>
+          <p className="text-sm mb-6" style={{ color: "var(--text-secondary)" }}>
+            Upload a lecture recording or transcript to get started.
+          </p>
+          <button
+            onClick={() => router.push("/")}
+            className="btn-glow px-6 py-3 rounded-xl text-sm font-semibold"
+            style={{
+              background: "linear-gradient(135deg, var(--accent), #FF8555)",
+              color: "#fff",
+              boxShadow: "0 8px 32px var(--accent-glow)",
+            }}
+          >
+            Upload a Lecture
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-1 overflow-x-hidden">
+      {/* Table of contents */}
+      <TOCSidebar
+        groups={groups}
+        activeSection={activeSection}
+        isOpen={tocOpen}
+        onToggle={() => setTocOpen(!tocOpen)}
+      />
+
       {/* Document */}
       <div className="flex-1 min-w-0 overflow-x-hidden">
         <div className="max-w-[820px] mx-auto px-6 lg:px-16 py-8 pb-16 overflow-hidden">

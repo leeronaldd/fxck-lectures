@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useAppStore } from "@/lib/store";
 import AppSidebar from "./AppSidebar";
 
-const PROTECTED_PATHS = ["/processing", "/reader"];
+const PROTECTED_PATHS = ["/upload", "/processing", "/reader"];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -14,12 +14,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const isSignInPage = pathname === "/signin";
   const isReaderPage = pathname === "/reader";
+  const isLandingPage = pathname === "/";
 
   // Route protection
   useEffect(() => {
     if (authLoading) return;
-    if (user.isLoggedIn && isSignInPage) {
-      router.push("/");
+    if (user.isLoggedIn && (isSignInPage || isLandingPage)) {
+      router.push("/upload");
       return;
     }
     if (!user.isLoggedIn && PROTECTED_PATHS.includes(pathname)) {
@@ -27,8 +28,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [user.isLoggedIn, authLoading, pathname, isSignInPage, router]);
 
-  // Don't show app shell on sign-in page
-  if (isSignInPage) {
+  // Don't show app shell on sign-in page or landing page
+  if (isSignInPage || isLandingPage) {
     return <>{children}</>;
   }
 

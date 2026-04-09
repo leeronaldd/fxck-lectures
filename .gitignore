@@ -8,3 +8,5 @@ data/screenshots/
 slide-*.jpg
 frontend/public/data/
 .claude/
+.vercel
+.env*.local

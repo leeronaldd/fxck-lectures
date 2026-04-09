@@ -11,7 +11,6 @@ export interface PipelineStage {
   mockDuration: number;
   mockResult: string;
   hasSubProgress?: boolean;
-  subTotal?: number;
   status: "pending" | "running" | "done";
   result?: string;
 }
@@ -92,14 +91,25 @@ interface AppState {
 // Sessions will be loaded from Supabase DB in the future
 const INITIAL_SESSIONS: Session[] = [];
 
-const DEFAULT_STAGES: PipelineStage[] = [
-  { name: "Chunking transcript", weight: 5, mockDuration: 800, mockResult: "14 chunks, 3 need expansion", status: "pending" },
-  { name: "Scoring exam importance", weight: 5, mockDuration: 600, mockResult: "CI% range: 8–95%", status: "pending" },
-  { name: "Transcribing lecture", weight: 5, mockDuration: 700, mockResult: "15,017 words transcribed", status: "pending" },
-  { name: "Grouping concepts", weight: 5, mockDuration: 500, mockResult: "8 groups (1 skipped, 1 minimal)", status: "pending" },
-  { name: "Generating explanations", weight: 60, mockDuration: 3000, mockResult: "7 sections generated", hasSubProgress: true, subTotal: 8, status: "pending" },
-  { name: "Verifying sources", weight: 8, mockDuration: 600, mockResult: "Sources verified against textbooks", status: "pending" },
-  { name: "Checking completeness", weight: 5, mockDuration: 400, mockResult: "97% key terms covered", status: "pending" },
+const TEXT_STAGES: PipelineStage[] = [
+  { name: "Chunking transcript", weight: 5, mockDuration: 800, mockResult: "14 chunks", status: "pending" },
+  { name: "Scoring exam importance", weight: 5, mockDuration: 600, mockResult: "CI% scored", status: "pending" },
+  { name: "Grouping concepts", weight: 5, mockDuration: 500, mockResult: "8 groups", status: "pending" },
+  { name: "Generating explanations", weight: 60, mockDuration: 3000, mockResult: "7 sections generated", hasSubProgress: true, status: "pending" },
+  { name: "Verifying sources", weight: 8, mockDuration: 600, mockResult: "Sources verified", status: "pending" },
+  { name: "Checking completeness", weight: 5, mockDuration: 400, mockResult: "97% covered", status: "pending" },
+  { name: "Inserting slide references", weight: 4, mockDuration: 300, mockResult: "12 slides mapped", status: "pending" },
+  { name: "Assembling final document", weight: 3, mockDuration: 200, mockResult: "Done!", status: "pending" },
+];
+
+const VIDEO_STAGES: PipelineStage[] = [
+  { name: "Transcribing lecture", weight: 15, mockDuration: 2000, mockResult: "Transcribed", status: "pending" },
+  { name: "Chunking transcript", weight: 5, mockDuration: 800, mockResult: "14 chunks", status: "pending" },
+  { name: "Scoring exam importance", weight: 5, mockDuration: 600, mockResult: "CI% scored", status: "pending" },
+  { name: "Grouping concepts", weight: 5, mockDuration: 500, mockResult: "8 groups", status: "pending" },
+  { name: "Generating explanations", weight: 50, mockDuration: 3000, mockResult: "7 sections generated", hasSubProgress: true, status: "pending" },
+  { name: "Verifying sources", weight: 8, mockDuration: 600, mockResult: "Sources verified", status: "pending" },
+  { name: "Checking completeness", weight: 5, mockDuration: 400, mockResult: "97% covered", status: "pending" },
   { name: "Inserting slide references", weight: 4, mockDuration: 300, mockResult: "12 slides mapped", status: "pending" },
   { name: "Assembling final document", weight: 3, mockDuration: 200, mockResult: "Done!", status: "pending" },
 ];
@@ -145,7 +155,7 @@ export const useAppStore = create<AppState>((set, get) => {
   setVideoFile: (f) => set({ videoFile: f }),
 
   // Pipeline
-  stages: DEFAULT_STAGES.map((s) => ({ ...s })),
+  stages: TEXT_STAGES.map((s) => ({ ...s })),
   currentStageIndex: -1,
   subProgress: 0,
   isProcessing: false,
@@ -156,9 +166,6 @@ export const useAppStore = create<AppState>((set, get) => {
   isUploading: false,
 
   startPipeline: () => {
-    const stages = DEFAULT_STAGES.map((s) => ({ ...s, status: "pending" as const }));
-    set({ stages, currentStageIndex: 0, subProgress: 0, isProcessing: true, isDone: false, pipelineError: null, uploadProgress: 0, isUploading: true });
-
     const file = get().transcriptFile || get().videoFile;
     if (!file) {
       set({ isProcessing: false, isUploading: false, pipelineError: "No file selected" });
@@ -166,35 +173,27 @@ export const useAppStore = create<AppState>((set, get) => {
       return;
     }
 
-    const stageMap: Record<string, number> = {
-      "Chunking transcript": 0,
-      "Scoring exam importance": 1,
-      "Transcribing lecture": 2,
-      "Grouping concepts": 3,
-      "Generating explanations": 4,
-      "Verifying sources": 5,
-      "Checking completeness": 6,
-      "Inserting slide references": 7,
-      "Assembling final document": 8,
-      "Done": 8,
-    };
+    const isVideo = /\.(mp4|mkv|avi|mov|webm)$/i.test(file.name);
+    const stageTemplate = isVideo ? VIDEO_STAGES : TEXT_STAGES;
+    const stages = stageTemplate.map((s) => ({ ...s, status: "pending" as const }));
+
+    // Build stageMap dynamically from chosen stages
+    const stageMap: Record<string, number> = {};
+    stages.forEach((s, i) => { stageMap[s.name] = i; });
+    stageMap["Done"] = stages.length - 1;
+
+    set({ stages, currentStageIndex: -1, subProgress: 0, isProcessing: true, isDone: false, pipelineError: null, uploadProgress: 0, isUploading: true });
 
     // Upload file with progress, then stream pipeline via SSE
     (async () => {
       try {
         toast.loading("Uploading lecture...", { id: "upload" });
 
-        set((state) => {
-          const s = [...state.stages];
-          s[0] = { ...s[0], status: "running" };
-          return { stages: s, currentStageIndex: 0 };
-        });
-
         const { file_id } = await uploadFile(file, (percent) => {
           set({ uploadProgress: percent });
         });
 
-        set({ isUploading: false, uploadProgress: 100 });
+        set({ isUploading: false, uploadProgress: 100, currentStageIndex: 0 });
         toast.success("Upload complete!", { id: "upload" });
         toast.loading("Processing lecture...", { id: "pipeline" });
 
@@ -257,7 +256,7 @@ export const useAppStore = create<AppState>((set, get) => {
       isDone: false,
       pipelineError: null,
       currentStageIndex: -1,
-      stages: DEFAULT_STAGES.map((s) => ({ ...s })),
+      stages: TEXT_STAGES.map((s) => ({ ...s })),
     });
   },
 
@@ -284,7 +283,7 @@ export const useAppStore = create<AppState>((set, get) => {
     set({
       transcriptFile: null,
       videoFile: null,
-      stages: DEFAULT_STAGES.map((s) => ({ ...s })),
+      stages: TEXT_STAGES.map((s) => ({ ...s })),
       currentStageIndex: -1,
       subProgress: 0,
       isProcessing: false,

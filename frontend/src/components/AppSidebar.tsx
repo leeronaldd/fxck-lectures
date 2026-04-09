@@ -2,13 +2,16 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { useAppStore } from "@/lib/store";
 import { createClient } from "@/lib/supabase";
+import SettingsModal from "@/components/SettingsModal";
 
 export default function AppSidebar() {
   const router = useRouter();
-  const { user, sessions, sidebarOpen } = useAppStore();
+  const { user, sessions, sidebarOpen, settings, updateSettings } = useAppStore();
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   if (!sidebarOpen) return null;
 
@@ -16,27 +19,37 @@ export default function AppSidebar() {
     <>
       {/* Mobile backdrop */}
       <div
-        className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+        className="fixed inset-0 z-30 lg:hidden"
+        style={{ background: "rgba(0, 0, 0, 0.6)", backdropFilter: "blur(4px)" }}
         onClick={() => useAppStore.getState().setSidebarOpen(false)}
       />
 
       {/* Sidebar */}
       <aside
-        className="fixed top-[49px] left-0 bottom-0 w-[280px] z-30 flex flex-col
-          bg-[var(--bg-primary)] border-r border-[var(--border)]
-          lg:sticky lg:top-[49px] lg:h-[calc(100vh-49px)] lg:z-auto lg:shrink-0"
+        className="fixed top-[56px] left-0 bottom-0 w-[280px] z-30 flex flex-col
+          lg:sticky lg:top-[56px] lg:h-[calc(100vh-56px)] lg:z-auto lg:shrink-0"
+        style={{
+          background: "rgba(10, 10, 15, 0.95)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+          borderRight: "1px solid var(--border)",
+        }}
       >
         {/* New Session button */}
         <div className="p-3">
           <button
             onClick={() => {
               useAppStore.getState().reset();
-              router.push("/");
+              router.push("/upload");
             }}
-            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-[var(--accent-dim)]"
-            style={{ color: "var(--accent)" }}
+            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
+            style={{
+              background: "var(--accent-dim)",
+              color: "var(--accent)",
+              border: "1px solid rgba(255, 107, 53, 0.15)",
+            }}
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M8 3v10M3 8h10" />
             </svg>
             New Session
@@ -49,38 +62,56 @@ export default function AppSidebar() {
             style={{ color: "var(--text-muted)" }}>
             Recent
           </p>
-          {sessions.map((session) => (
-            <button
-              key={session.id}
-              onClick={() => router.push("/reader")}
-              className="w-full text-left px-3 py-2 rounded-lg mb-0.5 hover:bg-[var(--bg-surface)] transition-colors group"
-            >
-              <p className="text-sm truncate" style={{ color: "var(--text-primary)" }}>
-                {session.name}
-              </p>
-              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                {session.date}
-              </p>
-            </button>
-          ))}
+          {sessions.length === 0 ? (
+            <p className="px-3 py-4 text-xs" style={{ color: "var(--text-muted)" }}>
+              No sessions yet. Upload a lecture to get started.
+            </p>
+          ) : (
+            sessions.map((session) => (
+              <button
+                key={session.id}
+                onClick={() => router.push("/reader")}
+                className="w-full text-left px-3 py-2.5 rounded-xl mb-0.5 transition-all group"
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "var(--bg-elevated)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                }}
+              >
+                <p className="text-sm truncate" style={{ color: "var(--text-primary)" }}>
+                  {session.name}
+                </p>
+                <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  {session.date}
+                </p>
+              </button>
+            ))
+          )}
         </div>
 
         {/* Account section */}
-        <div className="relative border-t border-[var(--border)] p-2">
+        <div className="relative p-2" style={{ borderTop: "1px solid var(--border)" }}>
           {/* Account menu dropdown */}
           {accountMenuOpen && (
             <div
-              className="absolute bottom-full left-2 right-2 mb-1 rounded-lg border overflow-hidden"
-              style={{ background: "var(--bg-surface)", borderColor: "var(--border)" }}
+              className="absolute bottom-full left-2 right-2 mb-1 rounded-xl overflow-hidden"
+              style={{
+                background: "rgba(20, 20, 25, 0.95)",
+                backdropFilter: "blur(20px)",
+                border: "1px solid var(--border)",
+                boxShadow: "0 -8px 32px rgba(0, 0, 0, 0.3)",
+              }}
             >
               {user.isLoggedIn ? (
                 <>
-                  <MenuItem label="Settings" onClick={() => { setAccountMenuOpen(false); }} />
-                  <MenuItem label="Learn More" onClick={() => { setAccountMenuOpen(false); }} />
-                  <MenuItem label="Upgrade Plan" onClick={() => { setAccountMenuOpen(false); }} />
-                  <div className="border-t border-[var(--border)]" />
+                  <MenuItem label="Settings" icon="gear" onClick={() => { setAccountMenuOpen(false); setSettingsOpen(true); }} />
+                  <MenuItem label="Learn More" icon="info" onClick={() => { setAccountMenuOpen(false); router.push("/#how-it-works"); }} />
+                  <MenuItem label="Upgrade Plan" icon="star" onClick={() => { setAccountMenuOpen(false); toast("Upgrade plans coming soon!"); }} />
+                  <div style={{ borderTop: "1px solid var(--border)" }} />
                   <MenuItem
                     label="Log Out"
+                    icon="logout"
                     onClick={async () => {
                       const supabase = createClient();
                       await supabase.auth.signOut();
@@ -90,11 +121,12 @@ export default function AppSidebar() {
                 </>
               ) : (
                 <>
-                  <MenuItem label="Settings" onClick={() => { setAccountMenuOpen(false); }} />
-                  <MenuItem label="Learn More" onClick={() => { setAccountMenuOpen(false); }} />
-                  <div className="border-t border-[var(--border)]" />
+                  <MenuItem label="Settings" icon="gear" onClick={() => { setAccountMenuOpen(false); setSettingsOpen(true); }} />
+                  <MenuItem label="Learn More" icon="info" onClick={() => { setAccountMenuOpen(false); router.push("/#how-it-works"); }} />
+                  <div style={{ borderTop: "1px solid var(--border)" }} />
                   <MenuItem
                     label="Sign In"
+                    icon="login"
                     onClick={() => {
                       setAccountMenuOpen(false);
                       router.push("/signin");
@@ -108,13 +140,17 @@ export default function AppSidebar() {
           {/* Account button */}
           <button
             onClick={() => setAccountMenuOpen(!accountMenuOpen)}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[var(--bg-surface)] transition-colors"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all"
+            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-elevated)")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
           >
             {/* Avatar */}
             <div
               className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
               style={{
-                background: user.isLoggedIn ? "var(--accent)" : "var(--bg-elevated)",
+                background: user.isLoggedIn
+                  ? "linear-gradient(135deg, var(--accent), #FF8555)"
+                  : "var(--bg-elevated)",
                 color: user.isLoggedIn ? "#fff" : "var(--text-muted)",
               }}
             >
@@ -122,7 +158,7 @@ export default function AppSidebar() {
             </div>
             <div className="min-w-0 text-left">
               <p className="text-sm truncate" style={{ color: "var(--text-primary)" }}>
-                {user.isLoggedIn ? user.name : "Guest Account"}
+                {user.isLoggedIn ? user.name : "Guest"}
               </p>
               {user.isLoggedIn && (
                 <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
@@ -130,20 +166,55 @@ export default function AppSidebar() {
                 </p>
               )}
             </div>
+            {/* Chevron */}
+            <svg
+              width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"
+              className="ml-auto shrink-0"
+              style={{ color: "var(--text-muted)", transform: accountMenuOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}
+            >
+              <path d="M4 6l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </button>
         </div>
       </aside>
+
+      {settingsOpen && (
+        <SettingsModal
+          settings={settings}
+          onUpdate={updateSettings}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
     </>
   );
 }
 
-function MenuItem({ label, onClick }: { label: string; onClick: () => void }) {
+function MenuItem({ label, icon, onClick }: { label: string; icon: string; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--bg-elevated)] transition-colors"
+      className="w-full text-left px-3 py-2.5 text-sm transition-all flex items-center gap-2.5"
       style={{ color: "var(--text-primary)" }}
+      onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-elevated)")}
+      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
     >
+      <span className="w-4 h-4 flex items-center justify-center" style={{ color: "var(--text-muted)" }}>
+        {icon === "gear" && (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        )}
+        {icon === "info" && (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        )}
+        {icon === "star" && (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
+        )}
+        {icon === "logout" && (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        )}
+        {icon === "login" && (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10,17 15,12 10,7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+        )}
+      </span>
       {label}
     </button>
   );
