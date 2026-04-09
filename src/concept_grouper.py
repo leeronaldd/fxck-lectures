@@ -14,7 +14,7 @@ from src.config import GCP_PROJECT_ID, GCP_LOCATION, CHUNKER_FALLBACK_MODEL
 @dataclass
 class ConceptGroup:
     group_index: int
-    group_name: str                          # e.g., "What Are Viruses?"
+    group_name: str                          # e.g., "Enzyme Kinetics" or "Viral Replication"
     chunk_indices: list[int]                 # which Stage 1 chunks are merged here
     action: str                              # "generate", "skip", "minimal"
     ci_percent: int = 50                     # aggregated CI% (max of constituent chunks)
@@ -34,7 +34,7 @@ class ConceptGroup:
 GROUPING_PROMPT = """You are organizing a lecture transcript into logical concept groups for a personal tutor to explain.
 
 The professor's ordering was chaotic. Your job is to:
-1. MERGE related chunks into logical groups (e.g., merge "Baltimore Framework" + "Baltimore Classes 1-7" into one group)
+1. MERGE related chunks into logical groups (e.g., merge "Overview of Topic X" + "Subtypes of Topic X" into one group)
 2. REORDER if the professor's sequence was illogical for learning
 3. MARK SKIPS for content a tutor would skip (housekeeping, yap, tangential history)
 
@@ -173,81 +173,106 @@ def group_chunks_with_llm(
     return groups
 
 
+def _jaccard(a: set, b: set) -> float:
+    """Jaccard similarity between two sets."""
+    if not a and not b:
+        return 0.0
+    return len(a & b) / len(a | b)
+
+
+def _derive_group_name(chunks: list[Chunk]) -> str:
+    """Derive a group name from the most common key terms across chunks."""
+    from collections import Counter
+    term_counts = Counter()
+    for c in chunks:
+        for t in c.key_terms[:5]:
+            term_counts[t.lower()] = term_counts.get(t.lower(), 0) + 1
+
+    if term_counts:
+        # Use the top 2 terms as the group name
+        top = [t.title() for t, _ in term_counts.most_common(2)]
+        return " & ".join(top)
+    # Fallback: use the first chunk's topic name
+    return chunks[0].topic_name if chunks else "Unknown Topic"
+
+
 def group_chunks_deterministic(
     chunks: list[Chunk],
     ci_scores: dict[int, CIScore] | None = None,
 ) -> list[ConceptGroup]:
     """Fallback: deterministic grouping without LLM.
 
-    Uses hardcoded grouping logic for the microbiology lecture.
+    Groups chunks by key_terms overlap — works for any medical subject.
+    First 1-2 chunks become "Course Overview" (minimal), remaining chunks
+    are grouped by term similarity.
     """
     ci_map = ci_scores or {}
-    chunk_map = {c.chunk_index: c for c in chunks}
 
-    # Hardcoded groups for microbiology lecture
-    group_defs = [
-        {
-            "group_name": "Course Overview",
-            "chunk_indices": [0, 1],
-            "action": "minimal",
-        },
-        {
-            "group_name": "What Are Viruses?",
-            "chunk_indices": [2, 3],
-            "action": "generate",
-        },
-        {
-            "group_name": "Virus Shapes & Sizes",
-            "chunk_indices": [4, 5],
-            "action": "generate",
-        },
-        {
-            "group_name": "Virus Naming & Classification",
-            "chunk_indices": [6],
-            "action": "skip",
-            "skip_message": "Professor rambled about naming history. Not tested.",
-        },
-        {
-            "group_name": "The Baltimore Classification System",
-            "chunk_indices": [7, 8],
-            "action": "generate",
-            "needs_expansion": True,
-            "expansion_hints": [
-                "Professor skimmed this but you NEED it for exams.",
-                "Group classes logically: DNA viruses, ready-to-go RNA, backwards RNA, rule-breakers.",
-                "Explain positive/negative sense BEFORE the classes.",
-            ],
-        },
-        {
-            "group_name": "Viral Evolution & Bacteriophages",
-            "chunk_indices": [9],
-            "action": "generate",
-        },
-        {
-            "group_name": "How Viruses Infect Cells",
-            "chunk_indices": [10, 11],
-            "action": "generate",
-        },
-        {
-            "group_name": "Animal Virus Families",
-            "chunk_indices": [12, 13],
-            "action": "generate",
-        },
-    ]
+    if not chunks:
+        return []
+
+    # Separate intro chunks from content chunks
+    intro_chunks = [c for c in chunks if c.chunk_index <= 1]
+    content_chunks = [c for c in chunks if c.chunk_index > 1]
 
     groups = []
-    for i, gd in enumerate(group_defs):
-        indices = gd["chunk_indices"]
-        group_chunks = [chunk_map[idx] for idx in indices if idx in chunk_map]
+    group_idx = 0
 
+    # First group: Course Overview (minimal)
+    if intro_chunks:
+        all_terms = []
+        all_transcripts = []
+        for c in intro_chunks:
+            all_terms.extend(c.key_terms)
+            all_transcripts.append(c.transcript_text)
+
+        groups.append(ConceptGroup(
+            group_index=group_idx,
+            group_name="Course Overview",
+            chunk_indices=[c.chunk_index for c in intro_chunks],
+            action="minimal",
+            ci_percent=0,
+            raw_transcript="\n\n---\n\n".join(all_transcripts),
+            key_terms=list(dict.fromkeys(t.lower() for t in all_terms))[:10],
+        ))
+        group_idx += 1
+
+    # Group remaining chunks by key_terms similarity
+    # Each chunk starts as ungrouped; merge chunks with overlapping terms
+    assigned = set()
+    cluster_list = []  # list of lists of Chunk
+
+    for chunk in content_chunks:
+        if chunk.chunk_index in assigned:
+            continue
+
+        cluster = [chunk]
+        assigned.add(chunk.chunk_index)
+        chunk_terms = set(t.lower() for t in chunk.key_terms)
+
+        # Try to merge subsequent chunks with similar terms
+        for other in content_chunks:
+            if other.chunk_index in assigned:
+                continue
+            other_terms = set(t.lower() for t in other.key_terms)
+            if _jaccard(chunk_terms, other_terms) >= 0.15:
+                cluster.append(other)
+                assigned.add(other.chunk_index)
+                chunk_terms |= other_terms  # expand the cluster's term set
+
+        cluster_list.append(cluster)
+
+    # Build ConceptGroups from clusters
+    for cluster in cluster_list:
+        indices = [c.chunk_index for c in cluster]
         all_terms = []
         all_prereqs = []
         all_transcripts = []
         max_ci = 0
         max_emphasis = "LOW"
-        any_expansion = gd.get("needs_expansion", False)
+        any_expansion = False
 
-        for gc in group_chunks:
+        for gc in cluster:
             all_terms.extend(gc.key_terms)
             all_prereqs.extend(gc.prerequisites)
             all_transcripts.append(gc.transcript_text)
@@ -259,6 +284,14 @@ def group_chunks_deterministic(
             if rank.get(gc.emphasis_score, 0) > rank.get(max_emphasis, 0):
                 max_emphasis = gc.emphasis_score
 
+        # Determine action based on CI%
+        if ci_map and max_ci < 20:
+            action = "skip"
+            skip_msg = f"Low exam relevance (CI% {max_ci}%). Skipped."
+        else:
+            action = "generate"
+            skip_msg = ""
+
         seen = set()
         unique_terms = []
         for t in all_terms:
@@ -267,19 +300,19 @@ def group_chunks_deterministic(
                 unique_terms.append(t)
 
         groups.append(ConceptGroup(
-            group_index=i,
-            group_name=gd["group_name"],
+            group_index=group_idx,
+            group_name=_derive_group_name(cluster),
             chunk_indices=indices,
-            action=gd.get("action", "generate"),
+            action=action,
             ci_percent=max_ci if ci_map else 50,
-            skip_message=gd.get("skip_message", ""),
+            skip_message=skip_msg,
             raw_transcript="\n\n---\n\n".join(all_transcripts),
             key_terms=unique_terms[:20],
             prerequisites=list(set(all_prereqs))[:10],
-            expansion_hints=gd.get("expansion_hints", []),
             needs_expansion=any_expansion,
             emphasis_score=max_emphasis,
         ))
+        group_idx += 1
 
     return groups
 

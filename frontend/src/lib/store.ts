@@ -52,6 +52,7 @@ interface AppState {
   sessions: Session[];
   loadSessions: () => void;
   loadSession: (sessionId: string) => Promise<void>;
+  deleteSession: (sessionId: string) => Promise<void>;
 
   // Sidebar
   sidebarOpen: boolean;
@@ -163,6 +164,13 @@ export const useAppStore = create<AppState>((set, get) => {
         (data.concept_groups || []) as ConceptGroup[],
         (data.verification_report || []) as VerificationClaim[],
       );
+    }
+  },
+  deleteSession: async (sessionId: string) => {
+    const { deleteSession: apiDelete } = await import("./api");
+    const ok = await apiDelete(sessionId);
+    if (ok) {
+      set((s) => ({ sessions: s.sessions.filter((sess) => sess.id !== sessionId) }));
     }
   },
 

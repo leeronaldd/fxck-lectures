@@ -303,7 +303,7 @@ CURRENT EXPLANATION TEXT:
 {explanation_text}
 \"\"\"
 
-For each missing term, find the sentence where the concept is already described and insert the bolded term naturally. For example, if "budding" is missing and the text says "it pushes its way out, wrapping itself in host membrane," change it to "it pushes its way out in a process called **budding**, wrapping itself in host membrane."
+For each missing term, find the sentence where the concept is already described and insert the bolded term naturally. For example, if "budding" is missing and the text says "it pushes its way out, wrapping itself in host membrane," change it to "it pushes its way out in a process called **budding**, wrapping itself in host membrane." Or if "depolarization" is missing and the text says "sodium rushes into the cell and the voltage shoots up," change it to "sodium rushes into the cell, causing **depolarization** — the voltage shoots up."
 
 Return ONLY the updated explanation text. Do not add new content — just insert the missing term names at the right points. Keep everything else identical."""
 

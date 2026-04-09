@@ -59,7 +59,14 @@ async def get_current_user(request: Request) -> dict:
             algorithms=[alg],
             audience="authenticated",
         )
-        return {"id": payload["sub"], "email": payload.get("email", "")}
+        # Email can be in different places depending on auth method
+        email = (
+            payload.get("email")
+            or payload.get("user_metadata", {}).get("email")
+            or payload.get("app_metadata", {}).get("email")
+            or ""
+        )
+        return {"id": payload["sub"], "email": email}
 
     except JWTError as e:
         raise HTTPException(status_code=401, detail=f"Invalid token: {e}")

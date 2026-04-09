@@ -25,129 +25,46 @@ from src.config import GCP_PROJECT_ID, GCP_LOCATION, CHUNKER_FALLBACK_MODEL
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
-# OpenStax textbook chapter lookup tables
-# Hardcoded URLs = 100% reliable, zero LLM calls for URL resolution
-# Add new textbooks as needed (anatomy, pharmacology, etc.)
+# Textbook retrieval: search-based with caching
+# Uses Google Search grounding to find OpenStax chapters dynamically,
+# falls back to NCBI Bookshelf. Works for ANY medical subject.
 # ---------------------------------------------------------------------------
 
-_OPENSTAX_BASE = "https://openstax.org/books"
-
-TEXTBOOK_CHAPTERS = {
-    "microbiology": {
-        # Ch 1: Introduction to Microbiology
-        "introduction": f"{_OPENSTAX_BASE}/microbiology/pages/1-1-what-our-ancestors-knew",
-        "history": f"{_OPENSTAX_BASE}/microbiology/pages/1-2-a-systematic-approach",
-        # Ch 2: Microscopy
-        "microscopy": f"{_OPENSTAX_BASE}/microbiology/pages/2-1-the-properties-of-light",
-        # Ch 3: Cell Structure
-        "prokaryotic cells": f"{_OPENSTAX_BASE}/microbiology/pages/3-3-unique-characteristics-of-prokaryotic-cells",
-        "eukaryotic cells": f"{_OPENSTAX_BASE}/microbiology/pages/3-4-unique-characteristics-of-eukaryotic-cells",
-        "cell wall": f"{_OPENSTAX_BASE}/microbiology/pages/3-3-unique-characteristics-of-prokaryotic-cells",
-        "cell membrane": f"{_OPENSTAX_BASE}/microbiology/pages/3-1-spontaneous-generation",
-        # Ch 6: Virology
-        "virus": f"{_OPENSTAX_BASE}/microbiology/pages/6-1-viruses",
-        "viruses": f"{_OPENSTAX_BASE}/microbiology/pages/6-1-viruses",
-        "viral structure": f"{_OPENSTAX_BASE}/microbiology/pages/6-1-viruses",
-        "viral classification": f"{_OPENSTAX_BASE}/microbiology/pages/6-1-viruses",
-        "baltimore": f"{_OPENSTAX_BASE}/microbiology/pages/6-1-viruses",
-        "viral life cycle": f"{_OPENSTAX_BASE}/microbiology/pages/6-2-the-viral-life-cycle",
-        "viral replication": f"{_OPENSTAX_BASE}/microbiology/pages/6-2-the-viral-life-cycle",
-        "lytic": f"{_OPENSTAX_BASE}/microbiology/pages/6-2-the-viral-life-cycle",
-        "lysogenic": f"{_OPENSTAX_BASE}/microbiology/pages/6-2-the-viral-life-cycle",
-        "bacteriophage": f"{_OPENSTAX_BASE}/microbiology/pages/6-2-the-viral-life-cycle",
-        "animal virus": f"{_OPENSTAX_BASE}/microbiology/pages/6-3-isolation-culture-and-identification-of-viruses",
-        "viral evolution": f"{_OPENSTAX_BASE}/microbiology/pages/6-1-viruses",
-        "viral infection": f"{_OPENSTAX_BASE}/microbiology/pages/6-2-the-viral-life-cycle",
-        # Ch 7: Microbial Biochemistry
-        "metabolism": f"{_OPENSTAX_BASE}/microbiology/pages/8-1-energy-matter-and-enzymes",
-        "enzyme": f"{_OPENSTAX_BASE}/microbiology/pages/8-1-energy-matter-and-enzymes",
-        # Ch 9: Microbial Growth
-        "bacterial growth": f"{_OPENSTAX_BASE}/microbiology/pages/9-1-how-microbes-grow",
-        # Ch 11: Mechanisms of Microbial Genetics
-        "genetics": f"{_OPENSTAX_BASE}/microbiology/pages/11-1-the-functions-of-genetic-material",
-        "dna replication": f"{_OPENSTAX_BASE}/microbiology/pages/11-2-dna-replication",
-        "transcription": f"{_OPENSTAX_BASE}/microbiology/pages/11-3-rna-transcription",
-        "translation": f"{_OPENSTAX_BASE}/microbiology/pages/11-4-protein-synthesis-translation",
-        # Ch 13: Antimicrobials
-        "antibiotic": f"{_OPENSTAX_BASE}/microbiology/pages/14-1-history-of-chemotherapy-and-antimicrobial-discovery",
-        "antimicrobial": f"{_OPENSTAX_BASE}/microbiology/pages/14-2-fundamentals-of-antimicrobial-chemotherapy",
-        # Ch 15: Immune System
-        "immune": f"{_OPENSTAX_BASE}/microbiology/pages/17-1-innate-nonspecific-host-defenses",
-        "inflammation": f"{_OPENSTAX_BASE}/microbiology/pages/17-4-inflammation-and-fever",
-    },
-    "anatomy": {
-        "muscle": f"{_OPENSTAX_BASE}/anatomy-and-physiology-2e/pages/10-1-overview-of-muscle-tissues",
-        "muscle contraction": f"{_OPENSTAX_BASE}/anatomy-and-physiology-2e/pages/10-3-muscle-fiber-contraction-and-relaxation",
-        "skeletal": f"{_OPENSTAX_BASE}/anatomy-and-physiology-2e/pages/6-1-the-functions-of-the-skeletal-system",
-        "bone": f"{_OPENSTAX_BASE}/anatomy-and-physiology-2e/pages/6-3-bone-structure",
-        "neuron": f"{_OPENSTAX_BASE}/anatomy-and-physiology-2e/pages/12-1-basic-structure-and-function-of-the-nervous-system",
-        "action potential": f"{_OPENSTAX_BASE}/anatomy-and-physiology-2e/pages/12-4-the-action-potential",
-        "cardiac": f"{_OPENSTAX_BASE}/anatomy-and-physiology-2e/pages/19-1-heart-anatomy",
-        "respiratory": f"{_OPENSTAX_BASE}/anatomy-and-physiology-2e/pages/22-1-organs-and-structures-of-the-respiratory-system",
-    },
-}
+# Track textbook sources for verification reporting
+_textbook_sources: list[dict] = []
 
 
-def fetch_textbook_chapter(topic_name: str, subject: str = "microbiology") -> str | None:
+def fetch_textbook_chapter(topic_name: str, subject: str | None = None) -> str | None:
     """Fetch the most relevant textbook chapter for a topic.
 
-    Uses a hardcoded lookup table for 100% reliability — zero LLM calls
-    for URL resolution. Matches topic keywords against chapter entries.
+    Uses AI-powered search to find OpenStax chapters dynamically,
+    with NCBI Bookshelf as fallback. Caches results for 90 days.
+    Works for any medical/health subject — no hardcoded URLs.
 
     Returns the chapter text (up to 5000 chars) or None if not found.
     """
-    import urllib.request
-    import re
+    from src.textbook_search import search_textbook
 
-    # Step 1: Look up the right chapter URL from the table
-    chapters = TEXTBOOK_CHAPTERS.get(subject, TEXTBOOK_CHAPTERS.get("microbiology", {}))
-    topic_lower = topic_name.lower()
+    result = search_textbook(topic_name)
 
-    url = None
-    # Try exact keyword matches first, then partial
-    for keyword, chapter_url in chapters.items():
-        if keyword in topic_lower:
-            url = chapter_url
-            break
+    # Log the source for verification reporting
+    _textbook_sources.append({
+        "section": topic_name,
+        "textbook_source": result.get("url"),
+        "source_type": result.get("source_type", "none"),
+    })
 
-    # Broader match: check if any chapter keyword appears in the topic
-    if not url:
-        for keyword, chapter_url in chapters.items():
-            if any(word in topic_lower for word in keyword.split()):
-                url = chapter_url
-                break
+    return result.get("text")
 
-    if not url:
-        print(f"    No textbook chapter mapped for '{topic_name}'")
-        return None
 
-    # Step 2: Fetch the chapter page
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        resp = urllib.request.urlopen(req, timeout=15)
-        html = resp.read().decode("utf-8")
-    except Exception as e:
-        print(f"    Failed to fetch {url}: {e}")
-        return None
+def get_textbook_source_log() -> list[dict]:
+    """Return the textbook source log for inclusion in verification reports."""
+    return list(_textbook_sources)
 
-    # Step 3: Extract text content
-    text = re.sub(r"<script[^>]*>.*?</script>", "", html, flags=re.DOTALL)
-    text = re.sub(r"<style[^>]*>.*?</style>", "", text, flags=re.DOTALL)
-    text = re.sub(r"<[^>]+>", " ", text)
-    text = re.sub(r"\s+", " ", text)
 
-    # Find actual content start
-    for marker in ["Learning Objectives", "By the end of this section", "Introduction"]:
-        start = text.find(marker)
-        if start > 0:
-            text = text[start:]
-            break
-
-    # Cap at 5000 chars (enough context for fact-checking, saves tokens)
-    chapter_text = text[:5000].strip()
-    if chapter_text:
-        print(f"    Fetched textbook: {url[:60]}... ({len(chapter_text)} chars)")
-    return chapter_text if chapter_text else None
+def reset_textbook_source_log():
+    """Reset the source log (call at start of each pipeline run)."""
+    _textbook_sources.clear()
 
 
 @dataclass
@@ -351,6 +268,9 @@ def verify_and_ground(
     """
     from src.config import GENERATOR_MODEL
 
+    # Reset textbook source log for this run
+    reset_textbook_source_log()
+
     all_verifications = []
 
     for expl in explanations:
@@ -417,6 +337,21 @@ def verify_and_ground(
                 exam_relevant=note.get("exam_relevant", True),
                 exam_notes=note.get("exam_notes", ""),
             ))
+
+    # Log textbook source coverage
+    sources = get_textbook_source_log()
+    if sources:
+        total = len(sources)
+        no_textbook = sum(1 for s in sources if s["source_type"] == "none")
+        google_fallback = sum(1 for s in sources if s["source_type"] == "google_search_fallback")
+        weak = no_textbook + google_fallback
+        if weak > total * 0.5:
+            print(f"\n  ⚠️  Textbook coverage warning: {weak}/{total} sections had no OpenStax source.")
+            print(f"      This may indicate connectivity issues or an unsupported subject area.")
+        else:
+            openstax = sum(1 for s in sources if s["source_type"] == "openstax")
+            ncbi = sum(1 for s in sources if s["source_type"] == "ncbi_bookshelf")
+            print(f"\n  📚 Textbook sources: {openstax} OpenStax, {ncbi} NCBI, {no_textbook} none")
 
     return explanations, all_verifications
 
@@ -511,7 +446,11 @@ def format_verification_report(verifications: list[ClaimVerification]) -> str:
 
 
 def save_verification_report(verifications: list[ClaimVerification], output_path: str):
-    """Save verification report to JSON."""
+    """Save verification report to JSON, including textbook source log."""
+    report = {
+        "claims": [asdict(v) for v in verifications],
+        "textbook_sources": get_textbook_source_log(),
+    }
     with open(output_path, "w", encoding="utf-8") as f:
-        json.dump([asdict(v) for v in verifications], f, indent=2, ensure_ascii=False)
+        json.dump(report, f, indent=2, ensure_ascii=False)
     print(f"Saved verification report ({len(verifications)} claims) to {output_path}")

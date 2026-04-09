@@ -56,6 +56,13 @@ def run_pipeline(input_path: str) -> Generator[dict, None, None]:
                    "error": f"Unsupported file type: {input_file.suffix}. Use .txt, .mp4, .mkv, .avi, .mov, or .webm"}
             return
 
+        # --- Guard: reject transcripts too short to contain real content ---
+        word_count = len(text.split())
+        if word_count < 100:
+            yield {"status": "error", "stage": "Chunking transcript", "progress": 5,
+                   "error": f"Transcript too short ({word_count} words). Need at least 100 words of lecture content."}
+            return
+
         # --- Step 1: Chunking ---
         yield {"status": "running", "stage": "Chunking transcript", "progress": 12}
         chunks = chunk_transcript(text)
@@ -81,8 +88,12 @@ def run_pipeline(input_path: str) -> Generator[dict, None, None]:
 
         # --- Step 3: Concept Grouping ---
         yield {"status": "running", "stage": "Grouping concepts", "progress": 25}
-        from src.concept_grouper import group_chunks_deterministic, save_groups
-        groups = group_chunks_deterministic(chunks, ci_map or None)
+        from src.concept_grouper import group_chunks_with_llm, group_chunks_deterministic, save_groups
+        try:
+            groups = group_chunks_with_llm(chunks, ci_map or None)
+        except Exception as e:
+            print(f"  LLM grouper failed ({e}), falling back to deterministic")
+            groups = group_chunks_deterministic(chunks, ci_map or None)
         groups_path = output_dir / f"{job_id}_groups.json"
         save_groups(groups, str(groups_path))
 
@@ -109,18 +120,29 @@ def run_pipeline(input_path: str) -> Generator[dict, None, None]:
         yield {"status": "running", "stage": "Verifying sources", "progress": 85}
         verification_path = output_dir / f"{job_id}_verification.json"
         try:
-            from src.fact_checker import fact_check_document
-            fact_check_document(output_path, str(verification_path))
-        except Exception:
-            pass  # Non-fatal
+            from src.fact_checker import verify_and_ground, save_verification_report
+            explanations_raw = json.loads(Path(output_path).read_text(encoding="utf-8"))
+            corrected, verifications = verify_and_ground(explanations_raw, groups_with_text)
+            # Save corrected explanations back
+            Path(output_path).write_text(
+                json.dumps(corrected, indent=2, ensure_ascii=False), encoding="utf-8"
+            )
+            save_verification_report(verifications, str(verification_path))
+        except Exception as e:
+            print(f"  Fact-checking failed: {e}")  # Non-fatal
 
         # --- Step 7: Completeness check ---
         yield {"status": "running", "stage": "Checking completeness", "progress": 90}
         try:
-            from src.completeness_checker import check_completeness
-            check_completeness(output_path, str(chunks_path))
-        except Exception:
-            pass  # Non-fatal
+            from src.completeness_checker import auto_fix
+            explanations_raw = json.loads(Path(output_path).read_text(encoding="utf-8"))
+            explanations_raw, misses = auto_fix(explanations_raw, groups_with_text)
+            # Save updated explanations
+            Path(output_path).write_text(
+                json.dumps(explanations_raw, indent=2, ensure_ascii=False), encoding="utf-8"
+            )
+        except Exception as e:
+            print(f"  Completeness check failed: {e}")  # Non-fatal
 
         # --- Step 8: Assembly ---
         yield {"status": "running", "stage": "Assembling final document", "progress": 95}

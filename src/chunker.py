@@ -106,6 +106,36 @@ SEED_TERMS = {
     "inflammation", "necrosis", "apoptosis", "edema", "fibrosis",
     "hyperplasia", "hypertrophy", "atrophy", "metaplasia", "dysplasia",
     "neoplasm", "benign", "malignant", "metastasis", "carcinoma",
+    # --- Biochemistry ---
+    "amino acid", "peptide bond", "polypeptide", "tertiary structure",
+    "quaternary structure", "denaturation", "michaelis-menten",
+    "allosteric", "competitive inhibition", "non-competitive inhibition",
+    "gluconeogenesis", "glycogenolysis", "beta oxidation", "ketogenesis",
+    "urea cycle", "pentose phosphate", "citric acid cycle",
+    "fatty acid", "cholesterol", "phospholipid", "triglyceride",
+    # --- Immunology ---
+    "t cell", "b cell", "helper t cell", "cytotoxic t cell",
+    "mhc class i", "mhc class ii", "humoral immunity", "cell mediated immunity",
+    "hypersensitivity", "autoimmune", "tolerance", "vaccination",
+    "immunoglobulin", "opsonization", "memory cell",
+    "natural killer cell", "dendritic cell", "macrophage",
+    # --- Genetics ---
+    "allele", "genotype", "phenotype", "homozygous", "heterozygous",
+    "dominant", "recessive", "codominant", "epistasis", "linkage",
+    "crossing over", "restriction enzyme", "crispr",
+    "mutation", "point mutation", "frameshift", "chromosomal",
+    "meiosis", "mitosis", "ploidy", "karyotype",
+    # --- Neuroscience ---
+    "dopamine", "serotonin", "norepinephrine", "acetylcholine",
+    "gaba", "glutamate", "blood brain barrier", "myelin",
+    "saltatory conduction", "long term potentiation",
+    "autonomic nervous system", "sympathetic", "parasympathetic",
+    "reflex arc", "cerebral cortex", "hippocampus", "amygdala",
+    # --- Endocrinology ---
+    "hormone", "endocrine", "hypothalamus", "pituitary",
+    "thyroid", "adrenal", "insulin", "glucagon",
+    "cortisol", "aldosterone", "negative feedback", "positive feedback",
+    "testosterone", "estrogen", "progesterone", "growth hormone",
     # --- Lab techniques ---
     "plaque assay", "pcr", "rt-pcr", "serology", "electron microscopy",
     "elisa", "western blot", "gel electrophoresis", "flow cytometry",
@@ -311,9 +341,9 @@ def polish_topic_name(name: str, key_terms: list[str], text: str) -> str:
         or any(c in name for c in ["'re", "'", "  "])  # artifacts
         or name.lower().startswith(("way ", "when ", "class one"))  # obvious garble
         or len(words) > 5  # too long = garbled
-        or (len(words) >= 3 and name.lower().count("virus") >= 2)  # repeated word
-        or name.lower() in {"proariots first", "naming viruses"}  # known bad names
-        or "replication genome" in name.lower()  # garbled compound
+        or (len(words) >= 3 and any(
+            name.lower().split().count(w) >= 2 for w in name.lower().split() if len(w) > 3
+        ))  # any word repeated multiple times
         or re.search(r"\b(based|includes|see)\s*$", name.lower())  # trailing junk word
     )
 
@@ -421,6 +451,37 @@ def _derive_topic_from_content(text: str, key_terms: list[str], use_llm: bool = 
         (r"(?:inflammation|inflammatory)\s+(?:response|process)", "Inflammatory Response"),
         (r"(?:neoplasia|tumor|cancer)\s+(?:development|growth)", "Neoplasia"),
         (r"(?:necrosis|apoptosis|cell\s+death)", "Cell Death Mechanisms"),
+
+        # --- Biochemistry-specific ---
+        (r"enzyme\s+(?:kinetics|regulation|inhibition)", "Enzyme Kinetics"),
+        (r"(?:amino\s+acid|protein)\s+(?:structure|folding)", "Protein Structure"),
+        (r"(?:metabolic|catabolic|anabolic)\s+pathway", "Metabolic Pathways"),
+        (r"(?:krebs|citric\s+acid|tca)\s+cycle", "Citric Acid Cycle"),
+        (r"(?:glycolysis|gluconeogenesis|glycogen)", "Glucose Metabolism"),
+        (r"(?:fatty\s+acid|lipid)\s+(?:metabolism|oxidation|synthesis)", "Lipid Metabolism"),
+
+        # --- Immunology-specific ---
+        (r"(?:innate|adaptive|humoral|cell.mediated)\s+immun", "Immune Response"),
+        (r"(?:t\s+cell|b\s+cell|lymphocyte)\s+(?:activation|differentiation)", "Lymphocyte Biology"),
+        (r"(?:antigen|antibody)\s+(?:presentation|recognition)", "Antigen Recognition"),
+        (r"(?:mhc|major\s+histocompatibility)", "MHC & Antigen Presentation"),
+        (r"(?:hypersensitivity|allerg)", "Hypersensitivity Reactions"),
+
+        # --- Genetics-specific ---
+        (r"(?:mendelian|non.mendelian)\s+(?:genetics|inheritance)", "Inheritance Patterns"),
+        (r"(?:gene|dna)\s+(?:regulation|expression)", "Gene Regulation"),
+        (r"(?:chromosom|karyotype|ploidy)", "Chromosomal Biology"),
+        (r"(?:mutation|mutagenesis)", "Mutations & Mutagenesis"),
+
+        # --- Neuroscience-specific ---
+        (r"(?:synaptic|neural)\s+(?:transmission|plasticity)", "Synaptic Transmission"),
+        (r"(?:autonomic|somatic)\s+nervous", "Autonomic Nervous System"),
+        (r"(?:dopamine|serotonin|neurotransmitter)\s+(?:pathway|system)", "Neurotransmitter Systems"),
+
+        # --- Endocrinology-specific ---
+        (r"(?:hormone|endocrine)\s+(?:regulation|signaling|system)", "Endocrine Regulation"),
+        (r"(?:hypothalamic|pituitary|thyroid|adrenal)\s+(?:axis|function)", "Endocrine Axis"),
+        (r"(?:insulin|glucagon|diabetes)", "Glucose Homeostasis"),
     ]
 
     for pattern, name in topic_patterns:

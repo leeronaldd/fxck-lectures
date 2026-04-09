@@ -40,19 +40,49 @@ _original_filenames: dict[str, str] = {}
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://husdhmaijvughqezlmjt.supabase.co")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "sb_publishable_CwLFt3Pfeaeq5iP0foroCA_tMmPucAy")
 
-# Unlimited usage for these emails
+# Unlimited usage for these emails (store canonical form — lowercase, no dots for gmail)
 UNLIMITED_EMAILS = {
-    "lee.wang.hong0215@gmail.com",
-    "lee.pak.wai0706@gmail.com",
+    "leewanghong0215@gmail.com",
+    "leepakwai0706@gmail.com",
 }
 FREE_USAGE_LIMIT = 1
+
+# Custom limits per email (overrides FREE_USAGE_LIMIT)
+# Store in canonical form (no dots for gmail). Add friends here:
+CUSTOM_LIMITS = {
+    # "friend@gmail.com": 10,
+}
+
+
+def _normalize_email(email: str) -> str:
+    """Normalize email for consistent comparison.
+
+    Gmail ignores dots in the local part and is case-insensitive:
+    Lee.Wang.Hong0215@gmail.com = leewanghong0215@gmail.com
+    Also handles googlemail.com (alias for gmail.com).
+    """
+    email = email.lower().strip()
+    if not email or "@" not in email:
+        return email
+
+    local, domain = email.rsplit("@", 1)
+
+    # Gmail/Googlemail: strip dots from local part
+    if domain in ("gmail.com", "googlemail.com"):
+        local = local.replace(".", "")
+        domain = "gmail.com"  # normalize googlemail → gmail
+
+    return f"{local}@{domain}"
 
 
 async def _check_usage(user: dict, request: Request) -> None:
     """Check if user has remaining usage. Raises 403 if limit exceeded."""
-    email = user.get("email", "")
+    email = _normalize_email(user.get("email", ""))
     if email in UNLIMITED_EMAILS:
         return  # Unlimited access
+
+    # Check custom limit or use default
+    limit = CUSTOM_LIMITS.get(email, FREE_USAGE_LIMIT)
 
     user_id = user["id"]
     token = request.headers.get("authorization", "").split(" ", 1)[-1]
@@ -69,10 +99,11 @@ async def _check_usage(user: dict, request: Request) -> None:
         )
         if resp.status_code == 200:
             count = len(resp.json())
-            if count >= FREE_USAGE_LIMIT:
+            if count >= limit:
+                remaining = limit - count
                 raise HTTPException(
                     status_code=403,
-                    detail="You've used your free lecture. Upgrade for unlimited access.",
+                    detail=f"You've used all {limit} of your lectures. Upgrade for unlimited access.",
                 )
 
 
@@ -194,6 +225,31 @@ async def get_session(
             if data:
                 return data[0]
         raise HTTPException(status_code=404, detail="Session not found")
+
+
+@app.delete("/api/sessions/{session_id}")
+async def delete_session(
+    session_id: str,
+    user: dict = Depends(get_current_user),
+    request: Request = None,
+):
+    """Delete a session owned by the current user."""
+    token = request.headers.get("authorization", "").split(" ", 1)[-1]
+    async with httpx.AsyncClient() as client:
+        resp = await client.delete(
+            f"{SUPABASE_URL}/rest/v1/sessions",
+            params={
+                "id": f"eq.{session_id}",
+                "user_id": f"eq.{user['id']}",
+            },
+            headers={
+                "apikey": SUPABASE_ANON_KEY,
+                "Authorization": f"Bearer {token}",
+            },
+        )
+        if resp.status_code in (200, 204):
+            return {"ok": True}
+        raise HTTPException(status_code=resp.status_code, detail="Failed to delete session")
 
 
 @app.get("/api/run/{file_id}")

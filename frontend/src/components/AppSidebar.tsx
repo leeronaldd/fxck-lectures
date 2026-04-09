@@ -9,7 +9,7 @@ import SettingsModal from "@/components/SettingsModal";
 
 export default function AppSidebar() {
   const router = useRouter();
-  const { user, sessions, sidebarOpen, settings, updateSettings, loadSession } = useAppStore();
+  const { user, sessions, sidebarOpen, settings, updateSettings, loadSession, deleteSession } = useAppStore();
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -68,13 +68,9 @@ export default function AppSidebar() {
             </p>
           ) : (
             sessions.map((session) => (
-              <button
+              <div
                 key={session.id}
-                onClick={async () => {
-                  await loadSession(session.id);
-                  router.push("/reader");
-                }}
-                className="w-full text-left px-3 py-2.5 rounded-xl mb-0.5 transition-all group"
+                className="flex items-center rounded-xl mb-0.5 transition-all group"
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = "var(--bg-elevated)";
                 }}
@@ -82,13 +78,36 @@ export default function AppSidebar() {
                   e.currentTarget.style.background = "transparent";
                 }}
               >
-                <p className="text-sm truncate" style={{ color: "var(--text-primary)" }}>
-                  {session.name}
-                </p>
-                <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                  {session.date}
-                </p>
-              </button>
+                <button
+                  onClick={async () => {
+                    await loadSession(session.id);
+                    router.push("/reader");
+                  }}
+                  className="flex-1 text-left px-3 py-2.5 min-w-0"
+                >
+                  <p className="text-sm truncate" style={{ color: "var(--text-primary)" }}>
+                    {session.name}
+                  </p>
+                  <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                    {session.date}
+                  </p>
+                </button>
+                <button
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    await deleteSession(session.id);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 p-2 mr-1 rounded-lg transition-opacity"
+                  style={{ color: "var(--text-muted)" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "#ef4444")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
+                  title="Delete session"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              </div>
             ))
           )}
         </div>

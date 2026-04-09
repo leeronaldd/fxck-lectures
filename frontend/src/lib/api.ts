@@ -94,6 +94,15 @@ export async function fetchSession(sessionId: string): Promise<{
   return res.json();
 }
 
+export async function deleteSession(sessionId: string): Promise<boolean> {
+  const token = await getToken();
+  const res = await fetch(`${API_URL}/api/sessions/${sessionId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.ok;
+}
+
 export function runPipeline(
   fileId: string,
   onUpdate: (event: PipelineEvent) => void,

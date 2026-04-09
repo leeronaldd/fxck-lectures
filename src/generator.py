@@ -80,6 +80,9 @@ Good: "the virus exits via **budding** — pushing its way out and wrapping itse
 Bad: "the cell shrinks and breaks into fragments"
 Good: "the cell undergoes **apoptosis** — it shrinks and breaks into fragments"
 
+Bad: "the membrane voltage drops back down after the sodium channels close"
+Good: "the cell undergoes **repolarization** — the membrane voltage drops back down as sodium channels close and potassium flows out"
+
 If you describe a process without naming it, that is a BUG. Scan your output and make sure every described mechanism has its scientific term bolded on first use.
 
 === TEACHING PATTERNS (use for complex concepts) ===

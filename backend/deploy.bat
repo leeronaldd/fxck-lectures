@@ -1,5 +1,6 @@
 @echo off
-REM Deploy backend to GCP Cloud Run — run from project root: backend\deploy.bat
+REM Deploy backend to GCP Cloud Run
+cd /d "%~dp0\.."
 SET PROJECT_ID=project-bc1fc31b-94c5-44b0-904
 SET SERVICE_NAME=fxck-lectures-api
 SET REGION=australia-southeast1
@@ -9,6 +10,7 @@ echo Building and pushing image...
 call gcloud builds submit --project %PROJECT_ID% --tag %IMAGE% --timeout=600s
 if %ERRORLEVEL% NEQ 0 (
     echo BUILD FAILED
+    pause
     exit /b 1
 )
 
@@ -17,3 +19,4 @@ call gcloud run deploy %SERVICE_NAME% --project %PROJECT_ID% --image %IMAGE% --r
 
 echo.
 echo Done! Backend: https://%SERVICE_NAME%-211270844056.%REGION%.run.app
+pause
