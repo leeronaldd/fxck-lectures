@@ -61,7 +61,7 @@ export default function LandingPage() {
       <header
         className="relative z-20 flex items-center justify-between px-6 sm:px-10 py-4"
       >
-        <span className="text-lg font-bold tracking-tight gradient-text">Klare</span>
+        <img src="/brand/logo-full-dark.svg" alt="Klare" className="h-7" />
         <button
           onClick={() => router.push("/signin")}
           className="text-xs px-4 py-2 rounded-lg font-medium transition-all"

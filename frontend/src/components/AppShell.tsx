@@ -62,9 +62,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           {/* Logo */}
           <button
             onClick={() => router.push("/")}
-            className="text-lg font-bold tracking-tight transition-opacity hover:opacity-80"
+            className="transition-opacity hover:opacity-80"
           >
-            <span className="gradient-text">Klare</span>
+            <img src="/brand/logo-full-dark.svg" alt="Klare" className="h-7" />
           </button>
         </div>
 

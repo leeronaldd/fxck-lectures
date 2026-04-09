@@ -104,9 +104,9 @@ export default function SignInPage() {
       >
         <button
           onClick={() => router.push("/")}
-          className="text-lg font-bold tracking-tight hover:opacity-80 transition-opacity"
+          className="hover:opacity-80 transition-opacity"
         >
-          <span className="gradient-text">Klare</span>
+          <img src="/brand/logo-full-dark.svg" alt="Klare" className="h-7" />
         </button>
       </header>
 

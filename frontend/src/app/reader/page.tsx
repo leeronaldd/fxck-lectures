@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import TrustBar from "@/components/TrustBar";
-import TOCSidebar from "@/components/TOCSidebar";
 import { useAppStore } from "@/lib/store";
 import {
   getMarkdownContent,
@@ -26,8 +25,6 @@ export default function ReaderPage() {
     verifiedPercent: 0,
   });
   const [loading, setLoading] = useState(true);
-  const [tocOpen, setTocOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState("");
 
   // Auto-collapse app sidebar on reader page (user can re-open with hamburger)
   useEffect(() => {
@@ -63,30 +60,6 @@ export default function ReaderPage() {
     load();
   }, [store.markdown, store.groups, store.trustStats]);
 
-  // Track active heading for TOC highlight
-  useEffect(() => {
-    if (!markdown) return;
-    // Small delay to let markdown render
-    const timer = setTimeout(() => {
-      const headings = document.querySelectorAll("h2[id]");
-      if (!headings.length) return;
-
-      const observer = new IntersectionObserver(
-        (entries) => {
-          for (const entry of entries) {
-            if (entry.isIntersecting) {
-              setActiveSection(entry.target.id);
-            }
-          }
-        },
-        { rootMargin: "-20% 0px -70% 0px" }
-      );
-
-      headings.forEach((h) => observer.observe(h));
-      return () => observer.disconnect();
-    }, 200);
-    return () => clearTimeout(timer);
-  }, [markdown]);
 
   if (loading) {
     return (
@@ -141,14 +114,6 @@ export default function ReaderPage() {
 
   return (
     <div className="flex flex-1 overflow-x-hidden">
-      {/* Table of contents */}
-      <TOCSidebar
-        groups={groups}
-        activeSection={activeSection}
-        isOpen={tocOpen}
-        onToggle={() => setTocOpen(!tocOpen)}
-      />
-
       {/* Document */}
       <div className="flex-1 min-w-0 overflow-x-hidden">
         <div className="max-w-[820px] mx-auto px-6 lg:px-16 py-8 pb-16 overflow-hidden">
