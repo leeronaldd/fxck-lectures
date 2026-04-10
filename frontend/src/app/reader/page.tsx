@@ -40,20 +40,8 @@ export default function ReaderPage() {
         setGroups(store.groups);
         setTrustStats(store.trustStats);
       } else {
-        // Try loading static files as fallback, but don't crash if missing
-        try {
-          const [md, grps, claims] = await Promise.all([
-            getMarkdownContent(),
-            getConceptGroups(),
-            getVerificationReport(),
-          ]);
-          setMarkdown(md);
-          setGroups(grps);
-          setTrustStats(computeTrustStats(claims));
-        } catch {
-          // No data available — show empty state
-          setMarkdown("");
-        }
+        // No data in store — show empty state
+        setMarkdown("");
       }
       setLoading(false);
     }
