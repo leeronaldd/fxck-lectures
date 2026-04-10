@@ -1,0 +1,6 @@
+<svg width="400" height="400" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+  <!-- Round background -->
+  <circle cx="200" cy="200" r="200" fill="#FF6B35"/>
+  <!-- K mark -->
+  <path d="M130 110 L130 290 M130 200 L270 110 M130 200 L270 290" stroke="#fff" stroke-width="28" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

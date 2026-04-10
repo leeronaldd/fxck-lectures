@@ -10,3 +10,4 @@ frontend/public/data/
 .claude/
 .vercel
 .env*.local
+.env.deploy

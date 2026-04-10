@@ -34,6 +34,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
+  // Show nothing while auth is loading to prevent flash of wrong page
+  if (authLoading && PROTECTED_PATHS.includes(pathname)) {
+    return (
+      <div className="h-screen flex items-center justify-center" style={{ background: "var(--bg-base)" }}>
+        <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }} />
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen flex flex-col">
       {/* Top bar — glassmorphism */}
@@ -64,8 +73,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <button
             onClick={() => {
               if (user.isLoggedIn) {
-                useAppStore.getState().reset();
                 router.push("/upload");
+                setTimeout(() => useAppStore.getState().reset(), 100);
               } else {
                 router.push("/");
               }

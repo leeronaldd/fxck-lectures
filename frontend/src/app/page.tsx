@@ -194,6 +194,60 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* ───── Sample Preview ───── */}
+        <section className="pb-20">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl sm:text-3xl font-bold mb-3" style={{ color: "var(--text-primary)" }}>
+              See the quality
+            </h2>
+            <p className="text-sm max-w-lg mx-auto" style={{ color: "var(--text-secondary)" }}>
+              This is real output from a microbiology lecture. The professor rambled for 2 hours — we turned it into this.
+            </p>
+          </div>
+
+          {/* Browser mockup */}
+          <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)", background: "var(--bg-elevated)" }}>
+            {/* Browser chrome */}
+            <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: "1px solid var(--border)" }}>
+              <div className="flex gap-1.5">
+                <div className="w-3 h-3 rounded-full" style={{ background: "#ff5f57" }} />
+                <div className="w-3 h-3 rounded-full" style={{ background: "#febc2e" }} />
+                <div className="w-3 h-3 rounded-full" style={{ background: "#28c840" }} />
+              </div>
+              <div className="flex-1 mx-4">
+                <div className="text-xs px-3 py-1 rounded-md text-center" style={{ background: "var(--bg-base)", color: "var(--text-muted)" }}>
+                  fxck-lectures.vercel.app/reader
+                </div>
+              </div>
+            </div>
+            {/* Content preview */}
+            <div className="px-8 sm:px-16 py-8 max-h-[500px] overflow-hidden relative" style={{ background: "var(--bg-base)" }}>
+              <h2 className="text-xl font-bold mb-4" style={{ color: "var(--text-primary)" }}>The Baltimore Classification System</h2>
+              <p className="text-sm mb-4 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                Imagine trying to play a PlayStation 5 game on an Xbox. It doesn&apos;t matter how incredible the game is; the console just can&apos;t read the disc. Viruses face the exact same problem when they break into our cells.
+              </p>
+              <p className="text-sm mb-4 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                As we covered earlier, viruses are <span style={{ color: "var(--accent)" }}>obligate intracellular parasites</span> — they have to hijack a host cell to survive. But just getting inside isn&apos;t enough. To make new <span style={{ color: "var(--accent)" }}>virions</span> (fully assembled virus particles), the virus has to hand its genetic instructions over to our cell&apos;s machinery to build viral proteins.
+              </p>
+              <div className="rounded-lg p-4 mb-4" style={{ background: "rgba(255,107,53,0.08)", borderLeft: "3px solid var(--accent)" }}>
+                <p className="text-sm leading-relaxed" style={{ color: "var(--text-primary)" }}>
+                  To make sense of this mess, we use the <strong style={{ color: "var(--accent)" }}>Baltimore Classification System</strong>. You absolutely need to know this for your exam. It groups viruses into seven classes based on one simple question: <em>How does this virus get its genome turned into mRNA?</em>
+                </p>
+              </div>
+              <p className="text-sm mb-3 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                Our cells read <strong style={{ color: "var(--text-primary)" }}>mRNA</strong> (messenger RNA) to build proteins.
+              </p>
+              <div className="ml-4 mb-3">
+                <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                  If a virus has <span style={{ color: "var(--accent)" }}>positive-sense (+)</span> RNA, it has it easy. This RNA is basically a perfectly formatted mRNA molecule. Our cellular machinery can read it and start building viral proteins the second it enters the cell.
+                </p>
+              </div>
+              {/* Fade overlay */}
+              <div className="absolute bottom-0 left-0 right-0 h-32" style={{ background: "linear-gradient(transparent, var(--bg-base))" }} />
+            </div>
+          </div>
+        </section>
+
         {/* ───── CTA Banner ───── */}
         <section className="pb-24">
           <div

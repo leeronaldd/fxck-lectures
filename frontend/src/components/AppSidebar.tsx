@@ -41,8 +41,8 @@ export default function AppSidebar() {
         <div className="p-3">
           <button
             onClick={() => {
-              useAppStore.getState().reset();
               router.push("/upload");
+              setTimeout(() => useAppStore.getState().reset(), 100);
             }}
             className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
             style={{
@@ -151,21 +151,41 @@ export default function AppSidebar() {
                     </button>
                   </div>
                 ) : (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDeleteConfirm(session.id);
-                    }}
-                    className="opacity-0 group-hover:opacity-100 p-2 mr-1 rounded-lg transition-opacity"
-                    style={{ color: "var(--text-muted)" }}
-                    onMouseEnter={(e) => (e.currentTarget.style.color = "#ef4444")}
-                    onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
-                    title="Delete session"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                      <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </button>
+                  <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    {/* Rename */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setRenaming(session.id);
+                        setRenameValue(session.name);
+                      }}
+                      className="p-1.5 rounded-lg"
+                      style={{ color: "var(--text-muted)" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
+                      title="Rename"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                      </svg>
+                    </button>
+                    {/* Delete */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteConfirm(session.id);
+                      }}
+                      className="p-1.5 mr-1 rounded-lg"
+                      style={{ color: "var(--text-muted)" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.color = "#ef4444")}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
+                      title="Delete"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14" />
+                      </svg>
+                    </button>
+                  </div>
                 )}
               </div>
             ))
@@ -188,7 +208,6 @@ export default function AppSidebar() {
               {user.isLoggedIn ? (
                 <>
                   <MenuItem label="Settings" icon="gear" onClick={() => { setAccountMenuOpen(false); router.push("/settings"); }} />
-                  <MenuItem label="Learn More" icon="info" onClick={() => { setAccountMenuOpen(false); router.push("/"); }} />
                   <MenuItem label="Upgrade Plan" icon="star" onClick={() => { setAccountMenuOpen(false); router.push("/settings?tab=Billing"); }} />
                   <div style={{ borderTop: "1px solid var(--border)" }} />
                   <MenuItem
@@ -204,7 +223,6 @@ export default function AppSidebar() {
               ) : (
                 <>
                   <MenuItem label="Settings" icon="gear" onClick={() => { setAccountMenuOpen(false); router.push("/settings"); }} />
-                  <MenuItem label="Learn More" icon="info" onClick={() => { setAccountMenuOpen(false); router.push("/#how-it-works"); }} />
                   <div style={{ borderTop: "1px solid var(--border)" }} />
                   <MenuItem
                     label="Sign In"
