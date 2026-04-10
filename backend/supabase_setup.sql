@@ -40,3 +40,36 @@ CREATE POLICY "Users read own sessions" ON public.sessions
 -- Service role can insert (backend saves after pipeline)
 CREATE POLICY "Service role insert sessions" ON public.sessions
   FOR INSERT WITH CHECK (true);
+
+-- Users can delete their own sessions
+CREATE POLICY "Users delete own sessions" ON public.sessions
+  FOR DELETE USING (auth.uid() = user_id);
+
+-- User profiles table (quiz answers + display settings)
+CREATE TABLE IF NOT EXISTS public.user_profiles (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL UNIQUE,
+  display_name TEXT,
+  avatar_color TEXT DEFAULT '#FF6B35',
+  study_program TEXT,      -- medicine, nursing, pharmacy, dentistry, other
+  study_year TEXT,          -- 1st year, 2nd year, 3rd year, 4th year+
+  frustration TEXT,         -- biggest lecture frustration
+  referral_source TEXT,     -- friend, tiktok, google, other
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_profiles_user_id ON public.user_profiles(user_id);
+
+ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
+
+-- Users can read/update their own profile
+CREATE POLICY "Users read own profile" ON public.user_profiles
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users update own profile" ON public.user_profiles
+  FOR UPDATE USING (auth.uid() = user_id);
+
+-- Service role can insert/upsert (backend saves after quiz)
+CREATE POLICY "Service role manage profiles" ON public.user_profiles
+  FOR ALL USING (true) WITH CHECK (true);

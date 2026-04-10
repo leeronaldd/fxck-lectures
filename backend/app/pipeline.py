@@ -16,11 +16,13 @@ def _ensure_imports():
         sys.path.insert(0, root_str)
 
 
-def run_pipeline(input_path: str) -> Generator[dict, None, None]:
+def run_pipeline(input_path: str, user_profile: dict | None = None) -> Generator[dict, None, None]:
     """Run the v4 pipeline, yielding progress dicts at each stage.
 
     Each yield is a dict with: status, stage, progress, error, output.
     The caller (SSE endpoint) sends these to the client.
+
+    user_profile: optional dict with study_program, study_year from quiz.
     """
     _ensure_imports()
 
@@ -106,7 +108,14 @@ def run_pipeline(input_path: str) -> Generator[dict, None, None]:
 
         # --- Step 5: Generation ---
         yield {"status": "running", "stage": "Generating explanations", "progress": 35}
-        from src.generator import generate_from_groups
+        from src.generator import generate_from_groups, set_student_context
+
+        # Pass student profile to generator if available
+        if user_profile:
+            program = user_profile.get("study_program", "")
+            year = user_profile.get("study_year", "")
+            if program or year:
+                set_student_context(program=program, year=year)
 
         output_path = str(output_dir / f"{job_id}_output.md")
         generate_from_groups(

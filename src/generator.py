@@ -135,6 +135,48 @@ No hard word limits. Some concepts need 600 words (complex classification system
 
 
 # ---------------------------------------------------------------------------
+# Student context — set by pipeline when user profile is available
+# ---------------------------------------------------------------------------
+
+_STUDENT_CONTEXT = ""
+
+
+def set_student_context(program: str = "", year: str = ""):
+    """Set the student's context from their quiz answers.
+
+    This adjusts the system prompt to match their assumed knowledge level.
+    """
+    global _STUDENT_CONTEXT
+    parts = []
+    if year and program:
+        parts.append(f"This student is a {year} {program} student.")
+    elif year:
+        parts.append(f"This student is in their {year}.")
+    elif program:
+        parts.append(f"This student is studying {program}.")
+
+    if year:
+        y = year.lower()
+        if "1st" in y:
+            parts.append("Assume NO prior knowledge — build every concept from scratch.")
+        elif "2nd" in y:
+            parts.append("Assume basic biology knowledge (cell structure, DNA/RNA, basic biochemistry). Skip foundational explanations but still introduce new mechanisms from scratch.")
+        elif "3rd" in y:
+            parts.append("Assume solid foundational knowledge. Focus on mechanisms, clinical relevance, and exam-specific detail. Skip basic definitions.")
+        elif "4th" in y:
+            parts.append("Advanced student. Focus on clinical applications, differential diagnosis, and high-yield exam detail. Be concise.")
+
+    _STUDENT_CONTEXT = " ".join(parts)
+
+
+def get_full_system_prompt() -> str:
+    """Return SYSTEM_PROMPT with student context appended if available."""
+    if _STUDENT_CONTEXT:
+        return SYSTEM_PROMPT + f"\n\n=== STUDENT PROFILE ===\n\n{_STUDENT_CONTEXT}"
+    return SYSTEM_PROMPT
+
+
+# ---------------------------------------------------------------------------
 # Chunk classification
 # ---------------------------------------------------------------------------
 
@@ -980,7 +1022,7 @@ def _generate_single_group(args: tuple) -> dict:
     prompt = build_group_prompt(group, prior_names, textbook_context=textbook)
 
     try:
-        text = call_llm_with_retry(prompt, max_tokens=8192)
+        text = call_llm_with_retry(prompt, system_prompt=get_full_system_prompt(), max_tokens=8192)
     except Exception as e:
         text = f"[GENERATION FAILED — group {group.group_index}: {e}]"
 

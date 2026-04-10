@@ -94,6 +94,29 @@ export async function fetchSession(sessionId: string): Promise<{
   return res.json();
 }
 
+export async function fetchProfile(): Promise<Record<string, string> | null> {
+  const token = await getToken();
+  const res = await fetch(`${API_URL}/api/profile`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return Object.keys(data).length > 0 ? data : null;
+}
+
+export async function updateProfile(profile: Record<string, string>): Promise<boolean> {
+  const token = await getToken();
+  const res = await fetch(`${API_URL}/api/profile`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(profile),
+  });
+  return res.ok;
+}
+
 export async function createCheckoutSession(period: "monthly" | "yearly"): Promise<string | null> {
   const token = await getToken();
   const res = await fetch(`${API_URL}/api/checkout`, {

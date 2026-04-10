@@ -44,18 +44,32 @@ function SettingsContent() {
   const [studyProgram, setStudyProgram] = useState("");
   const [studyYear, setStudyYear] = useState("");
 
-  // Load quiz answers from localStorage on mount
+  // Load profile from backend (falls back to localStorage)
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("klare_quiz");
-      if (saved) {
-        const answers = JSON.parse(saved);
-        for (const a of answers) {
-          if (a.question.includes("studying")) setStudyProgram(a.answer);
-          if (a.question.includes("year")) setStudyYear(a.answer);
+    (async () => {
+      try {
+        const { fetchProfile } = await import("@/lib/api");
+        const profile = await fetchProfile();
+        if (profile) {
+          if (profile.display_name) setDisplayName(profile.display_name);
+          if (profile.avatar_color) setAvatarColor(profile.avatar_color);
+          if (profile.study_program) setStudyProgram(profile.study_program);
+          if (profile.study_year) setStudyYear(profile.study_year);
+          return;
         }
-      }
-    } catch {}
+      } catch {}
+      // Fallback to localStorage
+      try {
+        const saved = localStorage.getItem("klare_quiz");
+        if (saved) {
+          const answers = JSON.parse(saved);
+          for (const a of answers) {
+            if (a.question.includes("studying")) setStudyProgram(a.answer);
+            if (a.question.includes("year")) setStudyYear(a.answer);
+          }
+        }
+      } catch {}
+    })();
   }, []);
 
   return (
@@ -164,7 +178,12 @@ function SettingsContent() {
 
             {/* Save */}
             <button
-              onClick={() => toast("Profile updated!")}
+              onClick={async () => {
+                const { updateProfile } = await import("@/lib/api");
+                const ok = await updateProfile({ display_name: displayName, avatar_color: avatarColor });
+                if (ok) toast("Profile updated!");
+                else toast("Failed to save. Try again.");
+              }}
               className="px-6 py-2.5 rounded-xl text-sm font-medium"
               style={{
                 background: "var(--accent)",
@@ -458,13 +477,11 @@ function SettingsContent() {
 
             {/* Save */}
             <button
-              onClick={() => {
-                const quiz = [
-                  { question: "What are you studying?", answer: studyProgram },
-                  { question: "What year are you in?", answer: studyYear },
-                ];
-                localStorage.setItem("klare_quiz", JSON.stringify(quiz));
-                toast("Customization saved!");
+              onClick={async () => {
+                const { updateProfile } = await import("@/lib/api");
+                const ok = await updateProfile({ study_program: studyProgram, study_year: studyYear });
+                if (ok) toast("Customization saved!");
+                else toast("Failed to save. Try again.");
               }}
               className="px-6 py-2.5 rounded-xl text-sm font-medium"
               style={{ background: "var(--accent)", color: "#fff" }}

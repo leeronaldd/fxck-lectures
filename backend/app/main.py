@@ -259,6 +259,67 @@ async def delete_session(
         raise HTTPException(status_code=resp.status_code, detail="Failed to delete session")
 
 
+@app.get("/api/profile")
+async def get_profile(
+    user: dict = Depends(get_current_user),
+    request: Request = None,
+):
+    """Get the current user's profile."""
+    token = request.headers.get("authorization", "").split(" ", 1)[-1]
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{SUPABASE_URL}/rest/v1/user_profiles",
+            params={"user_id": f"eq.{user['id']}", "select": "*", "limit": "1"},
+            headers={"apikey": SUPABASE_ANON_KEY, "Authorization": f"Bearer {token}"},
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            if data:
+                return data[0]
+        return {}
+
+
+@app.put("/api/profile")
+async def update_profile(
+    request: Request,
+    user: dict = Depends(get_current_user),
+):
+    """Update or create the user's profile (upsert)."""
+    body = await request.json()
+    token = request.headers.get("authorization", "").split(" ", 1)[-1]
+
+    # Build the profile data
+    profile = {
+        "user_id": user["id"],
+        "display_name": body.get("display_name"),
+        "avatar_color": body.get("avatar_color"),
+        "study_program": body.get("study_program"),
+        "study_year": body.get("study_year"),
+        "frustration": body.get("frustration"),
+        "referral_source": body.get("referral_source"),
+        "updated_at": "now()",
+    }
+    # Remove None values
+    profile = {k: v for k, v in profile.items() if v is not None}
+
+    async with httpx.AsyncClient() as client:
+        # Upsert — insert or update on conflict
+        resp = await client.post(
+            f"{SUPABASE_URL}/rest/v1/user_profiles",
+            json=profile,
+            headers={
+                "apikey": SUPABASE_ANON_KEY,
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+                "Prefer": "resolution=merge-duplicates,return=representation",
+            },
+        )
+        if resp.status_code in (200, 201):
+            data = resp.json()
+            return data[0] if data else profile
+        raise HTTPException(status_code=resp.status_code, detail="Failed to save profile")
+
+
 @app.post("/api/checkout")
 async def create_checkout_session(
     request: Request,
@@ -302,6 +363,23 @@ async def run_pipeline_stream(
     input_path = str(matching[0])
     original_filename = _original_filenames.get(file_id, matching[0].stem)
 
+    # Fetch user profile for personalized generation
+    user_profile = None
+    try:
+        token = request.headers.get("authorization", "").split(" ", 1)[-1]
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"{SUPABASE_URL}/rest/v1/user_profiles",
+                params={"user_id": f"eq.{user['id']}", "select": "study_program,study_year", "limit": "1"},
+                headers={"apikey": SUPABASE_ANON_KEY, "Authorization": f"Bearer {token}"},
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if data:
+                    user_profile = data[0]
+    except Exception:
+        pass  # Non-fatal — pipeline runs fine without profile
+
     # Shared state between pipeline thread and async generator
     events: list[dict] = []
     finished = False
@@ -311,7 +389,7 @@ async def run_pipeline_stream(
         nonlocal finished
         from app.pipeline import run_pipeline
 
-        for progress in run_pipeline(input_path):
+        for progress in run_pipeline(input_path, user_profile=user_profile):
             with lock:
                 events.append(progress)
         with lock:
