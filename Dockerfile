@@ -20,4 +20,5 @@ COPY data/ ./data/
 ENV PYTHONUNBUFFERED=1
 
 # Cloud Run uses PORT env var (default 8080)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Hypercorn supports HTTP/2, removing Cloud Run's 32MB body limit for HTTP/1.1
+CMD ["hypercorn", "app.main:app", "--bind", "0.0.0.0:8080"]

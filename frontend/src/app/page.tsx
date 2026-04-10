@@ -118,6 +118,118 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* ───── Sample Preview ───── */}
+        <section className="pb-20">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl sm:text-3xl font-bold mb-3" style={{ color: "var(--text-primary)" }}>
+              See the quality
+            </h2>
+            <p className="text-sm max-w-lg mx-auto" style={{ color: "var(--text-secondary)" }}>
+              This is real output from a microbiology lecture. The professor rambled for 2 hours — we turned it into this.
+            </p>
+          </div>
+
+          {/* Browser mockup */}
+          <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)", background: "var(--bg-elevated)" }}>
+            {/* Browser chrome */}
+            <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: "1px solid var(--border)" }}>
+              <div className="flex gap-1.5">
+                <div className="w-3 h-3 rounded-full" style={{ background: "#ff5f57" }} />
+                <div className="w-3 h-3 rounded-full" style={{ background: "#febc2e" }} />
+                <div className="w-3 h-3 rounded-full" style={{ background: "#28c840" }} />
+              </div>
+              <div className="flex-1 mx-4">
+                <div className="text-xs px-3 py-1 rounded-md text-center" style={{ background: "var(--bg-base)", color: "var(--text-muted)" }}>
+                  fxck-lectures.vercel.app/reader
+                </div>
+              </div>
+            </div>
+            {/* Content preview — exact reader output */}
+            <div className="px-8 sm:px-16 py-8" style={{ background: "var(--bg-base)" }}>
+              <h2 className="text-xl font-bold mb-5" style={{ color: "var(--text-primary)" }}>The Baltimore Classification System</h2>
+
+              <p className="text-sm mb-4 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                Imagine trying to play a PlayStation 5 game on an Xbox. It doesn&apos;t matter how incredible the game is; the console just can&apos;t read the disc. Viruses face the exact same problem when they break into our cells.
+              </p>
+
+              <p className="text-sm mb-4 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                As we covered earlier, viruses are <span style={{ color: "var(--accent)" }}>obligate intracellular parasites</span>&mdash;they have to hijack a host cell to survive. But just getting inside isn&apos;t enough. To make new <span style={{ color: "var(--accent)" }}>virions</span> (fully assembled virus particles), the virus has to hand its genetic instructions over to our cell&apos;s machinery to build viral proteins. The problem? Viruses carry their genomes in all sorts of weird formats, while our cells only naturally know how to read one specific sequence: DNA to RNA to Protein.
+              </p>
+
+              <div className="rounded-lg p-4 mb-5" style={{ background: "rgba(255,107,53,0.08)", borderLeft: "3px solid var(--accent)" }}>
+                <p className="text-sm leading-relaxed" style={{ color: "var(--text-primary)" }}>
+                  To make sense of this mess, we use the <strong style={{ color: "var(--accent)" }}>Baltimore Classification System</strong>. You absolutely need to know this for your exam. It groups viruses into seven classes based on one simple question: <em>How does this virus get its genome turned into mRNA?</em>
+                </p>
+              </div>
+
+              <p className="text-sm mb-4 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                Before we look at the groups, we need to clear up a massive stumbling block: RNA sense.
+              </p>
+
+              <p className="text-sm mb-3 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                Our cells read <strong style={{ color: "var(--text-primary)" }}>mRNA</strong> (messenger RNA) to build proteins.
+              </p>
+
+              <div className="ml-4 mb-3">
+                <p className="text-sm leading-relaxed mb-3" style={{ color: "var(--text-secondary)" }}>
+                  If a virus has <span style={{ color: "var(--accent)" }}>positive-sense (+)</span> RNA, it has it easy. This RNA is basically a perfectly formatted mRNA molecule. Our cellular machinery can read it and start building viral proteins the second it enters the cell.
+                </p>
+                <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                  If a virus has <span style={{ color: "var(--accent)" }}>negative-sense (-)</span> RNA, it&apos;s like handing the cell a blueprint written entirely in reverse. Our machinery can&apos;t read it. The virus has to make a complementary positive-sense copy before anything else can happen.
+                </p>
+              </div>
+
+              <p className="text-sm mb-4 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                Now, let&apos;s group the seven Baltimore classes logically so you don&apos;t have to blindly memorize them.
+              </p>
+
+              {/* The Traditionalists: DNA Viruses */}
+              <h3 className="text-base font-bold mb-2 mt-6" style={{ color: "var(--text-primary)" }}>
+                {"\uD83E\uDDEA"} The Traditionalists: DNA Viruses
+              </h3>
+              <p className="text-sm mb-3 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                These guys play by our cell&apos;s rules. Our cells normally transcribe double-stranded DNA into mRNA, so these viruses fit right in.
+              </p>
+              <p className="text-sm mb-3 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                <strong style={{ color: "var(--accent)" }}>Group I: Double-stranded DNA (dsDNA).</strong> This is exactly what our own cells use. The virus just hands its dsDNA over to our cellular enzymes, which transcribe it into mRNA. Easy.
+              </p>
+              <p className="text-sm mb-3 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                <strong style={{ color: "var(--accent)" }}>Group II: Single-stranded DNA (ssDNA).</strong> Our cells don&apos;t like single-stranded DNA. So, the first step is for the host cell to build a second DNA strand, temporarily turning it into dsDNA. From there, it acts exactly like Group I.
+              </p>
+
+              {/* The Fast Trackers */}
+              <h3 className="text-base font-bold mb-2 mt-6" style={{ color: "var(--text-primary)" }}>
+                {"\uD83C\uDFC3"} The Fast Trackers: Ready-to-Go RNA
+              </h3>
+              <p className="text-sm mb-3 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                <strong style={{ color: "var(--accent)" }}>Group IV: Positive-sense single-stranded RNA (+ssRNA).</strong> These viruses don&apos;t even need to visit the nucleus. The moment they enter the cell, our ribosomes (the protein builders) latch onto the +ssRNA and start translating it into viral proteins immediately.
+              </p>
+
+              {/* The Mirror-Image RNA */}
+              <h3 className="text-base font-bold mb-2 mt-6" style={{ color: "var(--text-primary)" }}>
+                {"\uD83E\uDE9E"} The Mirror-Image RNA
+              </h3>
+              <p className="text-sm mb-3 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                <strong style={{ color: "var(--accent)" }}>Group III: Double-stranded RNA (dsRNA).</strong> The virus uses the negative strand as a template to churn out positive-sense mRNA.
+              </p>
+              <p className="text-sm mb-3 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                <strong style={{ color: "var(--accent)" }}>Group V: Negative-sense single-stranded RNA (-ssRNA).</strong> This genome is backwards. The virus <em>must</em> pack its own polymerase enzyme inside its capsid. As soon as it enters, that enzyme reads the negative strand and transcribes it into positive-sense mRNA. Think Ebola, measles, rabies.
+              </p>
+
+              {/* The Rule Breakers */}
+              <h3 className="text-base font-bold mb-2 mt-6" style={{ color: "var(--text-primary)" }}>
+                {"\uD83D\uDD75\uFE0F"} The Rule Breakers
+              </h3>
+              <p className="text-sm mb-3 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                <strong style={{ color: "var(--accent)" }}>Group VI: Retroviruses (+ssRNA).</strong> These viruses have positive-sense RNA, but they <em>don&apos;t</em> use it as mRNA. Instead, they carry <strong style={{ color: "var(--accent)" }}>reverse transcriptase</strong> which converts their RNA into DNA. That viral DNA then permanently stitches itself into the host cell&apos;s own DNA. HIV is the poster child.
+              </p>
+              <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                <strong style={{ color: "var(--accent)" }}>Group VII: dsDNA with Reverse Transcriptase.</strong> Viruses like Hepatitis B start with dsDNA. They transcribe it into mRNA normally, but to package new genomes, they use reverse transcriptase to turn that mRNA <em>back</em> into dsDNA. Completely chaotic, but it works.
+              </p>
+            </div>
+          </div>
+        </section>
+
         {/* ───── Features Grid ───── */}
         <section className="pb-20">
           <div className="text-center mb-12">
@@ -191,60 +303,6 @@ export default function LandingPage() {
                 )}
               </div>
             ))}
-          </div>
-        </section>
-
-        {/* ───── Sample Preview ───── */}
-        <section className="pb-20">
-          <div className="text-center mb-8">
-            <h2 className="text-2xl sm:text-3xl font-bold mb-3" style={{ color: "var(--text-primary)" }}>
-              See the quality
-            </h2>
-            <p className="text-sm max-w-lg mx-auto" style={{ color: "var(--text-secondary)" }}>
-              This is real output from a microbiology lecture. The professor rambled for 2 hours — we turned it into this.
-            </p>
-          </div>
-
-          {/* Browser mockup */}
-          <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)", background: "var(--bg-elevated)" }}>
-            {/* Browser chrome */}
-            <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: "1px solid var(--border)" }}>
-              <div className="flex gap-1.5">
-                <div className="w-3 h-3 rounded-full" style={{ background: "#ff5f57" }} />
-                <div className="w-3 h-3 rounded-full" style={{ background: "#febc2e" }} />
-                <div className="w-3 h-3 rounded-full" style={{ background: "#28c840" }} />
-              </div>
-              <div className="flex-1 mx-4">
-                <div className="text-xs px-3 py-1 rounded-md text-center" style={{ background: "var(--bg-base)", color: "var(--text-muted)" }}>
-                  fxck-lectures.vercel.app/reader
-                </div>
-              </div>
-            </div>
-            {/* Content preview */}
-            <div className="px-8 sm:px-16 py-8 max-h-[500px] overflow-hidden relative" style={{ background: "var(--bg-base)" }}>
-              <h2 className="text-xl font-bold mb-4" style={{ color: "var(--text-primary)" }}>The Baltimore Classification System</h2>
-              <p className="text-sm mb-4 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                Imagine trying to play a PlayStation 5 game on an Xbox. It doesn&apos;t matter how incredible the game is; the console just can&apos;t read the disc. Viruses face the exact same problem when they break into our cells.
-              </p>
-              <p className="text-sm mb-4 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                As we covered earlier, viruses are <span style={{ color: "var(--accent)" }}>obligate intracellular parasites</span> — they have to hijack a host cell to survive. But just getting inside isn&apos;t enough. To make new <span style={{ color: "var(--accent)" }}>virions</span> (fully assembled virus particles), the virus has to hand its genetic instructions over to our cell&apos;s machinery to build viral proteins.
-              </p>
-              <div className="rounded-lg p-4 mb-4" style={{ background: "rgba(255,107,53,0.08)", borderLeft: "3px solid var(--accent)" }}>
-                <p className="text-sm leading-relaxed" style={{ color: "var(--text-primary)" }}>
-                  To make sense of this mess, we use the <strong style={{ color: "var(--accent)" }}>Baltimore Classification System</strong>. You absolutely need to know this for your exam. It groups viruses into seven classes based on one simple question: <em>How does this virus get its genome turned into mRNA?</em>
-                </p>
-              </div>
-              <p className="text-sm mb-3 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                Our cells read <strong style={{ color: "var(--text-primary)" }}>mRNA</strong> (messenger RNA) to build proteins.
-              </p>
-              <div className="ml-4 mb-3">
-                <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                  If a virus has <span style={{ color: "var(--accent)" }}>positive-sense (+)</span> RNA, it has it easy. This RNA is basically a perfectly formatted mRNA molecule. Our cellular machinery can read it and start building viral proteins the second it enters the cell.
-                </p>
-              </div>
-              {/* Fade overlay */}
-              <div className="absolute bottom-0 left-0 right-0 h-32" style={{ background: "linear-gradient(transparent, var(--bg-base))" }} />
-            </div>
           </div>
         </section>
 

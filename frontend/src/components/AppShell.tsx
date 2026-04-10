@@ -20,14 +20,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   // Route protection
   useEffect(() => {
     if (authLoading) return;
-    if (user.isLoggedIn && isSignInPage) {
-      router.push("/upload");
+    if (user.isLoggedIn && (isSignInPage || isLandingPage)) {
+      router.replace("/upload");
       return;
     }
     if (!user.isLoggedIn && PROTECTED_PATHS.includes(pathname)) {
       router.push("/signin");
     }
-  }, [user.isLoggedIn, authLoading, pathname, isSignInPage, router]);
+  }, [user.isLoggedIn, authLoading, pathname, isSignInPage, isLandingPage, router]);
 
   // Don't show app shell on sign-in, quiz, or landing page (for guests only)
   if (isSignInPage || isQuizPage || (isLandingPage && !user.isLoggedIn)) {

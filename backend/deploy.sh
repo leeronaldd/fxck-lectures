@@ -20,6 +20,7 @@ gcloud run deploy "$SERVICE_NAME" \
   --region "$REGION" \
   --platform managed \
   --allow-unauthenticated \
+  --use-http2 \
   --memory 2Gi \
   --timeout 900 \
   --concurrency 1 \

@@ -99,8 +99,17 @@ export default function AppSidebar() {
                       autoFocus
                       value={renameValue}
                       onChange={(e) => setRenameValue(e.target.value)}
-                      onBlur={() => setRenaming(null)}
-                      onKeyDown={(e) => { if (e.key === "Escape") setRenaming(null); }}
+                      onBlur={async (e) => {
+                        // Delay to let onSubmit fire first if Enter was pressed
+                        const val = renameValue.trim();
+                        if (val && val !== session.name) {
+                          const { renameSession: apiRename } = await import("@/lib/api");
+                          const ok = await apiRename(session.id, val);
+                          if (ok) useAppStore.getState().loadSessions();
+                        }
+                        setRenaming(null);
+                      }}
+                      onKeyDown={(e) => { if (e.key === "Escape") { setRenameValue(session.name); setRenaming(null); } }}
                       className="w-full text-sm px-2 py-1 rounded-lg outline-none"
                       style={{
                         background: "var(--bg-base)",

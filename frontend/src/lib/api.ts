@@ -21,10 +21,17 @@ async function getToken(): Promise<string> {
   }
 }
 
+const MAX_UPLOAD_MB = 100; // Cloud Run HTTP/2 supports up to 10 GiB
+
 export async function uploadFile(
   file: File,
   onProgress?: (percent: number) => void,
 ): Promise<{ file_id: string; filename: string }> {
+  const sizeMB = file.size / (1024 * 1024);
+  if (sizeMB > MAX_UPLOAD_MB) {
+    throw new Error(`File too large (${sizeMB.toFixed(0)} MB). Maximum is ${MAX_UPLOAD_MB} MB.`);
+  }
+
   const token = await getToken();
   console.log("[Upload] Starting upload, token length:", token.length, "file:", file.name, file.size);
 
