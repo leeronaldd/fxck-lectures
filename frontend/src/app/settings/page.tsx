@@ -298,14 +298,14 @@ function SettingsContent() {
                     </div>
                     <h3 className="text-lg font-bold mb-1" style={{ color: "var(--text-primary)" }}>Pro</h3>
                     <p className="text-2xl font-bold mb-1" style={{ color: "var(--text-primary)" }}>
-                      {billingPeriod === "yearly" ? "$69.99" : "$12.99"}
+                      {billingPeriod === "yearly" ? "$5.83" : "$12.99"}
                       <span className="text-sm font-normal" style={{ color: "var(--text-muted)" }}>
-                        /{billingPeriod === "yearly" ? "yr" : "mo"}
+                        /mo
                       </span>
                     </p>
                     {billingPeriod === "yearly" && (
-                      <p className="text-xs mb-3" style={{ color: "#22C55E" }}>
-                        $5.83/mo — save $85.89/yr
+                      <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
+                        Billed as $69.99/yr — <span style={{ color: "#22C55E" }}>save 55%</span>
                       </p>
                     )}
                     {billingPeriod === "monthly" && <div className="mb-3" />}
