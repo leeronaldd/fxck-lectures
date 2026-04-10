@@ -132,6 +132,19 @@ export async function createCheckoutSession(period: "monthly" | "yearly"): Promi
   return data.url;
 }
 
+export async function renameSession(sessionId: string, name: string): Promise<boolean> {
+  const token = await getToken();
+  const res = await fetch(`${API_URL}/api/sessions/${sessionId}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ name }),
+  });
+  return res.ok;
+}
+
 export async function deleteSession(sessionId: string): Promise<boolean> {
   const token = await getToken();
   const res = await fetch(`${API_URL}/api/sessions/${sessionId}`, {

@@ -234,6 +234,39 @@ async def get_session(
         raise HTTPException(status_code=404, detail="Session not found")
 
 
+@app.patch("/api/sessions/{session_id}")
+async def rename_session(
+    session_id: str,
+    request: Request,
+    user: dict = Depends(get_current_user),
+):
+    """Rename a session owned by the current user."""
+    body = await request.json()
+    name = body.get("name", "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Name is required")
+
+    token = request.headers.get("authorization", "").split(" ", 1)[-1]
+    async with httpx.AsyncClient() as client:
+        resp = await client.patch(
+            f"{SUPABASE_URL}/rest/v1/sessions",
+            params={
+                "id": f"eq.{session_id}",
+                "user_id": f"eq.{user['id']}",
+            },
+            json={"name": name},
+            headers={
+                "apikey": SUPABASE_ANON_KEY,
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+                "Prefer": "return=minimal",
+            },
+        )
+        if resp.status_code in (200, 204):
+            return {"ok": True}
+        raise HTTPException(status_code=resp.status_code, detail="Failed to rename session")
+
+
 @app.delete("/api/sessions/{session_id}")
 async def delete_session(
     session_id: str,

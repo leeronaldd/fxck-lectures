@@ -12,6 +12,8 @@ export default function AppSidebar() {
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
 
   if (!sidebarOpen) return null;
 
@@ -78,20 +80,56 @@ export default function AppSidebar() {
                   e.currentTarget.style.background = "transparent";
                 }}
               >
-                <button
-                  onClick={async () => {
-                    await loadSession(session.id);
-                    router.push("/reader");
-                  }}
-                  className="flex-1 text-left px-3 py-2.5 min-w-0"
-                >
-                  <p className="text-sm truncate" style={{ color: "var(--text-primary)" }}>
-                    {session.name}
-                  </p>
-                  <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                    {session.date}
-                  </p>
-                </button>
+                {renaming === session.id ? (
+                  <form
+                    className="flex-1 px-3 py-2 min-w-0"
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (renameValue.trim()) {
+                        const { renameSession: apiRename } = await import("@/lib/api");
+                        const ok = await apiRename(session.id, renameValue.trim());
+                        if (ok) {
+                          useAppStore.getState().loadSessions();
+                        }
+                      }
+                      setRenaming(null);
+                    }}
+                  >
+                    <input
+                      autoFocus
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onBlur={() => setRenaming(null)}
+                      onKeyDown={(e) => { if (e.key === "Escape") setRenaming(null); }}
+                      className="w-full text-sm px-2 py-1 rounded-lg outline-none"
+                      style={{
+                        background: "var(--bg-base)",
+                        border: "1px solid var(--accent)",
+                        color: "var(--text-primary)",
+                      }}
+                    />
+                  </form>
+                ) : (
+                  <button
+                    onClick={async () => {
+                      await loadSession(session.id);
+                      router.push("/reader");
+                    }}
+                    onDoubleClick={(e) => {
+                      e.preventDefault();
+                      setRenaming(session.id);
+                      setRenameValue(session.name);
+                    }}
+                    className="flex-1 text-left px-3 py-2.5 min-w-0"
+                  >
+                    <p className="text-sm truncate" style={{ color: "var(--text-primary)" }}>
+                      {session.name}
+                    </p>
+                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                      {session.date}
+                    </p>
+                  </button>
+                )}
                 {deleteConfirm === session.id ? (
                   <div className="flex items-center gap-1 mr-1" onClick={(e) => e.stopPropagation()}>
                     <button

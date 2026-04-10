@@ -116,7 +116,7 @@ export default function ReaderPage() {
     <div className="flex flex-1 overflow-x-hidden">
       {/* Document */}
       <div className="flex-1 min-w-0 overflow-x-hidden">
-        <div className="max-w-[820px] mx-auto px-6 lg:px-16 py-8 pb-16 overflow-hidden">
+        <div className="max-w-[1000px] mx-auto px-6 lg:px-16 py-8 pb-16 overflow-hidden">
           {/* Back to upload */}
           <button
             onClick={() => {
