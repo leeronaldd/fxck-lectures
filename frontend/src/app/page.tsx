@@ -83,7 +83,7 @@ export default function LandingPage() {
           <div className="animate-fade-in-up inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass mb-8">
             <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
             <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
-              Powered by Gemini 3.1 Pro
+              AI-powered lecture replacement
             </span>
           </div>
 
@@ -100,7 +100,7 @@ export default function LandingPage() {
           {/* CTA button */}
           <div className="animate-fade-in-up animation-delay-300">
             <button
-              onClick={() => router.push("/signin")}
+              onClick={() => router.push("/quiz")}
               className="btn-glow px-10 py-4 rounded-xl text-base font-semibold transition-all"
               style={{
                 background: "linear-gradient(135deg, var(--accent), #FF8555)",

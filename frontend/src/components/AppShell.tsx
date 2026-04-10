@@ -15,11 +15,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const isSignInPage = pathname === "/signin";
   const isReaderPage = pathname === "/reader";
   const isLandingPage = pathname === "/";
+  const isQuizPage = pathname === "/quiz";
 
   // Route protection
   useEffect(() => {
     if (authLoading) return;
-    if (user.isLoggedIn && (isSignInPage || isLandingPage)) {
+    if (user.isLoggedIn && isSignInPage) {
       router.push("/upload");
       return;
     }
@@ -28,8 +29,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [user.isLoggedIn, authLoading, pathname, isSignInPage, router]);
 
-  // Don't show app shell on sign-in page or landing page
-  if (isSignInPage || isLandingPage) {
+  // Don't show app shell on sign-in, quiz, or landing page (for guests only)
+  if (isSignInPage || isQuizPage || (isLandingPage && !user.isLoggedIn)) {
     return <>{children}</>;
   }
 
@@ -59,9 +60,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </svg>
           </button>
 
-          {/* Logo */}
+          {/* Logo — dashboard if logged in, sales page if guest */}
           <button
-            onClick={() => router.push("/")}
+            onClick={() => {
+              if (user.isLoggedIn) {
+                useAppStore.getState().reset();
+                router.push("/upload");
+              } else {
+                router.push("/");
+              }
+            }}
             className="transition-opacity hover:opacity-80"
           >
             <img src="/brand/logo-full-dark.svg" alt="Klare" className="h-7" />
@@ -69,22 +77,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Model selector */}
-          <div className="hidden sm:block">
-            <select
-              value={settings.model}
-              onChange={(e) => updateSettings({ model: e.target.value })}
-              className="text-xs px-3 py-1.5 rounded-lg outline-none cursor-pointer appearance-none"
-              style={{
-                background: "var(--bg-elevated)",
-                border: "1px solid var(--border)",
-                color: "var(--text-secondary)",
-              }}
-            >
-              <option value="gemini-3.1-pro">Gemini 3.1 Pro</option>
-            </select>
-          </div>
-
           {/* Sign In / Avatar */}
           {!user.isLoggedIn ? (
             <button

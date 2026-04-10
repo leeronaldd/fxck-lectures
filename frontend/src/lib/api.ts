@@ -94,6 +94,21 @@ export async function fetchSession(sessionId: string): Promise<{
   return res.json();
 }
 
+export async function createCheckoutSession(period: "monthly" | "yearly"): Promise<string | null> {
+  const token = await getToken();
+  const res = await fetch(`${API_URL}/api/checkout`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ period }),
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.url;
+}
+
 export async function deleteSession(sessionId: string): Promise<boolean> {
   const token = await getToken();
   const res = await fetch(`${API_URL}/api/sessions/${sessionId}`, {

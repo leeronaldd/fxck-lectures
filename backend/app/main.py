@@ -40,12 +40,19 @@ _original_filenames: dict[str, str] = {}
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://husdhmaijvughqezlmjt.supabase.co")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "sb_publishable_CwLFt3Pfeaeq5iP0foroCA_tMmPucAy")
 
+# Stripe config
+import stripe
+stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "")
+STRIPE_PRICE_MONTHLY = "price_1TKSLDGW2ryevu4Tytl0EGlA"
+STRIPE_PRICE_YEARLY = "price_1TKSLDGW2ryevu4TtsoJE3Am"
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "https://fxck-lectures.vercel.app")
+
 # Unlimited usage for these emails (store canonical form — lowercase, no dots for gmail)
 UNLIMITED_EMAILS = {
     "leewanghong0215@gmail.com",
     "leepakwai0706@gmail.com",
 }
-FREE_USAGE_LIMIT = 1
+FREE_USAGE_LIMIT = 2
 
 # Custom limits per email (overrides FREE_USAGE_LIMIT)
 # Store in canonical form (no dots for gmail). Add friends here:
@@ -250,6 +257,32 @@ async def delete_session(
         if resp.status_code in (200, 204):
             return {"ok": True}
         raise HTTPException(status_code=resp.status_code, detail="Failed to delete session")
+
+
+@app.post("/api/checkout")
+async def create_checkout_session(
+    request: Request,
+    user: dict = Depends(get_current_user),
+):
+    """Create a Stripe Checkout session for upgrading to Pro."""
+    body = await request.json()
+    period = body.get("period", "yearly")
+    price_id = STRIPE_PRICE_YEARLY if period == "yearly" else STRIPE_PRICE_MONTHLY
+
+    email = user.get("email", "")
+
+    try:
+        session = stripe.checkout.Session.create(
+            mode="subscription",
+            line_items=[{"price": price_id, "quantity": 1}],
+            customer_email=email,
+            success_url=f"{FRONTEND_URL}/settings?tab=Billing&upgraded=true",
+            cancel_url=f"{FRONTEND_URL}/settings?tab=Billing",
+            metadata={"user_id": user["id"]},
+        )
+        return {"url": session.url}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Stripe error: {e}")
 
 
 @app.get("/api/run/{file_id}")
