@@ -27,7 +27,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     if (!user.isLoggedIn && PROTECTED_PATHS.includes(pathname)) {
       router.push("/signin");
     }
-  }, [user.isLoggedIn, authLoading, pathname, isSignInPage, isLandingPage, router]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user.isLoggedIn, authLoading, pathname, router]);
 
   // Don't show app shell on sign-in, quiz, or landing page (for guests only)
   if (isSignInPage || isQuizPage || (isLandingPage && !user.isLoggedIn)) {

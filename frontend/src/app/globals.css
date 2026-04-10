@@ -449,3 +449,45 @@ body {
 .animate-pulse-dot {
   animation: pulse-dot 2s ease-in-out infinite;
 }
+
+/* ───── Demo preview auto-scroll ───── */
+@keyframes demo-scroll {
+  0% { transform: translateY(0); }
+  10% { transform: translateY(0); }
+  90% { transform: translateY(calc(-100% + 500px)); }
+  100% { transform: translateY(calc(-100% + 500px)); }
+}
+
+.demo-scroll-content {
+  animation: demo-scroll 25s ease-in-out infinite;
+}
+
+.demo-scroll-content:hover {
+  animation-play-state: paused;
+}
+
+/* Staggered reveal for demo sections */
+@keyframes demo-reveal {
+  0% { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.demo-reveal {
+  opacity: 0;
+  animation: demo-reveal 0.6s ease-out forwards;
+}
+
+.demo-reveal-1 { animation-delay: 0.5s; }
+.demo-reveal-2 { animation-delay: 1.2s; }
+.demo-reveal-3 { animation-delay: 1.9s; }
+.demo-reveal-4 { animation-delay: 2.6s; }
+.demo-reveal-5 { animation-delay: 3.3s; }
+.demo-reveal-6 { animation-delay: 4.0s; }
+.demo-reveal-7 { animation-delay: 4.7s; }
+.demo-reveal-8 { animation-delay: 5.4s; }
+.demo-reveal-9 { animation-delay: 6.1s; }
+.demo-reveal-10 { animation-delay: 6.8s; }
+.demo-reveal-11 { animation-delay: 7.5s; }
+.demo-reveal-12 { animation-delay: 8.2s; }
+.demo-reveal-13 { animation-delay: 8.9s; }
+.demo-reveal-14 { animation-delay: 9.6s; }
