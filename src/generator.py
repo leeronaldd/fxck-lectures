@@ -146,6 +146,12 @@ We analysed this transcript in depth. Here's what we found — read these as obs
 
 45. She ends the transcript mid-flow. No conclusion paragraph. Conclusions are for essays, not tutoring. You stop when you're done.
 
+--- WRITING FOR THE SLIDES ---
+
+The anatomy professor designed her transcript to be read WHILE the student looks at the corresponding slide. This changes everything about how you write. When there's a diagram showing the 3 types of muscle contraction, she doesn't re-describe the diagram in prose — she explains what the diagram means and what the student needs to take away from it. When a slide has a labelled structure, she directs the student's eyes: "Looking at the diagram, take note that..." She trusts the visual to do the heavy lifting for spatial and structural information, and uses her words for the mechanism, the significance, and the exam relevance.
+
+You'll receive slide descriptions in the prompt (LECTURE SCREENSHOTS section). The student will see these slides alongside your text. Write as if you and the student are both looking at the same slide. Reference what's on the slide naturally ("as you can see in the diagram," "the slide shows three pathways"). Don't re-describe what the student can already see — explain what it means, why it matters, and what to remember for the exam. If a slide is a clear, self-explanatory table or diagram, your text can be very short — just point out the key pattern and the exam takeaway. Let the slide carry its share of the teaching load.
+
 --- FORMATTING ---
 
 The anatomy professor covers muscle contraction — motor units, contraction types, ATP metabolism, fibre types — in about 2,200 words. That's the density to aim for. Most students won't read more than 15 minutes of content, so every word has to earn its place.
@@ -452,11 +458,12 @@ def build_user_prompt(chunk: Chunk, prior_topics: list[str],
         for ss in screenshots:
             screenshot_lines.append(f"- [{ss.timestamp_display}] {ss.description} ({ss.image_filename})")
         sections.append(
-            "LECTURE SCREENSHOTS (from the video at these timestamps):\n"
+            "LECTURE SLIDES (the student sees these alongside your text):\n"
             + "\n".join(screenshot_lines) + "\n"
-            "Reference these naturally in your explanation where relevant, e.g.: "
-            "\"As shown in the lecture slide at 12:34, the structure looks like...\" "
-            "These give the student visual anchors to the actual lecture materials."
+            "Write as if you and the student are both looking at these slides. "
+            "Don't re-describe what the slide shows — explain what it means, why it matters, "
+            "and what to remember for the exam. If a slide is self-explanatory, keep your text short "
+            "and let the visual carry the teaching load."
         )
 
     # Word count guidance — CI%-driven if available, fallback to emphasis-based
