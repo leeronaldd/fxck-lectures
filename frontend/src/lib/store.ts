@@ -50,7 +50,7 @@ interface AppState {
 
   // Sessions
   sessions: Session[];
-  loadSessions: () => void;
+  loadSessions: () => Promise<void>;
   loadSession: (sessionId: string) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
 
@@ -145,8 +145,9 @@ export const useAppStore = create<AppState>((set, get) => {
 
   // Sessions
   sessions: INITIAL_SESSIONS,
-  loadSessions: () => {
-    fetchSessions().then((data) => {
+  loadSessions: async () => {
+    try {
+      const data = await fetchSessions();
       const sessions: Session[] = data.map((s) => ({
         id: s.id,
         name: s.name,
@@ -154,7 +155,9 @@ export const useAppStore = create<AppState>((set, get) => {
         groups: 0,
       }));
       set({ sessions });
-    }).catch(() => {});
+    } catch (e) {
+      console.error("[Sessions] Failed to load sessions:", e);
+    }
   },
   loadSession: async (sessionId: string) => {
     const data = await fetchSession(sessionId);
@@ -253,12 +256,8 @@ export const useAppStore = create<AppState>((set, get) => {
             toast.error(`Pipeline failed: ${error}`, { id: "pipeline" });
           },
           // onDone
-          (output) => {
+          async (output) => {
             cancelStream = null;
-            set((state) => {
-              const newStages = state.stages.map((s) => ({ ...s, status: "done" as const }));
-              return { stages: newStages, isProcessing: false, isDone: true };
-            });
             toast.success("Your lecture is ready!", { id: "pipeline", duration: 5000 });
 
             if (output) {
@@ -268,8 +267,12 @@ export const useAppStore = create<AppState>((set, get) => {
                 (output.verification_report || []) as VerificationClaim[],
               );
             }
-            // Refresh sessions list
-            get().loadSessions();
+            // Refresh sessions list BEFORE marking done (so sidebar updates before navigation)
+            await get().loadSessions();
+            set((state) => {
+              const newStages = state.stages.map((s) => ({ ...s, status: "done" as const }));
+              return { stages: newStages, isProcessing: false, isDone: true };
+            });
           },
         );
       } catch (err) {

@@ -371,6 +371,7 @@ async def create_checkout_session(
             mode="subscription",
             line_items=[{"price": price_id, "quantity": 1}],
             customer_email=email,
+            allow_promotion_codes=True,
             success_url=f"{FRONTEND_URL}/settings?tab=Billing&upgraded=true",
             cancel_url=f"{FRONTEND_URL}/settings?tab=Billing",
             metadata={"user_id": user["id"]},

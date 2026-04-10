@@ -170,7 +170,16 @@ def run_pipeline(input_path: str, user_profile: dict | None = None) -> Generator
                     text = exp.get("explanation_text", "")
                     topic = exp.get("topic_name", "")
                     if text and not exp.get("was_skipped", False):
-                        md_parts.append(f"## {topic}\n\n{text}")
+                        section = f"## {topic}\n\n{text}"
+                        # Append screenshot references if present
+                        screenshots = exp.get("screenshot_refs", [])
+                        if screenshots:
+                            img_lines = "\n".join(
+                                f"\n![Lecture slide](screenshots/{img})"
+                                for img in screenshots if img
+                            )
+                            section += f"\n{img_lines}"
+                        md_parts.append(section)
             markdown = "\n\n---\n\n".join(md_parts)
 
         if groups_path.exists():

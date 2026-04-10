@@ -166,14 +166,21 @@ def score_all(chunks_path: str, output_path: str | None = None) -> list[CIScore]
         raw_chunks = json.load(f)
 
     chunks = [Chunk(**c) for c in raw_chunks]
-    scores: list[CIScore] = []
 
-    for chunk in chunks:
-        score = score_chunk(chunk)
-        scores.append(score)
-        # Brief pause between LLM calls to avoid rate limits
-        if not _is_housekeeping(chunk):
-            time.sleep(0.5)
+    # Parallelize CI scoring — each chunk is independent
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    scores_map: dict[int, CIScore] = {}
+    with ThreadPoolExecutor(max_workers=min(4, len(chunks))) as executor:
+        futures = {executor.submit(score_chunk, chunk): chunk.chunk_index for chunk in chunks}
+        for future in as_completed(futures):
+            idx = futures[future]
+            try:
+                scores_map[idx] = future.result()
+            except Exception as e:
+                print(f"WARNING: CI% scoring failed for chunk {idx}: {e}")
+
+    # Preserve original order
+    scores: list[CIScore] = [scores_map[c.chunk_index] for c in chunks if c.chunk_index in scores_map]
 
     if output_path:
         import os

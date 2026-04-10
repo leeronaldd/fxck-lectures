@@ -273,16 +273,18 @@ def verify_and_ground(
 
     all_verifications = []
 
-    for expl in explanations:
-        if expl.get("was_skipped") or not expl.get("explanation_text"):
-            continue
+    # Filter to checkable explanations
+    checkable = [
+        expl for expl in explanations
+        if not expl.get("was_skipped")
+        and expl.get("explanation_text")
+        and len(expl.get("explanation_text", "").split()) >= 50
+    ]
 
+    def _verify_one(expl):
+        """Verify a single section — runs in parallel."""
         topic = expl.get("topic_name", "Unknown")
         text = expl.get("explanation_text", "")
-
-        if len(text.split()) < 50:
-            continue
-
         print(f"  Checking: {topic}")
 
         # Fetch relevant textbook chapter for this topic
@@ -294,18 +296,18 @@ def verify_and_ground(
 
         try:
             findings = verify_section(text, topic, textbook_context=textbook)
-            time.sleep(1)  # rate limiting between sections
         except Exception as e:
             print(f"    Verification failed: {e}")
-            continue
+            return []
 
         errors = [f for f in findings if f.get("verdict") == "wrong"]
         exam_notes = [f for f in findings if f.get("verdict") == "exam_note"]
+        section_verifications = []
 
         if errors:
             for err in errors:
                 print(f"    ❌ {err.get('claim', '?')[:60]}")
-                all_verifications.append(ClaimVerification(
+                section_verifications.append(ClaimVerification(
                     claim=err.get("claim", ""),
                     claim_type=err.get("type", "unknown"),
                     source_group=topic,
@@ -329,7 +331,7 @@ def verify_and_ground(
             print(f"    ✅ All claims verified")
 
         for note in exam_notes:
-            all_verifications.append(ClaimVerification(
+            section_verifications.append(ClaimVerification(
                 claim=note.get("claim", ""),
                 claim_type="exam_relevance",
                 source_group=topic,
@@ -337,6 +339,19 @@ def verify_and_ground(
                 exam_relevant=note.get("exam_relevant", True),
                 exam_notes=note.get("exam_notes", ""),
             ))
+
+        return section_verifications
+
+    # Run verification in parallel (up to 4 concurrent sections)
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    with ThreadPoolExecutor(max_workers=min(4, len(checkable))) as executor:
+        futures = {executor.submit(_verify_one, expl): expl for expl in checkable}
+        for future in as_completed(futures):
+            try:
+                results = future.result()
+                all_verifications.extend(results)
+            except Exception as e:
+                print(f"    ⚠️ Verification thread failed: {e}")
 
     # Log textbook source coverage
     sources = get_textbook_source_log()
