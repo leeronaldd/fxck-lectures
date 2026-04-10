@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useAppStore } from "@/lib/store";
 
 const FEATURES = [
   {
@@ -49,6 +50,8 @@ const FEATURES = [
 
 export default function LandingPage() {
   const router = useRouter();
+  const { user } = useAppStore();
+  const isLoggedIn = user.isLoggedIn;
 
   return (
     <div className="flex-1 relative overflow-hidden">
@@ -57,23 +60,25 @@ export default function LandingPage() {
       <div className="orb orb-orange" style={{ width: 400, height: 400, top: "-10%", right: "10%" }} />
       <div className="orb orb-purple" style={{ width: 300, height: 300, bottom: "20%", left: "5%" }} />
 
-      {/* Top nav — minimal, no hamburger */}
-      <header
-        className="relative z-20 flex items-center justify-between px-6 sm:px-10 py-4"
-      >
-        <img src="/brand/logo-full-dark.svg" alt="Klare" className="h-7" />
-        <button
-          onClick={() => router.push("/signin")}
-          className="text-xs px-4 py-2 rounded-lg font-medium transition-all"
-          style={{
-            background: "var(--accent-dim)",
-            color: "var(--accent)",
-            border: "1px solid rgba(255, 107, 53, 0.2)",
-          }}
+      {/* Top nav — only show for guests (logged-in users have AppShell header) */}
+      {!isLoggedIn && (
+        <header
+          className="relative z-20 flex items-center justify-between px-6 sm:px-10 py-4"
         >
-          Sign In
-        </button>
-      </header>
+          <img src="/brand/logo-full-dark.svg" alt="Klare" className="h-7" />
+          <button
+            onClick={() => router.push("/signin")}
+            className="text-xs px-4 py-2 rounded-lg font-medium transition-all"
+            style={{
+              background: "var(--accent-dim)",
+              color: "var(--accent)",
+              border: "1px solid rgba(255, 107, 53, 0.2)",
+            }}
+          >
+            Sign In
+          </button>
+        </header>
+      )}
 
       {/* Content */}
       <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6">

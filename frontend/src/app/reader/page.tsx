@@ -104,23 +104,7 @@ export default function ReaderPage() {
     <div className="flex flex-1 overflow-x-hidden">
       {/* Document */}
       <div className="flex-1 min-w-0 overflow-x-hidden">
-        <div className="max-w-[1000px] mx-auto px-6 lg:px-16 py-8 pb-16 overflow-hidden">
-          {/* Back to upload */}
-          <button
-            onClick={() => {
-              useAppStore.getState().reset();
-              router.push("/upload");
-            }}
-            className="flex items-center gap-1.5 text-xs mb-6 px-3 py-1.5 rounded-lg transition-colors"
-            style={{ color: "var(--text-muted)" }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "var(--accent)"; e.currentTarget.style.background = "var(--accent-dim)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; e.currentTarget.style.background = "transparent"; }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-            New Lecture
-          </button>
+        <div className="max-w-[1200px] mx-auto px-6 lg:px-20 py-8 pb-16 overflow-hidden">
           <MarkdownRenderer content={markdown} />
         </div>
       </div>
