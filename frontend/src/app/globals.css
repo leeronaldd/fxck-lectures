@@ -450,20 +450,9 @@ body {
   animation: pulse-dot 2s ease-in-out infinite;
 }
 
-/* ───── Demo preview auto-scroll ───── */
-@keyframes demo-scroll {
-  0% { transform: translateY(0); }
-  10% { transform: translateY(0); }
-  90% { transform: translateY(calc(-100% + 500px)); }
-  100% { transform: translateY(calc(-100% + 500px)); }
-}
-
+/* ───── Demo preview scrollable ───── */
 .demo-scroll-content {
-  animation: demo-scroll 25s ease-in-out infinite;
-}
-
-.demo-scroll-content:hover {
-  animation-play-state: paused;
+  /* No auto-scroll — user scrolls manually */
 }
 
 /* Staggered reveal for demo sections */

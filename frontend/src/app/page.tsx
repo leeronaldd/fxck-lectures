@@ -148,8 +148,8 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              {/* Scrolling content area */}
-              <div className="flex-1 overflow-hidden relative">
+              {/* Scrollable content area */}
+              <div className="flex-1 overflow-y-auto relative">
                 <div className="demo-scroll-content px-6 sm:px-12 py-6">
                   <div className="demo-reveal demo-reveal-1">
                     <h2 className="text-lg font-bold mb-4" style={{ color: "var(--text-primary)" }}>The Baltimore Classification System</h2>
