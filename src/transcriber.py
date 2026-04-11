@@ -1,18 +1,22 @@
-"""Speech-to-text transcription using Gemini Flash multimodal.
+"""Speech-to-text transcription via self-hosted Whisper on Cloud Run GPU.
 
-Extracts audio from video files and transcribes using Gemini Flash's
-native audio understanding — no rate limits, ~$0.02 per 2-hour lecture.
+Sends audio to our own faster-whisper service running on Cloud Run with
+NVIDIA L4 GPU. No rate limits, no chunking, ~$0.035 per 2-hour lecture.
 
-Falls back to Groq Whisper if Gemini fails (optional).
+Falls back to Gemini Flash for local dev if WHISPER_SERVICE_URL is not set.
 """
 
 import os
 import subprocess
-import tempfile
-import math
+import time
 from pathlib import Path
 
-from src.config import GCP_PROJECT_ID, GCP_LOCATION, CHUNKER_FALLBACK_MODEL
+import requests
+import google.auth
+import google.auth.transport.requests
+
+
+WHISPER_SERVICE_URL = os.environ.get("WHISPER_SERVICE_URL", "")
 
 
 def extract_audio(video_path: str, output_path: str = None) -> str:
@@ -55,46 +59,64 @@ def get_audio_duration(audio_path: str) -> float:
     return float(result.stdout.strip())
 
 
-def split_audio(audio_path: str, chunk_duration_s: int, overlap_s: int = 30) -> list[str]:
-    """Split audio into overlapping chunks. Returns list of temp file paths."""
-    total_duration = get_audio_duration(audio_path)
-    step = chunk_duration_s - overlap_s
-    chunks = []
-    start = 0
+def _get_id_token(audience: str) -> str:
+    """Get a Google ID token for authenticating to Cloud Run (no-allow-unauthenticated)."""
+    creds, _ = google.auth.default()
+    auth_req = google.auth.transport.requests.Request()
+    creds.refresh(auth_req)
 
-    while start < total_duration:
-        end = min(start + chunk_duration_s, total_duration)
-        chunk_path = tempfile.mktemp(suffix=".mp3")
-
-        cmd = [
-            "ffmpeg", "-i", audio_path,
-            "-ss", str(start),
-            "-t", str(end - start),
-            "-ac", "1", "-ab", "64k", "-ar", "16000",
-            "-y", chunk_path,
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise RuntimeError(f"ffmpeg chunk split failed: {result.stderr}")
-
-        chunks.append(chunk_path)
-        start += step
-
-    return chunks
+    # Use the IAM credentials API to generate an ID token
+    from google.oauth2 import id_token
+    token = id_token.fetch_id_token(auth_req, audience)
+    return token
 
 
-def _transcribe_chunk_gemini(audio_bytes: bytes, chunk_index: int = 0, total_chunks: int = 1) -> str:
-    """Transcribe a single audio chunk using Gemini Flash multimodal.
+def _transcribe_via_whisper_service(audio_path: str) -> dict:
+    """Send audio file to our Whisper Cloud Run service for transcription."""
+    print(f"Sending to Whisper service at {WHISPER_SERVICE_URL}...")
+    start = time.time()
 
-    Gemini natively understands audio — no separate STT API needed.
-    Cost: ~32 tokens/second of audio at $0.10/M tokens = ~$0.01/hr.
-    """
+    # Get ID token for Cloud Run auth
+    token = _get_id_token(WHISPER_SERVICE_URL)
+
+    # Upload the audio file
+    with open(audio_path, "rb") as f:
+        response = requests.post(
+            f"{WHISPER_SERVICE_URL}/transcribe",
+            files={"file": (Path(audio_path).name, f, "audio/mpeg")},
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=900,  # 15 min max for very long lectures
+        )
+
+    if response.status_code != 200:
+        raise RuntimeError(f"Whisper service error {response.status_code}: {response.text}")
+
+    result = response.json()
+    elapsed = time.time() - start
+
+    print(f"  Whisper transcription complete in {elapsed:.1f}s")
+    print(f"  Words: {result['metadata']['word_count']}")
+    print(f"  Speed: {result['metadata'].get('speed_factor', '?')}x real-time")
+
+    return result
+
+
+def _transcribe_via_gemini(audio_path: str, duration: float) -> dict:
+    """Fallback: transcribe using Gemini Flash (for local dev without Whisper service)."""
     from google import genai
     from google.genai import types
+    from src.config import GCP_PROJECT_ID, GCP_LOCATION, CHUNKER_FALLBACK_MODEL
 
     client = genai.Client(
         vertexai=True, project=GCP_PROJECT_ID, location=GCP_LOCATION
     )
+
+    file_size_mb = os.path.getsize(audio_path) / (1024 * 1024)
+    print(f"Transcribing {duration/60:.1f} min audio ({file_size_mb:.1f}MB) with Gemini Flash (fallback)...")
+    print(f"  ⚠ Gemini Flash may be slow/unreliable for long audio. Set WHISPER_SERVICE_URL for production.")
+
+    with open(audio_path, "rb") as f:
+        audio_bytes = f.read()
 
     parts = [
         types.Part.from_bytes(data=audio_bytes, mime_type="audio/mp3"),
@@ -119,12 +141,22 @@ def _transcribe_chunk_gemini(audio_bytes: bytes, chunk_index: int = 0, total_chu
         },
     )
 
-    return response.text.strip()
+    text = response.text.strip()
+    word_count = len(text.split())
+    estimated_tokens = duration * 32
+    estimated_cost = estimated_tokens / 1_000_000 * 0.10
 
-
-# Gemini has input limits — split audio into ~20 min chunks
-CHUNK_DURATION_MINUTES = 20
-MAX_SINGLE_FILE_MB = 20  # Send directly if under this size
+    return {
+        "text": text,
+        "metadata": {
+            "duration_seconds": duration,
+            "duration_minutes": round(duration / 60, 1),
+            "file_size_mb": round(file_size_mb, 1),
+            "model": CHUNKER_FALLBACK_MODEL,
+            "estimated_cost_usd": round(estimated_cost, 4),
+            "word_count": word_count,
+        },
+    }
 
 
 def transcribe(
@@ -133,15 +165,16 @@ def transcribe(
     medical_terms: list[str] = None,
     timestamps: bool = False,
 ) -> dict:
-    """Transcribe a video or audio file using Gemini Flash.
+    """Transcribe a video or audio file.
 
-    Handles chunking for long files. No rate limits, no external API keys needed.
+    Primary: sends to self-hosted Whisper service on Cloud Run GPU.
+    Fallback: Gemini Flash multimodal (for local dev).
 
     Args:
         input_path: Path to video (.mp4, .mkv, etc.) or audio (.mp3, .wav, etc.)
-        language: ISO-639-1 language code (currently unused — Gemini auto-detects)
-        medical_terms: Optional list of expected medical terms (unused with Gemini)
-        timestamps: If True, include segment-level timestamps (not supported with Gemini)
+        language: ISO-639-1 language code
+        medical_terms: Optional list of expected medical terms
+        timestamps: If True, include segment-level timestamps
 
     Returns:
         dict with 'text' and 'metadata'
@@ -167,51 +200,15 @@ def transcribe(
         file_size_mb = os.path.getsize(audio_path) / (1024 * 1024)
         duration = get_audio_duration(audio_path)
 
-        if file_size_mb <= MAX_SINGLE_FILE_MB:
-            # Single file — no chunking needed
-            print(f"Transcribing {duration/60:.1f} min audio ({file_size_mb:.1f}MB) with Gemini Flash...")
-            with open(audio_path, "rb") as f:
-                audio_bytes = f.read()
-            text = _transcribe_chunk_gemini(audio_bytes)
+        # Primary: Whisper service (production)
+        if WHISPER_SERVICE_URL:
+            result = _transcribe_via_whisper_service(audio_path)
         else:
-            # Split into chunks for long lectures
-            chunk_duration_s = CHUNK_DURATION_MINUTES * 60
-            chunk_paths = split_audio(audio_path, chunk_duration_s)
-            n_chunks = len(chunk_paths)
-            print(f"Audio is {file_size_mb:.1f}MB — splitting into {n_chunks} chunks...")
+            # Fallback: Gemini Flash (local dev only)
+            result = _transcribe_via_gemini(audio_path, duration)
 
-            all_text = []
-            for i, chunk_path in enumerate(chunk_paths):
-                print(f"  Transcribing chunk {i+1}/{n_chunks}...")
-                try:
-                    with open(chunk_path, "rb") as f:
-                        chunk_bytes = f.read()
-                    chunk_text = _transcribe_chunk_gemini(chunk_bytes, i, n_chunks)
-                    all_text.append(chunk_text)
-                finally:
-                    os.unlink(chunk_path)
-
-            text = " ".join(all_text)
-
-        word_count = len(text.split())
-        # Gemini Flash: ~32 tokens/sec audio, $0.10/M input tokens
-        estimated_tokens = duration * 32
-        estimated_cost = estimated_tokens / 1_000_000 * 0.10
-
-        result = {
-            "text": text,
-            "metadata": {
-                "duration_seconds": duration,
-                "duration_minutes": round(duration / 60, 1),
-                "file_size_mb": round(file_size_mb, 1),
-                "model": CHUNKER_FALLBACK_MODEL,
-                "estimated_cost_usd": round(estimated_cost, 4),
-                "word_count": word_count,
-            },
-        }
         print(f"  Duration:  {duration/60:.1f} min")
-        print(f"  Est. cost: ${estimated_cost:.3f}")
-        print(f"  Words:     {word_count}")
+        print(f"  Words:     {result['metadata']['word_count']}")
 
         return result
 
