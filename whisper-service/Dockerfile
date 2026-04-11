@@ -9,9 +9,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Download the model at build time so it's baked into the image
-# (no download delay on cold start)
-RUN python3 -c "from faster_whisper import WhisperModel; WhisperModel('large-v3-turbo', device='cuda', compute_type='float16')"
+# Download model weights at build time (no GPU needed for download)
+# This bakes the ~1.5GB model into the image so cold starts are fast
+RUN python3 -c "from huggingface_hub import snapshot_download; snapshot_download('deepdml/faster-whisper-large-v3-turbo-ct2')"
 
 COPY main.py .
 
