@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { toast } from "sonner";
 import { ConceptGroup, VerificationClaim, TrustStats } from "./types";
 import { computeTrustStats } from "./data";
-import { uploadFile, runPipeline, fetchSessions, fetchSession } from "./api";
+import { uploadFile, uploadSlides, runPipeline, fetchSessions, fetchSession } from "./api";
 import type { PipelineEvent } from "./api";
 
 export interface PipelineStage {
@@ -62,8 +62,10 @@ interface AppState {
   // Upload
   transcriptFile: File | null;
   videoFile: File | null;
+  slidesFile: File | null;
   setTranscriptFile: (f: File | null) => void;
   setVideoFile: (f: File | null) => void;
+  setSlidesFile: (f: File | null) => void;
 
   // Pipeline
   stages: PipelineStage[];
@@ -95,26 +97,18 @@ interface AppState {
 const INITIAL_SESSIONS: Session[] = [];
 
 const TEXT_STAGES: PipelineStage[] = [
-  { name: "Chunking transcript", weight: 5, mockDuration: 800, mockResult: "14 chunks", status: "pending" },
-  { name: "Scoring exam importance", weight: 5, mockDuration: 600, mockResult: "CI% scored", status: "pending" },
-  { name: "Grouping concepts", weight: 5, mockDuration: 500, mockResult: "8 groups", status: "pending" },
-  { name: "Generating explanations", weight: 60, mockDuration: 3000, mockResult: "7 sections generated", hasSubProgress: true, status: "pending" },
-  { name: "Verifying sources", weight: 8, mockDuration: 600, mockResult: "Sources verified", status: "pending" },
-  { name: "Checking completeness", weight: 5, mockDuration: 400, mockResult: "97% covered", status: "pending" },
-  { name: "Inserting slide references", weight: 4, mockDuration: 300, mockResult: "12 slides mapped", status: "pending" },
-  { name: "Assembling final document", weight: 3, mockDuration: 200, mockResult: "Done!", status: "pending" },
+  { name: "Chunking transcript", weight: 10, mockDuration: 800, mockResult: "12 chunks", status: "pending" },
+  { name: "Preparing teaching context", weight: 15, mockDuration: 1500, mockResult: "Summaries ready", status: "pending" },
+  { name: "Generating lecture", weight: 70, mockDuration: 4000, mockResult: "Slides + transcript ready", hasSubProgress: true, status: "pending" },
+  { name: "Assembling output", weight: 5, mockDuration: 300, mockResult: "Done!", status: "pending" },
 ];
 
 const VIDEO_STAGES: PipelineStage[] = [
   { name: "Transcribing lecture", weight: 15, mockDuration: 2000, mockResult: "Transcribed", status: "pending" },
-  { name: "Chunking transcript", weight: 5, mockDuration: 800, mockResult: "14 chunks", status: "pending" },
-  { name: "Scoring exam importance", weight: 5, mockDuration: 600, mockResult: "CI% scored", status: "pending" },
-  { name: "Grouping concepts", weight: 5, mockDuration: 500, mockResult: "8 groups", status: "pending" },
-  { name: "Generating explanations", weight: 50, mockDuration: 3000, mockResult: "7 sections generated", hasSubProgress: true, status: "pending" },
-  { name: "Verifying sources", weight: 8, mockDuration: 600, mockResult: "Sources verified", status: "pending" },
-  { name: "Checking completeness", weight: 5, mockDuration: 400, mockResult: "97% covered", status: "pending" },
-  { name: "Inserting slide references", weight: 4, mockDuration: 300, mockResult: "12 slides mapped", status: "pending" },
-  { name: "Assembling final document", weight: 3, mockDuration: 200, mockResult: "Done!", status: "pending" },
+  { name: "Chunking transcript", weight: 10, mockDuration: 800, mockResult: "12 chunks", status: "pending" },
+  { name: "Preparing teaching context", weight: 15, mockDuration: 1500, mockResult: "Summaries ready", status: "pending" },
+  { name: "Generating lecture", weight: 55, mockDuration: 4000, mockResult: "Slides + transcript ready", hasSubProgress: true, status: "pending" },
+  { name: "Assembling output", weight: 5, mockDuration: 300, mockResult: "Done!", status: "pending" },
 ];
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -185,8 +179,10 @@ export const useAppStore = create<AppState>((set, get) => {
   // Upload
   transcriptFile: null,
   videoFile: null,
+  slidesFile: null,
   setTranscriptFile: (f) => set({ transcriptFile: f }),
   setVideoFile: (f) => set({ videoFile: f }),
+  setSlidesFile: (f) => set({ slidesFile: f }),
 
   // Pipeline
   stages: TEXT_STAGES.map((s) => ({ ...s })),
@@ -226,6 +222,13 @@ export const useAppStore = create<AppState>((set, get) => {
         const { file_id } = await uploadFile(file, (percent) => {
           set({ uploadProgress: percent });
         });
+
+        // Upload slides PDF if provided
+        const slidesFile = get().slidesFile;
+        if (slidesFile) {
+          toast.loading("Uploading slides...", { id: "upload" });
+          await uploadSlides(file_id, slidesFile);
+        }
 
         set({ isUploading: false, uploadProgress: 100, currentStageIndex: 0 });
         toast.success("Upload complete!", { id: "upload" });
@@ -319,6 +322,7 @@ export const useAppStore = create<AppState>((set, get) => {
     set({
       transcriptFile: null,
       videoFile: null,
+      slidesFile: null,
       stages: TEXT_STAGES.map((s) => ({ ...s })),
       currentStageIndex: -1,
       subProgress: 0,

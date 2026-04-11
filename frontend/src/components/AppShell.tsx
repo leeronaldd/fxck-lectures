@@ -30,8 +30,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.isLoggedIn, authLoading, pathname, router]);
 
-  // Don't show app shell on sign-in, quiz, or landing page (for guests only)
-  if (isSignInPage || isQuizPage || (isLandingPage && !user.isLoggedIn)) {
+  // Don't show app shell on sign-in, quiz, preview, or landing page (for guests only)
+  const isPreviewPage = pathname === "/preview";
+  if (isSignInPage || isQuizPage || isPreviewPage || (isLandingPage && !user.isLoggedIn)) {
     return <>{children}</>;
   }
 

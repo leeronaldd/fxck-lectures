@@ -118,8 +118,10 @@ function UploadSlot({ label, accept, file, onFileChange, icon, hint }: UploadSlo
 interface UploadZoneProps {
   videoFile: File | null;
   transcriptFile: File | null;
+  slidesFile: File | null;
   onVideoChange: (f: File | null) => void;
   onTranscriptChange: (f: File | null) => void;
+  onSlidesChange: (f: File | null) => void;
   uploadProgress?: number;
   isUploading?: boolean;
 }
@@ -127,8 +129,10 @@ interface UploadZoneProps {
 export default function UploadZone({
   videoFile,
   transcriptFile,
+  slidesFile,
   onVideoChange,
   onTranscriptChange,
+  onSlidesChange,
   uploadProgress = 0,
   isUploading = false,
 }: UploadZoneProps) {
@@ -200,6 +204,30 @@ export default function UploadZone({
               </svg>
             }
           />
+
+          {/* Optional: Lecture slides */}
+          {(videoFile || transcriptFile) && (
+            <>
+              <div className="flex items-center gap-3 py-1">
+                <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
+                <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>optional</span>
+                <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
+              </div>
+              <UploadSlot
+                label="Add lecture slides"
+                accept=".pdf"
+                file={slidesFile}
+                onFileChange={onSlidesChange}
+                hint="PDF — higher quality visuals than video frames"
+                icon={
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="3" width="20" height="14" rx="2" />
+                    <path d="M8 21h8M12 17v4" />
+                  </svg>
+                }
+              />
+            </>
+          )}
         </>
       )}
     </div>

@@ -12,8 +12,10 @@ export default function UploadPage() {
     sessions,
     transcriptFile,
     videoFile,
+    slidesFile,
     setTranscriptFile,
     setVideoFile,
+    setSlidesFile,
     startPipeline,
     uploadProgress,
     isUploading,
@@ -50,8 +52,10 @@ export default function UploadPage() {
           <UploadZone
             videoFile={videoFile}
             transcriptFile={transcriptFile}
+            slidesFile={slidesFile}
             onVideoChange={setVideoFile}
             onTranscriptChange={setTranscriptFile}
+            onSlidesChange={setSlidesFile}
             uploadProgress={uploadProgress}
             isUploading={isUploading}
           />

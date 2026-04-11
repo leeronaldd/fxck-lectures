@@ -59,6 +59,27 @@ export async function uploadFile(
   return res.json();
 }
 
+export async function uploadSlides(
+  fileId: string,
+  file: File,
+): Promise<void> {
+  const token = await getToken();
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await fetch(`${API_URL}/api/upload-slides?file_id=${fileId}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    console.error("[Slides Upload] Error:", body);
+    throw new Error(`Slides upload failed: ${res.status}`);
+  }
+}
+
 export interface PipelineEvent {
   status: string;
   current_stage: string | null;

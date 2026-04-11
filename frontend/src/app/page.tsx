@@ -110,9 +110,8 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ───── Animated App Demo ───── */}
+        {/* ───── V2 App Demo — Two-Panel Layout ───── */}
         <section className="pb-20">
-          {/* Browser mockup — wide horizontal layout with fake sidebar */}
           <div className="rounded-xl overflow-hidden shadow-2xl" style={{ border: "1px solid var(--border)", background: "var(--bg-elevated)" }}>
             {/* Browser chrome */}
             <div className="flex items-center gap-2 px-4 py-2.5" style={{ borderBottom: "1px solid var(--border)" }}>
@@ -128,134 +127,97 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* App body — sidebar + content */}
-            <div className="flex" style={{ background: "var(--bg-base)", height: 480 }}>
-              {/* Fake sidebar */}
-              <div className="hidden sm:flex flex-col w-[200px] shrink-0 p-3 gap-2" style={{ borderRight: "1px solid var(--border)", background: "rgba(10,10,15,0.95)" }}>
-                <div className="flex items-center gap-2 px-2 py-2 rounded-lg text-xs font-medium" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>
-                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M8 3v10M3 8h10" /></svg>
-                  New Session
+            {/* App body — slide card left + transcript right */}
+            <div className="flex" style={{ background: "var(--bg-base)", height: 520 }}>
+              {/* Left: Slide Card */}
+              <div className="hidden sm:flex flex-col w-[45%] shrink-0 p-4 overflow-y-auto" style={{ borderRight: "1px solid var(--border)" }}>
+                <div className="demo-reveal demo-reveal-1 rounded-xl overflow-hidden border" style={{ background: "var(--bg-surface)", borderColor: "var(--border)" }}>
+                  {/* Card header */}
+                  <div className="px-4 py-2.5 flex items-center justify-between border-b" style={{ borderColor: "var(--border)" }}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono font-bold px-1.5 py-0.5 rounded-md" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>1a</span>
+                      <span className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>The Baltimore Classification System</span>
+                    </div>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "rgba(255,176,32,0.15)", color: "var(--ci-high)" }}>EI 90%</span>
+                  </div>
+                  {/* Slide image */}
+                  <div className="p-2.5">
+                    <div className="rounded-lg overflow-hidden bg-white">
+                      <img src="/screenshots/screenshot_005.jpg" alt="Baltimore Classification System" className="w-full h-auto" />
+                    </div>
+                  </div>
+                  {/* Exam tip */}
+                  <div className="px-4 py-2.5 text-[11px] border-t" style={{ borderColor: "var(--border)", background: "var(--exam-bg)", color: "var(--ci-high)" }}>
+                    <span className="font-semibold">Exam tip:</span> Positive-sense (+ssRNA) viruses can be translated directly by host ribosomes, whereas negative-sense (&minus;ssRNA) viruses must carry RNA-dependent RNA polymerase to synthesize a readable positive strand first.
+                  </div>
                 </div>
-                <p className="px-2 pt-2 text-[9px] font-semibold uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>Recent</p>
-                {/* Animated session appearing */}
-                <div className="demo-reveal demo-reveal-1 px-2 py-2 rounded-lg" style={{ background: "var(--bg-elevated)" }}>
-                  <p className="text-xs truncate" style={{ color: "var(--text-primary)" }}>Microbiology Lec 4</p>
-                  <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>Apr 9, 2026</p>
-                </div>
-                <div className="demo-reveal demo-reveal-2 px-2 py-2 rounded-lg">
-                  <p className="text-xs truncate" style={{ color: "var(--text-secondary)" }}>Neuroscience of Habit</p>
-                  <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>Apr 10, 2026</p>
+
+                {/* Sub-slide indicators */}
+                <div className="demo-reveal demo-reveal-2 flex items-center justify-center gap-2 py-3">
+                  <span className="text-[10px] px-2 py-1 rounded-full border font-mono" style={{ background: "var(--accent-dim)", color: "var(--accent)", borderColor: "var(--accent)" }}>1a</span>
+                  <span className="text-[10px] px-2 py-1 rounded-full border font-mono" style={{ color: "var(--text-muted)", borderColor: "var(--border)" }}>1b</span>
                 </div>
               </div>
 
-              {/* Scrollable content area */}
+              {/* Right: Transcript */}
               <div className="flex-1 overflow-y-auto relative">
-                <div className="demo-scroll-content px-6 sm:px-12 py-6">
+                <div className="demo-scroll-content px-5 sm:px-8 py-5">
                   <div className="demo-reveal demo-reveal-1">
-                    <h2 className="text-lg font-bold mb-4" style={{ color: "var(--text-primary)" }}>The Baltimore Classification System</h2>
+                    <h2 className="text-lg font-bold mb-4" style={{ color: "var(--text-primary)" }}>Baltimore Classification System</h2>
                   </div>
 
                   <div className="demo-reveal demo-reveal-2">
-                    <p className="text-sm mb-4 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                      Imagine trying to play a PlayStation 5 game on an Xbox. It doesn&apos;t matter how incredible the game is; the console just can&apos;t read the disc. Viruses face the exact same problem when they break into our cells.
+                    <p className="text-[13px] mb-4 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                      Remember back in Module 1, we established that cellular DNA replicates via semi-conservative replication. The two double-helix strands separate, and each acts as a physical template to synthesize a new complementary strand.
                     </p>
                   </div>
 
                   <div className="demo-reveal demo-reveal-3">
-                    <p className="text-sm mb-4 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                      As we covered earlier, viruses are <span style={{ color: "var(--accent)" }}>obligate intracellular parasites</span>&mdash;they have to hijack a host cell to survive. But just getting inside isn&apos;t enough. To make new <span style={{ color: "var(--accent)" }}>virions</span> (fully assembled virus particles), the virus has to hand its genetic instructions over to our cell&apos;s machinery to build viral proteins. The problem? Viruses carry their genomes in all sorts of weird formats, while our cells only naturally know how to read one specific sequence: DNA to RNA to Protein.
+                    <p className="text-[13px] mb-4 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                      Viruses, however, are essentially genetic hijackers. Every virus has one ultimate goal when it enters a host cell: to synthesize viral proteins. But to make proteins, you need messenger RNA. Where does a virus get it?
                     </p>
                   </div>
 
                   <div className="demo-reveal demo-reveal-4">
-                    <div className="rounded-lg p-4 mb-5" style={{ background: "rgba(255,107,53,0.08)", borderLeft: "3px solid var(--accent)" }}>
-                      <p className="text-sm leading-relaxed" style={{ color: "var(--text-primary)" }}>
-                        To make sense of this mess, we use the <strong style={{ color: "var(--accent)" }}>Baltimore Classification System</strong>. You absolutely need to know this for your exam. It groups viruses into seven classes based on one simple question: <em>How does this virus get its genome turned into mRNA?</em>
-                      </p>
-                    </div>
+                    <p className="text-[13px] mb-4 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                      Look at the diagram on the slide. Right in the middle, you see mRNA highlighted in yellow. Notice how every single grey arrow points directly to it. This is the <strong style={{ color: "var(--accent)" }}>Baltimore classification system</strong>. It categorizes all viruses based on two physical traits: the structure of their genome, and the specific enzymatic pathway they use to reach that central mRNA step.
+                    </p>
                   </div>
 
                   <div className="demo-reveal demo-reveal-5">
-                    <p className="text-sm mb-4 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                      Before we look at the groups, we need to clear up a massive stumbling block: RNA sense.
-                    </p>
-                    <p className="text-sm mb-3 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                      Our cells read <strong style={{ color: "var(--text-primary)" }}>mRNA</strong> (messenger RNA) to build proteins.
+                    <p className="text-[13px] mb-4 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                      A nucleic acid strand has a direction. We call the 5&apos; to 3&apos; orientation <strong style={{ color: "var(--accent)" }}>positive sense</strong>. The reverse direction is <strong style={{ color: "var(--accent)" }}>negative sense</strong>. Messenger RNA is <em>always</em> positive sense. If a virus carries a negative sense genome, it cannot be translated directly; it must be converted first.
                     </p>
                   </div>
 
                   <div className="demo-reveal demo-reveal-6">
-                    <div className="ml-4 mb-3">
-                      <p className="text-sm leading-relaxed mb-3" style={{ color: "var(--text-secondary)" }}>
-                        If a virus has <span style={{ color: "var(--accent)" }}>positive-sense (+)</span> RNA, it has it easy. This RNA is basically a perfectly formatted mRNA molecule. Our cellular machinery can read it and start building viral proteins the second it enters the cell.
-                      </p>
-                      <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                        If a virus has <span style={{ color: "var(--accent)" }}>negative-sense (-)</span> RNA, it&apos;s like handing the cell a blueprint written entirely in reverse. Our machinery can&apos;t read it. The virus has to make a complementary positive-sense copy before anything else can happen.
-                      </p>
-                    </div>
+                    <p className="text-[13px] mb-4 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                      Your professor glossed over the individual viral classes, but you will consistently see them on board exams. Let&apos;s walk through the main pathways.
+                    </p>
                   </div>
 
                   <div className="demo-reveal demo-reveal-7">
-                    <p className="text-sm mb-4 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                      Now, let&apos;s group the seven Baltimore classes logically so you don&apos;t have to blindly memorize them.
+                    <p className="text-[13px] mb-3 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                      Classes I and II start with DNA. <strong style={{ color: "var(--accent)" }}>Class I</strong> viruses possess double-stranded DNA, so they use the host&apos;s own RNA polymerase to transcribe mRNA. <strong style={{ color: "var(--accent)" }}>Class II</strong> viruses possess single-stranded DNA, so they must first build a complementary strand to form a double-stranded intermediate.
                     </p>
                   </div>
 
                   <div className="demo-reveal demo-reveal-8">
-                    <h3 className="text-base font-bold mb-2 mt-4" style={{ color: "var(--text-primary)" }}>
-                      {"\uD83E\uDDEA"} The Traditionalists: DNA Viruses
-                    </h3>
-                    <p className="text-sm mb-3 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                      These guys play by our cell&apos;s rules. Our cells normally transcribe double-stranded DNA into mRNA, so these viruses fit right in.
+                    <p className="text-[13px] mb-3 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                      Classes III, IV, and V start with RNA. Host cells lack enzymes to copy RNA from RNA, so these viruses encode their own <strong style={{ color: "var(--accent)" }}>RNA-dependent RNA polymerase</strong>. Class IV (+ssRNA) acts directly as mRNA. Class V (&minus;ssRNA) must first be transcribed into a positive-sense copy.
                     </p>
                   </div>
 
                   <div className="demo-reveal demo-reveal-9">
-                    <p className="text-sm mb-3 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                      <strong style={{ color: "var(--accent)" }}>Group I: Double-stranded DNA (dsDNA).</strong> This is exactly what our own cells use. The virus just hands its dsDNA over to our cellular enzymes, which transcribe it into mRNA. Easy.
-                    </p>
-                    <p className="text-sm mb-3 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                      <strong style={{ color: "var(--accent)" }}>Group II: Single-stranded DNA (ssDNA).</strong> Our cells don&apos;t like single-stranded DNA. So, the first step is for the host cell to build a second DNA strand, temporarily turning it into dsDNA. From there, it acts exactly like Group I.
-                    </p>
-                  </div>
-
-                  <div className="demo-reveal demo-reveal-10">
-                    <h3 className="text-base font-bold mb-2 mt-4" style={{ color: "var(--text-primary)" }}>
-                      {"\uD83C\uDFC3"} The Fast Trackers: Ready-to-Go RNA
-                    </h3>
-                    <p className="text-sm mb-3 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                      <strong style={{ color: "var(--accent)" }}>Group IV: Positive-sense single-stranded RNA (+ssRNA).</strong> These viruses don&apos;t even need to visit the nucleus. The moment they enter the cell, our ribosomes (the protein builders) latch onto the +ssRNA and start translating it into viral proteins immediately.
-                    </p>
-                  </div>
-
-                  <div className="demo-reveal demo-reveal-11">
-                    <h3 className="text-base font-bold mb-2 mt-4" style={{ color: "var(--text-primary)" }}>
-                      {"\uD83E\uDE9E"} The Mirror-Image RNA
-                    </h3>
-                    <p className="text-sm mb-3 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                      <strong style={{ color: "var(--accent)" }}>Group III: Double-stranded RNA (dsRNA).</strong> The virus uses the negative strand as a template to churn out positive-sense mRNA.
-                    </p>
-                    <p className="text-sm mb-3 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                      <strong style={{ color: "var(--accent)" }}>Group V: Negative-sense single-stranded RNA (-ssRNA).</strong> This genome is backwards. The virus <em>must</em> pack its own polymerase enzyme inside its capsid. As soon as it enters, that enzyme reads the negative strand and transcribes it into positive-sense mRNA. Think Ebola, measles, rabies.
-                    </p>
-                  </div>
-
-                  <div className="demo-reveal demo-reveal-12">
-                    <h3 className="text-base font-bold mb-2 mt-4" style={{ color: "var(--text-primary)" }}>
-                      {"\uD83D\uDD75\uFE0F"} The Rule Breakers
-                    </h3>
-                    <p className="text-sm mb-3 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                      <strong style={{ color: "var(--accent)" }}>Group VI: Retroviruses (+ssRNA).</strong> These viruses have positive-sense RNA, but they <em>don&apos;t</em> use it as mRNA. Instead, they carry <strong style={{ color: "var(--accent)" }}>reverse transcriptase</strong> which converts their RNA into DNA. That viral DNA then permanently stitches itself into the host cell&apos;s own DNA. HIV is the poster child.
-                    </p>
-                    <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                      <strong style={{ color: "var(--accent)" }}>Group VII: dsDNA with Reverse Transcriptase.</strong> Viruses like Hepatitis B start with dsDNA. They transcribe it into mRNA normally, but to package new genomes, they use reverse transcriptase to turn that mRNA <em>back</em> into dsDNA. Completely chaotic, but it works.
+                    <p className="text-[13px] mb-3 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                      Class VI and VII use <strong style={{ color: "var(--accent)" }}>reverse transcriptase</strong>. Class VI retroviruses convert their +ssRNA into double-stranded DNA that integrates into the host genome permanently. HIV is the classic example.
                     </p>
                   </div>
                 </div>
 
-                {/* Fade overlays top and bottom */}
-                <div className="absolute top-0 left-0 right-0 h-8 pointer-events-none" style={{ background: "linear-gradient(var(--bg-base), transparent)" }} />
-                <div className="absolute bottom-0 left-0 right-0 h-16 pointer-events-none" style={{ background: "linear-gradient(transparent, var(--bg-base))" }} />
+                {/* Fade overlays */}
+                <div className="absolute top-0 left-0 right-0 h-6 pointer-events-none" style={{ background: "linear-gradient(var(--bg-base), transparent)" }} />
+                <div className="absolute bottom-0 left-0 right-0 h-12 pointer-events-none" style={{ background: "linear-gradient(transparent, var(--bg-base))" }} />
               </div>
             </div>
           </div>

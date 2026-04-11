@@ -180,6 +180,38 @@ async def upload_file(
     return UploadResponse(file_id=file_id, filename=file.filename or "file.txt")
 
 
+# Map file_id → slides path for pipeline to pick up
+_slide_files: dict[str, Path] = {}
+
+
+@app.post("/api/upload-slides")
+async def upload_slides(
+    file: UploadFile = File(...),
+    file_id: str = "",
+    user: dict = Depends(get_current_user),
+):
+    """Upload lecture slides (PDF) to accompany a previously uploaded lecture.
+
+    The file_id should match a previously uploaded transcript/video.
+    The pipeline will validate that slides match the transcript before
+    running the expensive generation step.
+    """
+    if not file_id:
+        raise HTTPException(400, "file_id is required — upload the lecture first")
+
+    ext = Path(file.filename or "slides.pdf").suffix.lower()
+    if ext not in (".pdf", ".pptx"):
+        raise HTTPException(400, "Only PDF and PPTX slide files are supported")
+
+    slides_path = UPLOAD_DIR / f"{file_id}_slides{ext}"
+    with open(slides_path, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+
+    _slide_files[file_id] = slides_path
+
+    return {"status": "ok", "slides_filename": file.filename, "file_id": file_id}
+
+
 @app.get("/api/sessions")
 async def get_sessions(
     user: dict = Depends(get_current_user),
@@ -420,11 +452,15 @@ async def run_pipeline_stream(
     finished = False
     lock = threading.Lock()
 
+    # Check if slides were uploaded for this file
+    slides_path = _slide_files.get(file_id)
+
     def pipeline_worker():
         nonlocal finished
         from app.pipeline import run_pipeline
 
-        for progress in run_pipeline(input_path, user_profile=user_profile):
+        for progress in run_pipeline(input_path, user_profile=user_profile,
+                                     slides_path=str(slides_path) if slides_path else None):
             with lock:
                 events.append(progress)
         with lock:

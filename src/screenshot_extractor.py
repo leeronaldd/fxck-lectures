@@ -101,13 +101,13 @@ def extract_frames(
 
                 # Save frame
                 idx_str = f"{len(detections) + 1:03d}"
-                filename = f"screenshot_{idx_str}.jpg"
+                filename = f"screenshot_{idx_str}.png"
                 save_path = os.path.join(output_dir, filename)
 
                 # Use Pillow for JPEG quality control
                 frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 img = Image.fromarray(frame_rgb)
-                img.save(save_path, "JPEG", quality=85)
+                img.save(save_path, "PNG")
 
                 detections.append({
                     "timestamp_seconds": round(timestamp, 1),
@@ -116,11 +116,11 @@ def extract_frames(
         else:
             # Always save the first frame after skip as a baseline
             idx_str = f"{len(detections) + 1:03d}"
-            filename = f"screenshot_{idx_str}.jpg"
+            filename = f"screenshot_{idx_str}.png"
             save_path = os.path.join(output_dir, filename)
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             img = Image.fromarray(frame_rgb)
-            img.save(save_path, "JPEG", quality=85)
+            img.save(save_path, "PNG")
             detections.append({
                 "timestamp_seconds": round(timestamp, 1),
                 "image_path": save_path,

@@ -29,3 +29,22 @@ export interface TrustStats {
   correctClaims: number;
   verifiedPercent: number;
 }
+
+// V2 types
+export interface SlideCard {
+  slide_id: string;
+  title: string;
+  card_type: "professor_slide" | "diagram";
+  image_ref: string;
+  bullet_points: string[];
+  exam_tip: string;
+  ei_percent: number;
+}
+
+export interface TranscriptSection {
+  slide_number: number;
+  title: string;
+  narrative: string;
+  ei_percent: number;
+  ei_reasoning: string;
+}

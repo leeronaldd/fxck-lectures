@@ -1,4 +1,12 @@
-"""Pipeline runner — runs the pipeline as a generator that yields progress."""
+"""Pipeline runner — V2: 3-stage anatomy-professor pipeline.
+
+Stages:
+1. Transcribe (if video) + Chunk
+2. Flash prefetch (teaching summaries + term tracking) + Flash textbook fetch
+3. Pro generation (parallel, all chunks at once)
+
+Yields progress dicts for the SSE stream.
+"""
 
 import json
 import sys
@@ -16,13 +24,20 @@ def _ensure_imports():
         sys.path.insert(0, root_str)
 
 
-def run_pipeline(input_path: str, user_profile: dict | None = None) -> Generator[dict, None, None]:
-    """Run the v4 pipeline, yielding progress dicts at each stage.
+def run_pipeline(
+    input_path: str,
+    user_profile: dict | None = None,
+    slides_path: str | None = None,
+) -> Generator[dict, None, None]:
+    """Run the V2 pipeline, yielding progress dicts at each stage.
 
     Each yield is a dict with: status, stage, progress, error, output.
     The caller (SSE endpoint) sends these to the client.
 
-    user_profile: optional dict with study_program, study_year from quiz.
+    Args:
+        input_path: Path to .txt transcript or .mp4/.mkv video file
+        user_profile: Optional dict with study_program, study_year from quiz
+        slides_path: Optional path to uploaded slides PDF
     """
     _ensure_imports()
 
@@ -30,21 +45,19 @@ def run_pipeline(input_path: str, user_profile: dict | None = None) -> Generator
     output_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        from src.models import Chunk
         from src.chunker import chunk_transcript
 
         input_file = Path(input_path)
         job_id = input_file.stem
         video_extensions = {".mp4", ".mkv", ".avi", ".mov", ".webm"}
 
-        # --- Step 0 (conditional): Transcribe video ---
+        # ── Stage 0 (conditional): Transcribe video ──
         if input_file.suffix in video_extensions:
             yield {"status": "running", "stage": "Transcribing lecture", "progress": 2}
             from src.transcriber import transcribe
             result = transcribe(input_path)
             text = result["text"]
 
-            # Save transcript for reference
             transcript_path = output_dir / f"{job_id}_transcript.txt"
             transcript_path.write_text(text, encoding="utf-8")
 
@@ -54,149 +67,93 @@ def run_pipeline(input_path: str, user_profile: dict | None = None) -> Generator
         elif input_file.suffix == ".txt":
             text = input_file.read_text(encoding="utf-8")
         else:
-            yield {"status": "error", "stage": "Chunking transcript", "progress": 5,
+            yield {"status": "error", "stage": "Reading file", "progress": 5,
                    "error": f"Unsupported file type: {input_file.suffix}. Use .txt, .mp4, .mkv, .avi, .mov, or .webm"}
             return
 
-        # --- Guard: reject transcripts too short to contain real content ---
+        # Guard: reject too-short transcripts
         word_count = len(text.split())
         if word_count < 100:
             yield {"status": "error", "stage": "Chunking transcript", "progress": 5,
-                   "error": f"Transcript too short ({word_count} words). Need at least 100 words of lecture content."}
+                   "error": f"Transcript too short ({word_count} words). Need at least 100 words."}
             return
 
-        # --- Step 1: Chunking ---
+        # ── Stage 1: Chunking ──
         yield {"status": "running", "stage": "Chunking transcript", "progress": 12}
         chunks = chunk_transcript(text)
-        chunks_path = output_dir / f"{job_id}_chunks.json"
-        with open(chunks_path, "w", encoding="utf-8") as f:
-            json.dump([c.model_dump() for c in chunks], f, indent=2)
+
+        # Convert Pydantic models to dicts for V2
+        chunks_dicts = [c.model_dump() for c in chunks]
 
         yield {"status": "running", "stage": "Chunking transcript", "progress": 15,
                "result": f"{len(chunks)} chunks"}
 
-        # --- Step 2: CI% Scoring ---
-        yield {"status": "running", "stage": "Scoring exam importance", "progress": 15}
-        from src.ci_scorer import score_all
-        ci_output = str(output_dir / f"{job_id}_ci.json")
-        try:
-            ci_scores = score_all(str(chunks_path), output_path=ci_output)
-            ci_map = {s.chunk_index: s for s in ci_scores}
-        except Exception as e:
-            # CI scoring is non-fatal — continue without scores
-            ci_map = {}
-            yield {"status": "running", "stage": "Scoring exam importance", "progress": 20,
-                   "result": f"Skipped: {e}"}
+        # ── Stage 2: Validate slides match (if provided) ──
+        if slides_path:
+            yield {"status": "running", "stage": "Validating slides", "progress": 16}
+            from src.generator_v2 import validate_content_match
+            validation = validate_content_match(text[:2000], slides_path=slides_path)
+            if not validation.is_match and validation.confidence > 0.7:
+                yield {"status": "error", "stage": "Validating slides", "progress": 16,
+                       "error": (
+                           f"Slides don't match the transcript. "
+                           f"Transcript topic: {validation.transcript_topic}. "
+                           f"Slides topic: {validation.slides_topic}. "
+                           f"Please upload the correct slides for this lecture."
+                       )}
+                return
+            yield {"status": "running", "stage": "Validating slides", "progress": 18,
+                   "result": "Slides match confirmed"}
 
-        # --- Step 3: Concept Grouping ---
-        yield {"status": "running", "stage": "Grouping concepts", "progress": 25}
-        from src.concept_grouper import group_chunks_with_llm, group_chunks_deterministic, save_groups
-        try:
-            groups = group_chunks_with_llm(chunks, ci_map or None)
-        except Exception as e:
-            print(f"  LLM grouper failed ({e}), falling back to deterministic")
-            groups = group_chunks_deterministic(chunks, ci_map or None)
-        groups_path = output_dir / f"{job_id}_groups.json"
-        save_groups(groups, str(groups_path))
+        # ── Stage 3: V2 Generation (prefetch + textbook + Pro, all inside) ──
+        yield {"status": "running", "stage": "Preparing teaching context", "progress": 20}
 
-        yield {"status": "running", "stage": "Grouping concepts", "progress": 30,
-               "result": f"{len(groups)} groups"}
+        from src.generator_v2 import generate_lecture, assemble_api_response
 
-        # --- Step 4: Load groups with transcripts ---
-        from src.concept_grouper import load_groups_with_transcripts
-        groups_with_text = load_groups_with_transcripts(str(groups_path), str(chunks_path))
-
-        # --- Step 5: Generation ---
-        yield {"status": "running", "stage": "Generating explanations", "progress": 35}
-        from src.generator import generate_from_groups, set_student_context
-
-        # Pass student profile to generator if available
+        # Derive subject hint from user profile if available
+        subject = None
         if user_profile:
             program = user_profile.get("study_program", "")
-            year = user_profile.get("study_year", "")
-            if program or year:
-                set_student_context(program=program, year=year)
+            if program:
+                subject = program
 
-        output_path = str(output_dir / f"{job_id}_output.md")
-        generate_from_groups(
-            groups_with_text,
-            output_path=output_path,
-            dry_run=False,
+        yield {"status": "running", "stage": "Generating lecture", "progress": 30}
+
+        sections = generate_lecture(
+            chunks=chunks_dicts,
+            lecture_slides_path=slides_path,
+            subject=subject,
+            parallel=True,
         )
-        yield {"status": "running", "stage": "Generating explanations", "progress": 80}
 
-        # --- Step 6: Fact checking ---
-        yield {"status": "running", "stage": "Verifying sources", "progress": 85}
-        verification_path = output_dir / f"{job_id}_verification.json"
-        try:
-            from src.fact_checker import verify_and_ground, save_verification_report
-            explanations_raw = json.loads(Path(output_path).read_text(encoding="utf-8"))
-            corrected, verifications = verify_and_ground(explanations_raw, groups_with_text)
-            # Save corrected explanations back
-            Path(output_path).write_text(
-                json.dumps(corrected, indent=2, ensure_ascii=False), encoding="utf-8"
-            )
-            save_verification_report(verifications, str(verification_path))
-        except Exception as e:
-            print(f"  Fact-checking failed: {e}")  # Non-fatal
+        if not sections:
+            yield {"status": "error", "stage": "Generating lecture", "progress": 30,
+                   "error": "No sections generated. The lecture may be too short or entirely housekeeping."}
+            return
 
-        # --- Step 7: Completeness check ---
-        yield {"status": "running", "stage": "Checking completeness", "progress": 90}
-        try:
-            from src.completeness_checker import auto_fix
-            explanations_raw = json.loads(Path(output_path).read_text(encoding="utf-8"))
-            explanations_raw, misses = auto_fix(explanations_raw, groups_with_text)
-            # Save updated explanations
-            Path(output_path).write_text(
-                json.dumps(explanations_raw, indent=2, ensure_ascii=False), encoding="utf-8"
-            )
-        except Exception as e:
-            print(f"  Completeness check failed: {e}")  # Non-fatal
+        yield {"status": "running", "stage": "Assembling output", "progress": 90}
 
-        # --- Step 8: Assembly ---
-        yield {"status": "running", "stage": "Assembling final document", "progress": 95}
+        # Build V2 API response
+        api_response = assemble_api_response(sections)
 
-        # Read outputs — the generator saves JSON, so assemble markdown from explanation_text fields
-        markdown = ""
-        concept_groups = []
-        verification = []
-
-        if Path(output_path).exists():
-            raw = json.loads(Path(output_path).read_text(encoding="utf-8"))
-            # Assemble markdown from explanation_text fields
-            md_parts = []
-            for exp in raw:
-                if isinstance(exp, dict):
-                    text = exp.get("explanation_text", "")
-                    topic = exp.get("topic_name", "")
-                    if text and not exp.get("was_skipped", False):
-                        section = f"## {topic}\n\n{text}"
-                        # Append screenshot references if present
-                        screenshots = exp.get("screenshot_refs", [])
-                        if screenshots:
-                            img_lines = "\n".join(
-                                f"\n![Lecture slide](screenshots/{img})"
-                                for img in screenshots if img
-                            )
-                            section += f"\n{img_lines}"
-                        md_parts.append(section)
-            markdown = "\n\n---\n\n".join(md_parts)
-
-        if groups_path.exists():
-            concept_groups = json.loads(groups_path.read_text(encoding="utf-8"))
-        if verification_path.exists():
-            verification = json.loads(verification_path.read_text(encoding="utf-8"))
+        # Serialize as JSON string into the markdown field (no schema migration needed)
+        # Frontend detects JSON vs plain markdown and renders accordingly
+        v2_json = json.dumps(api_response, ensure_ascii=False)
 
         yield {
             "status": "done",
             "stage": "Done",
             "progress": 100,
             "output": {
-                "markdown": markdown,
-                "concept_groups": concept_groups,
-                "verification_report": verification,
+                "markdown": v2_json,
+                "slides": api_response.get("slides", []),
+                "transcript": api_response.get("transcript", []),
+                "concept_groups": [],
+                "verification_report": [],
             },
         }
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         yield {"status": "error", "stage": "Pipeline error", "progress": 0, "error": str(e)}
