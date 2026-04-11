@@ -467,6 +467,7 @@ async def run_pipeline_stream(
     events: list[dict] = []
     finished = False
     lock = threading.Lock()
+    cancel_event = threading.Event()
 
     # Check if slides were uploaded for this file
     slides_path = _slide_files.get(file_id)
@@ -476,9 +477,12 @@ async def run_pipeline_stream(
         from app.pipeline import run_pipeline
 
         for progress in run_pipeline(input_path, user_profile=user_profile,
-                                     slides_path=str(slides_path) if slides_path else None):
+                                     slides_path=str(slides_path) if slides_path else None,
+                                     cancel_event=cancel_event):
             with lock:
                 events.append(progress)
+            if cancel_event.is_set():
+                break
         with lock:
             finished = True
 
@@ -488,41 +492,51 @@ async def run_pipeline_stream(
 
     async def event_stream():
         sent = 0
-        while True:
-            with lock:
-                new_events = events[sent:]
-                is_finished = finished
-
-            for progress in new_events:
-                data = json.dumps({
-                    "status": progress.get("status", "running"),
-                    "current_stage": progress.get("stage"),
-                    "progress": progress.get("progress", 0),
-                    "error": progress.get("error"),
-                    "output": progress.get("output"),
-                })
-                yield f"data: {data}\n\n"
-                sent += 1
-
-                # On success, record usage and save session
-                if progress.get("status") == "done" and progress.get("output"):
-                    try:
-                        await _record_usage(user, request)
-                        session_name = original_filename.replace("-", " ").replace("_", " ").title()
-                        await _save_session(user, request, session_name, progress["output"])
-                    except Exception:
-                        pass  # Non-fatal — don't fail the pipeline for tracking issues
-
-                # Stop if done or error
-                if progress.get("status") in ("done", "error"):
+        try:
+            while True:
+                # Check if client disconnected
+                if await request.is_disconnected():
+                    cancel_event.set()
+                    print(f"  Client disconnected — cancelling pipeline for {file_id}")
                     return
 
-            if is_finished:
-                return
+                with lock:
+                    new_events = events[sent:]
+                    is_finished = finished
 
-            # Send keepalive comment every iteration to prevent Cloud Run timeout
-            yield ": keepalive\n\n"
-            await asyncio.sleep(5)
+                for progress in new_events:
+                    data = json.dumps({
+                        "status": progress.get("status", "running"),
+                        "current_stage": progress.get("stage"),
+                        "progress": progress.get("progress", 0),
+                        "error": progress.get("error"),
+                        "output": progress.get("output"),
+                    })
+                    yield f"data: {data}\n\n"
+                    sent += 1
+
+                    # On success, record usage and save session
+                    if progress.get("status") == "done" and progress.get("output"):
+                        try:
+                            await _record_usage(user, request)
+                            session_name = original_filename.replace("-", " ").replace("_", " ").title()
+                            await _save_session(user, request, session_name, progress["output"])
+                        except Exception:
+                            pass  # Non-fatal — don't fail the pipeline for tracking issues
+
+                    # Stop if done, error, or cancelled
+                    if progress.get("status") in ("done", "error", "cancelled"):
+                        return
+
+                if is_finished:
+                    return
+
+                # Send keepalive comment every iteration to prevent Cloud Run timeout
+                yield ": keepalive\n\n"
+                await asyncio.sleep(2)
+        except asyncio.CancelledError:
+            cancel_event.set()
+            print(f"  SSE stream cancelled — stopping pipeline for {file_id}")
 
     return StreamingResponse(
         event_stream(),

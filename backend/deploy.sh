@@ -22,6 +22,7 @@ gcloud run deploy "$SERVICE_NAME" \
   --allow-unauthenticated \
   --use-http2 \
   --memory 2Gi \
+  --cpu 4 \
   --timeout 900 \
   --concurrency 1 \
   --min-instances 0 \

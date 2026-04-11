@@ -191,12 +191,14 @@ export function runPipeline(
   onDone: (output: PipelineEvent["output"]) => void,
 ): () => void {
   let cancelled = false;
+  const controller = new AbortController();
 
   (async () => {
     try {
       const token = await getToken();
       const res = await fetch(`${API_URL}/api/run/${fileId}`, {
         headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
       });
 
       if (!res.ok) {
@@ -243,11 +245,14 @@ export function runPipeline(
         }
       }
     } catch (e) {
-      if (!cancelled) {
+      if (!cancelled && !(e instanceof DOMException && e.name === "AbortError")) {
         onError(e instanceof Error ? e.message : "Connection lost");
       }
     }
   })();
 
-  return () => { cancelled = true; };
+  return () => {
+    cancelled = true;
+    controller.abort();
+  };
 }

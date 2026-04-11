@@ -10,11 +10,23 @@ Yields progress dicts for the SSE stream.
 
 import json
 import sys
+import threading
 from pathlib import Path
 from typing import Generator
 
 # Project root — one level up from backend/
 PROJECT_ROOT = Path(__file__).parent.parent
+
+
+class PipelineCancelled(Exception):
+    """Raised when the client disconnects and the pipeline should stop."""
+    pass
+
+
+def _check_cancelled(cancel_event: threading.Event | None):
+    """Check if the pipeline has been cancelled by the client."""
+    if cancel_event and cancel_event.is_set():
+        raise PipelineCancelled("Client disconnected")
 
 
 def _ensure_imports():
@@ -28,6 +40,7 @@ def run_pipeline(
     input_path: str,
     user_profile: dict | None = None,
     slides_path: str | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> Generator[dict, None, None]:
     """Run the V2 pipeline, yielding progress dicts at each stage.
 
@@ -64,6 +77,7 @@ def run_pipeline(
             word_count = len(text.split())
             yield {"status": "running", "stage": "Transcribing lecture", "progress": 10,
                    "result": f"{word_count:,} words transcribed"}
+            _check_cancelled(cancel_event)
         elif input_file.suffix == ".txt":
             text = input_file.read_text(encoding="utf-8")
         else:
@@ -87,6 +101,7 @@ def run_pipeline(
 
         yield {"status": "running", "stage": "Chunking transcript", "progress": 15,
                "result": f"{len(chunks)} chunks"}
+        _check_cancelled(cancel_event)
 
         # ── Stage 1.5: Extract screenshots from video (if no slides PDF uploaded) ──
         screenshots_json = None
@@ -137,6 +152,7 @@ def run_pipeline(
                    "result": "Slides match confirmed"}
 
         # ── Stage 3: V2 Generation (prefetch + textbook + Pro, all inside) ──
+        _check_cancelled(cancel_event)
         yield {"status": "running", "stage": "Preparing teaching context", "progress": 20}
 
         from src.generator_v2 import generate_lecture, assemble_api_response
@@ -148,6 +164,7 @@ def run_pipeline(
             if program:
                 subject = program
 
+        _check_cancelled(cancel_event)
         yield {"status": "running", "stage": "Generating lecture", "progress": 30}
 
         sections = generate_lecture(
@@ -185,6 +202,9 @@ def run_pipeline(
             },
         }
 
+    except PipelineCancelled:
+        print(f"  Pipeline cancelled by client disconnect")
+        yield {"status": "cancelled", "stage": "Cancelled", "progress": 0}
     except Exception as e:
         import traceback
         traceback.print_exc()
