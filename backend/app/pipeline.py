@@ -88,7 +88,38 @@ def run_pipeline(
         yield {"status": "running", "stage": "Chunking transcript", "progress": 15,
                "result": f"{len(chunks)} chunks"}
 
-        # ── Stage 2: Validate slides match (if provided) ──
+        # ── Stage 1.5: Extract screenshots from video (if no slides PDF uploaded) ──
+        screenshots_json = None
+        if not slides_path and input_file.suffix in video_extensions:
+            yield {"status": "running", "stage": "Extracting lecture slides", "progress": 16}
+            try:
+                from src.screenshot_extractor import extract_all
+                screenshots_dir = output_dir / "screenshots"
+                screenshots_dir.mkdir(exist_ok=True)
+
+                # Save chunks to temp file for extract_all
+                chunks_temp_path = output_dir / f"{job_id}_chunks.json"
+                with open(chunks_temp_path, "w", encoding="utf-8") as f:
+                    json.dump(chunks_dicts, f, indent=2, ensure_ascii=False)
+
+                results = extract_all(
+                    video_path=input_path,
+                    chunks_path=str(chunks_temp_path),
+                    output_dir=str(screenshots_dir),
+                    output_json=str(output_dir / f"{job_id}_screenshots.json"),
+                )
+                if results:
+                    screenshots_json = str(output_dir / f"{job_id}_screenshots.json")
+                    yield {"status": "running", "stage": "Extracting lecture slides", "progress": 19,
+                           "result": f"{len(results)} slides extracted"}
+                else:
+                    yield {"status": "running", "stage": "Extracting lecture slides", "progress": 19,
+                           "result": "No slide transitions detected"}
+            except Exception as e:
+                print(f"  Screenshot extraction failed: {e}")
+                # Non-fatal — continue without screenshots
+
+        # ── Stage 2: Validate slides match (if PDF provided) ──
         if slides_path:
             yield {"status": "running", "stage": "Validating slides", "progress": 16}
             from src.generator_v2 import validate_content_match
@@ -122,6 +153,7 @@ def run_pipeline(
         sections = generate_lecture(
             chunks=chunks_dicts,
             lecture_slides_path=slides_path,
+            screenshots_json=screenshots_json,
             subject=subject,
             parallel=True,
         )

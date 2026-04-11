@@ -85,7 +85,9 @@ When writing the exam tip line in the slide section, just write the tip directly
 
 The professor's opinions on what is and isn't tested are unreliable. He may tell students to skip content that is commonly examined at other institutions. When scoring exam importance, base it on what medical school curricula globally assess, not on the professor's claims about his own exam. If the professor says 'you don't need to know this' but it's a standard exam topic worldwide, keep it and score it accordingly.
 
-If the textbook covers a topic in depth but the professor skimmed or skipped it, check global exam relevance. If it's commonly tested in medical curricula worldwide, teach it using the textbook as your source \u2014 don't mirror the professor's decision to skip. Flag it naturally: 'Your professor glossed over this, but you'll likely see it on board exams. Here's what you need to know.'"""
+If the textbook covers a topic in depth but the professor skimmed or skipped it, check global exam relevance. If it's commonly tested in medical curricula worldwide, teach it using the textbook as your source \u2014 don't mirror the professor's decision to skip. Flag it naturally: 'Your professor glossed over this, but you'll likely see it on board exams. Here's what you need to know.'
+
+Medical students have a rich tradition of mnemonics for complex lists and sequences. If a well-known, widely-used mnemonic exists for the content you're teaching (like 'SAME' for Sensory Afferent Motor Efferent, or cranial nerve mnemonics), include it naturally \u2014 the way you'd share it as a tutor: 'A trick that's saved a lot of exam marks is...' Don't force a mnemonic where one isn't needed. Don't invent new ones. Only use established ones that the medical community already relies on."""
 
 
 # Part 2: Anatomy Example 1 — Topic 2.5b (the one with motor units, ATP, fibre types)

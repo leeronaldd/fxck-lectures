@@ -87,6 +87,8 @@ export interface PipelineEvent {
   error: string | null;
   output: {
     markdown: string;
+    slides: { slide_id: string; title: string; card_type: string; image_ref: string; bullet_points: string[]; exam_tip: string; ei_percent: number }[];
+    transcript: { slide_number: number; title: string; narrative: string; ei_percent: number; ei_reasoning: string }[];
     concept_groups: unknown[];
     verification_report: unknown[];
   } | null;

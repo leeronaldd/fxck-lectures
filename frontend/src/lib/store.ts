@@ -98,16 +98,18 @@ const INITIAL_SESSIONS: Session[] = [];
 
 const TEXT_STAGES: PipelineStage[] = [
   { name: "Chunking transcript", weight: 10, mockDuration: 800, mockResult: "12 chunks", status: "pending" },
+  { name: "Validating slides", weight: 5, mockDuration: 400, mockResult: "Slides match confirmed", status: "pending" },
   { name: "Preparing teaching context", weight: 15, mockDuration: 1500, mockResult: "Summaries ready", status: "pending" },
-  { name: "Generating lecture", weight: 70, mockDuration: 4000, mockResult: "Slides + transcript ready", hasSubProgress: true, status: "pending" },
+  { name: "Generating lecture", weight: 65, mockDuration: 4000, mockResult: "Slides + transcript ready", hasSubProgress: true, status: "pending" },
   { name: "Assembling output", weight: 5, mockDuration: 300, mockResult: "Done!", status: "pending" },
 ];
 
 const VIDEO_STAGES: PipelineStage[] = [
-  { name: "Transcribing lecture", weight: 15, mockDuration: 2000, mockResult: "Transcribed", status: "pending" },
-  { name: "Chunking transcript", weight: 10, mockDuration: 800, mockResult: "12 chunks", status: "pending" },
-  { name: "Preparing teaching context", weight: 15, mockDuration: 1500, mockResult: "Summaries ready", status: "pending" },
-  { name: "Generating lecture", weight: 55, mockDuration: 4000, mockResult: "Slides + transcript ready", hasSubProgress: true, status: "pending" },
+  { name: "Transcribing lecture", weight: 12, mockDuration: 2000, mockResult: "Transcribed", status: "pending" },
+  { name: "Chunking transcript", weight: 8, mockDuration: 800, mockResult: "12 chunks", status: "pending" },
+  { name: "Extracting lecture slides", weight: 10, mockDuration: 1500, mockResult: "Slides extracted", status: "pending" },
+  { name: "Preparing teaching context", weight: 12, mockDuration: 1500, mockResult: "Summaries ready", status: "pending" },
+  { name: "Generating lecture", weight: 53, mockDuration: 4000, mockResult: "Slides + transcript ready", hasSubProgress: true, status: "pending" },
   { name: "Assembling output", weight: 5, mockDuration: 300, mockResult: "Done!", status: "pending" },
 ];
 
