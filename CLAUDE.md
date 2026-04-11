@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-AI tool that transforms bad medical lecture transcripts into lecture-replacement documents. A student reads the output instead of watching the lecture and understands 100% of the content. Built for a 1st year Biomedical Science student at Griffith University.
+AI tool that transforms bad medical/health lecture transcripts into lecture-replacement documents. A student reads the output instead of watching the lecture and understands 100% of the content. General-purpose for all medical, health, and science lectures — not limited to any specific subject.
+
+Pipeline is personalized via a 4-question quiz onboarding (program, year, frustration, referral) stored in Supabase `user_profiles`. Generator adjusts depth/tone by year level.
 
 The tool is NOT a summarizer or note-taker — it re-explains concepts from scratch using a teacher-student agent loop, producing output quality equivalent to the best human tutor.
 
@@ -54,48 +56,42 @@ Regex chunking is free. Use cheap models (Gemini Flash) for simple tasks like CI
 
 ## Architecture
 
-V4 pipeline (Stages 0-2 implemented):
+V2 pipeline (3-stage parallel architecture, replaced V1's 8 stages):
 
 ```
 Stage 0: Transcription (src/transcriber.py) — optional, if input is video/audio
-    → Groq Whisper Large v3 Turbo ($0.04/hr)
+    → Gemini Flash multimodal audio (~$0.02/2hr lecture, no rate limits)
     → auto audio extraction via ffmpeg, chunking for large files
-    → saves transcript to data/transcripts/
+    ↓
+Stage 0.5: Screenshot Extraction (src/screenshot_extractor.py) — if video input
+    → OpenCV frame detection + Gemini Flash descriptions
+    → matched to chunks by timestamp
     ↓
 Stage 1: Chunking (src/chunker.py)
     → regex splitting with Gemini Flash fallback
     ↓
-Stage 1.5a: CI% Scoring (src/ci_scorer.py)
-    → exam importance 0-100, recalibrated to use full range
+Stage 2: V2 Generation (src/generator_v2.py) — all parallel
     ↓
-Stage 1.5b: Screenshot Extraction (src/screenshot_extractor.py)
-    → OpenCV frame detection + Gemini Flash descriptions
+    ├── Flash prefetch (parallel, ~10s)
+    │   → teaching summaries + term tracking for all chunks
+    │   → term ownership assigned by Python set arithmetic
+    │
+    ├── Flash textbook fetch (parallel, ~30s)
+    │   → OpenStax content via Google Search grounding per chunk
+    │
+    └── Pro generation (parallel, ~60s)
+        → creative brief with anatomy professor style transfer
+        → context caching (system instruction cached once)
+        → per-chunk: prior previews + textbook + transcript + slides
+        → output: slide doc + transcript + EI% per section
     ↓
-Concept Grouper (src/concept_grouper.py)
-    → merges ~14 chunks into ~8 logical groups
-    → marks skips, expansion targets, reorders for learning flow
-    ↓
-Stage 2: Explanation Generation (src/generator.py)
-    → Gemini 3.1 Pro, v1 conversational tutor prompt
-    → per concept group, not per chunk/slide
-    → textbook chapter fetched from OpenStax as factual reference
-    → Google Search grounding enabled during generation
-    ↓
-Fact-Check & Correct (src/fact_checker.py)
-    → Flash reads entire output per section + textbook + Google Search
-    → flags errors against reputable sources (NIH, PubMed, textbooks)
-    → Pro surgically rewrites flagged paragraphs
-    ↓
-Completeness Checker (src/completeness_checker.py)
-    → grep terms + slide-derived terms (Flash extraction)
-    → inserts inline skip-lines for low-CI% misses
-    ↓
-Slide Reference Insertion (src/slide_inserter.py)
-    → post-processing: maps slides to paragraphs
-    ↓
-Assembly (run_stage2.py → assemble_markdown)
-    → inline slide images, skip lines, final markdown
+Assembly (Python parser, no LLM)
+    → splits delimited output into slides.json + transcript.json
+    → frontend renders two-panel layout
 ```
+
+Old V1 files (src/generator.py, ci_scorer.py, concept_grouper.py, fact_checker.py, 
+completeness_checker.py, slide_inserter.py) kept as fallback but not used by V2.
 
 Not yet implemented (Stage 3-5 — Teacher-Student Agent Loop):
 
@@ -138,18 +134,18 @@ Estimated token budget per lecture (~8 chunks):
 
 ### Factual Accuracy Strategy (implemented)
 - **Generation-time grounding**: Gemini Pro has Google Search enabled during generation — it verifies claims while writing, not after
-- **Textbook RAG during generation**: relevant OpenStax chapter fetched and included as primary factual context in the generation prompt. Hardcoded URL lookup table (100% reliable). Rule: "textbook wins on facts, professor wins on scope"
+- **Textbook RAG during generation**: relevant OpenStax chapter fetched via `src/textbook_search.py` — 89 keyword entries across 12 OpenStax textbooks. Multi-tier: keyword match → Flash LLM pick → NCBI Bookshelf API → graceful skip. File-based cache with 90-day TTL. Rule: "textbook wins on facts, professor wins on scope"
 - **Post-generation verification**: Flash + Google Search reads the entire output per section, flags errors against textbook + reputable medical sources (NIH, PubMed, NCBI, .edu)
 - **Pro correction loop**: surgically rewrites flagged paragraphs while maintaining colloquial tone. Conditional — only runs when errors found
 - Error rate: 11 → 1 across 6 prompt iterations + textbook RAG
 
-### Textbook RAG (planned — not yet implemented)
-The gold standard for accuracy: use the student's prescribed textbook as the primary knowledge source.
-- Student enters university + course during onboarding
-- Pipeline searches for prescribed textbook (e.g., Prescott's Microbiology 16th ed)
-- First priority: university's own textbook. Fallback: OpenStax or NCBI Bookshelf (free, peer-reviewed)
-- Textbook chunks stored in vector DB, used as RAG context during generation
-- Every claim grounded in the actual textbook the exam will test from
+### Textbook RAG (implemented — OpenStax + NCBI)
+Uses `src/textbook_search.py` for dynamic retrieval:
+- 89 keyword entries across 12 OpenStax textbooks (microbiology, anatomy, biology, chemistry, psychology, pharmacology, nursing, nutrition, psychiatric, population health)
+- Multi-tier: keyword match (free) → Flash LLM numbered-list pick (cheap) → NCBI Bookshelf API (free) → graceful skip
+- File-based cache in `data/textbook_cache/` with 90-day TTL
+- Handles JavaScript-only pages with CNX API fallback
+- Future: university-specific prescribed textbooks via vector DB
 
 ## Running
 
@@ -213,6 +209,7 @@ src/
   slide_chunker.py         # Slide-based chunking (legacy, superseded by concept grouper)
   concept_grouper.py       # Merge/reorder/skip pass on Stage 1 chunks
   generator.py             # Stage 2: system prompt + Gemini Pro generation
+  textbook_search.py         # Dynamic OpenStax + NCBI textbook retrieval (89 keyword entries, 12 books)
   fact_checker.py            # Textbook RAG + Google Search verification + Pro correction loop
   completeness_checker.py  # Grep + slide-term coverage check + auto-fix
   slide_inserter.py        # Post-processing slide references (companion doc only, inline done in assembly)
@@ -243,10 +240,13 @@ backend/
 frontend/
   src/
     app/
-      page.tsx             # Upload page (home)
+      page.tsx             # Landing page (sales page with sample preview)
+      quiz/page.tsx        # 4-question onboarding quiz funnel
       reader/page.tsx      # Document reader
       processing/page.tsx  # Pipeline progress stepper
-      signin/page.tsx      # Auth page (Google/Microsoft OAuth + email)
+      signin/page.tsx      # Auth page (Google OAuth + email)
+      settings/page.tsx    # Settings (Account, Billing, Usage, Privacy, Customization)
+      upload/page.tsx      # Upload dashboard (drag-drop + recent sessions)
       layout.tsx           # Root layout with AuthProvider
     components/
       AuthProvider.tsx     # Supabase auth state listener
@@ -271,3 +271,37 @@ docs/
 
 - `docs/anatomy-style-analysis.md` — 7 transferable teaching rules from the anatomy professor (question-answer chain, functional naming, inclusive language, etc.). Used selectively for complex concepts.
 - `dev-logs/` — session snapshots: what changed, what worked, what failed, what to try next.
+
+
+
+# How We Write System Prompts — Read This Before Writing Any Prompt
+
+## The Rule
+
+Never write a system prompt as a list of orders. No "YOU MUST", no "NEVER do X", no "ALWAYS do Y", no bullet-pointed commands. That produces robotic, rule-following output where the model is checking boxes instead of thinking.
+
+Instead, write every system prompt like a creative brief you'd hand to a talented author before they ghost-write something for you. You're talking to a collaborator, not issuing commands to a machine.
+
+## What a Good Prompt Looks Like
+
+Share examples of writing you love and explain what makes them work. Describe the audience — who's reading this, what do they already know, what are they feeling. Talk about the three drives or principles behind the work, the way one writer talks to another about craft. Paste in reference samples so the model can absorb the style by reading it, the same way a new writer learns by reading good writing. Mention hard constraints (word count ranges, accuracy requirements, terms that must appear) at the end as contract terms — brief, firm, non-negotiable. Those stay directive because they're factual constraints, not style opinions.
+
+## What a Bad Prompt Looks Like
+
+50 bullet points starting with "MUST", "NEVER", "ALWAYS", "CRITICAL", "DO NOT". Numbered rules. Sections titled "=== REQUIREMENTS ===". Shouting in caps. Treating the model like a misbehaving employee instead of a skilled collaborator. The word "prompt" itself carries baggage — if you find yourself writing something that feels like a prompt, stop and rewrite it as a conversation.
+
+## Variable Naming
+
+Don't call it `SYSTEM_PROMPT`. Call it `CREATIVE_BRIEF` or `WRITING_GUIDE` or `AUTHOR_NOTES`. The variable name shapes how you write the content inside it. If the variable is called `SYSTEM_PROMPT`, you'll instinctively write orders. If it's called `CREATIVE_BRIEF`, you'll instinctively write like a human talking to another human.
+
+## The 52 Observations Pattern
+
+When we analyse a gold-standard example (like we did with the anatomy professor's transcript — 52 observations about what makes it exceptional), paste those observations into the prompt as-is. They read like analysis, like one writer talking to another about craft. Don't rewrite them as rules. "She never introduces a structure without placing it physically" produces better output than "YOU MUST place every structure physically before explaining function." The observation describes what great looks like. The rule describes what failure looks like. Always orient toward the positive example.
+
+## Accuracy Constraints Are the Exception
+
+Factual accuracy rules (verify via search, textbook wins on facts, correct misspellings, bold key terms on first use) stay firm and direct. These are contract terms, not style opinions. A brief section at the end of the creative brief with these constraints is fine. But even these should feel like "here are the non-negotiables we agreed on" not "YOU WILL BE PENALISED FOR FAILING TO COMPLY."
+
+## Why This Matters
+
+The quality difference is massive. A model reading a creative brief thinks like a writer. A model reading a list of orders thinks like a compliance checker. The first produces output with soul, rhythm, and judgment. The second produces output that technically follows every rule but feels dead. We want the first.
