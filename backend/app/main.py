@@ -11,7 +11,7 @@ from pathlib import Path
 import httpx
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 
 from app.auth import get_current_user
 from app.models import UploadResponse
@@ -159,6 +159,22 @@ async def _save_session(user: dict, request: Request, name: str, output: dict) -
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}
+
+
+# Serve screenshot images from data/output/screenshots/
+SCREENSHOTS_DIR = Path(__file__).parent.parent / "data" / "output" / "screenshots"
+
+
+@app.get("/api/screenshots/{filename}")
+async def get_screenshot(filename: str):
+    """Serve extracted lecture slide images."""
+    # Sanitize filename to prevent path traversal
+    safe_name = Path(filename).name
+    file_path = SCREENSHOTS_DIR / safe_name
+    if not file_path.exists():
+        raise HTTPException(404, "Screenshot not found")
+    mime = "image/png" if safe_name.endswith(".png") else "image/jpeg"
+    return FileResponse(file_path, media_type=mime)
 
 
 @app.post("/api/upload", response_model=UploadResponse)

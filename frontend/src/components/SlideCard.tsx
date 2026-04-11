@@ -3,6 +3,20 @@
 import { useState } from "react";
 import type { SlideCard } from "@/lib/types";
 
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/+$/, "");
+
+/** Resolve a slide image_ref to a full URL.
+ *  "screenshots/screenshot_005.jpg" → "{API_URL}/api/screenshots/screenshot_005.jpg"
+ */
+function resolveImageUrl(imageRef: string): string {
+  if (imageRef.startsWith("http")) return imageRef;
+  if (imageRef.startsWith("screenshots/")) {
+    const filename = imageRef.replace("screenshots/", "");
+    return `${API_URL}/api/screenshots/${filename}`;
+  }
+  return `/${imageRef}`;
+}
+
 export function SlideCardComponent({
   card,
   onImageClick,
@@ -75,11 +89,11 @@ export function SlideCardComponent({
       {card.image_ref && !card.image_ref.startsWith("[") && (
         <div className="px-3 pb-3">
           <button
-            onClick={() => onImageClick?.(`/${card.image_ref}`)}
+            onClick={() => onImageClick?.(resolveImageUrl(card.image_ref))}
             className="w-full rounded-xl overflow-hidden bg-white cursor-zoom-in hover:ring-2 hover:ring-[var(--accent)] transition-all"
           >
             <img
-              src={`/${card.image_ref}`}
+              src={resolveImageUrl(card.image_ref)}
               alt={card.title}
               className="w-full h-auto"
             />

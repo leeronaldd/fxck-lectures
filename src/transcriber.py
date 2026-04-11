@@ -99,10 +99,14 @@ def _transcribe_chunk_gemini(audio_bytes: bytes, chunk_index: int = 0, total_chu
     parts = [
         types.Part.from_bytes(data=audio_bytes, mime_type="audio/mp3"),
         types.Part.from_text(text=(
-            "Transcribe this audio precisely. This is a university lecture. "
-            "Output ONLY the transcription text — no timestamps, no speaker labels, "
-            "no commentary. Preserve the speaker's exact words including filler words "
-            "like 'um', 'so', 'okay'. Do not correct grammar or rephrase anything."
+            "Transcribe this audio word for word. Do not summarize, do not skip "
+            "anything, do not clean up the speaker's language. Output every single "
+            "word as spoken, including filler words (um, uh, so, okay, right, like), "
+            "repetitions, false starts, and incomplete sentences. Do not merge or "
+            "paraphrase any content. Do not add punctuation that changes meaning. "
+            "The output should have the SAME word count as the spoken audio. "
+            "This is a university lecture recording — transcribe it as if you are "
+            "a court stenographer capturing every utterance."
         )),
     ]
 
@@ -111,7 +115,7 @@ def _transcribe_chunk_gemini(audio_bytes: bytes, chunk_index: int = 0, total_chu
         contents=parts,
         config={
             "temperature": 0.0,
-            "max_output_tokens": 8192,
+            "max_output_tokens": 65536,
         },
     )
 
