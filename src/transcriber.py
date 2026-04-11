@@ -1,7 +1,9 @@
-"""Speech-to-text transcription using Groq Whisper API.
+"""Speech-to-text transcription using Gemini Flash multimodal.
 
-Extracts audio from video files and transcribes using Whisper Large v3 Turbo
-at $0.04/hour — 18x cheaper than OpenAI, 24x cheaper than Google Cloud STT.
+Extracts audio from video files and transcribes using Gemini Flash's
+native audio understanding — no rate limits, ~$0.02 per 2-hour lecture.
+
+Falls back to Groq Whisper if Gemini fails (optional).
 """
 
 import os
@@ -10,23 +12,7 @@ import tempfile
 import math
 from pathlib import Path
 
-from groq import Groq
-
-from src.config import GROQ_API_KEY, TRANSCRIPTION_MODEL
-
-# Groq limits: 25MB free tier, 100MB dev tier
-MAX_FILE_SIZE_MB = 25
-CHUNK_DURATION_MINUTES = 20  # safe chunk size for most audio formats
-OVERLAP_SECONDS = 30  # overlap between chunks to avoid cutting mid-sentence
-
-
-def get_client() -> Groq:
-    api_key = GROQ_API_KEY
-    if not api_key:
-        raise ValueError(
-            "GROQ_API_KEY not set. Get one free at https://console.groq.com/keys"
-        )
-    return Groq(api_key=api_key)
+from src.config import GCP_PROJECT_ID, GCP_LOCATION, CHUNKER_FALLBACK_MODEL
 
 
 def extract_audio(video_path: str, output_path: str = None) -> str:
@@ -44,7 +30,7 @@ def extract_audio(video_path: str, output_path: str = None) -> str:
         "-vn",  # no video
         "-ac", "1",  # mono
         "-ab", "64k",  # 64kbps — speech doesn't need more
-        "-ar", "16000",  # 16kHz sample rate — Whisper's native rate
+        "-ar", "16000",  # 16kHz sample rate
         "-y",  # overwrite
         output_path,
     ]
@@ -69,7 +55,7 @@ def get_audio_duration(audio_path: str) -> float:
     return float(result.stdout.strip())
 
 
-def split_audio(audio_path: str, chunk_duration_s: int, overlap_s: int) -> list[str]:
+def split_audio(audio_path: str, chunk_duration_s: int, overlap_s: int = 30) -> list[str]:
     """Split audio into overlapping chunks. Returns list of temp file paths."""
     total_duration = get_audio_duration(audio_path)
     step = chunk_duration_s - overlap_s
@@ -97,56 +83,44 @@ def split_audio(audio_path: str, chunk_duration_s: int, overlap_s: int) -> list[
     return chunks
 
 
-def transcribe_file(
-    audio_path: str,
-    language: str = "en",
-    prompt: str = None,
-    timestamps: bool = False,
-) -> dict:
-    """Transcribe a single audio file via Groq Whisper.
+def _transcribe_chunk_gemini(audio_bytes: bytes, chunk_index: int = 0, total_chunks: int = 1) -> str:
+    """Transcribe a single audio chunk using Gemini Flash multimodal.
 
-    Args:
-        audio_path: Path to audio file (mp3, wav, etc.)
-        language: ISO-639-1 language code
-        prompt: Optional context hint for medical terms (max 224 tokens)
-        timestamps: If True, return word-level timestamps
-
-    Returns:
-        dict with 'text' and optionally 'segments' keys
+    Gemini natively understands audio — no separate STT API needed.
+    Cost: ~32 tokens/second of audio at $0.10/M tokens = ~$0.01/hr.
     """
-    client = get_client()
+    from google import genai
+    from google.genai import types
 
-    kwargs = {
-        "model": TRANSCRIPTION_MODEL,
-        "language": language,
-        "temperature": 0.0,  # deterministic for accuracy
-    }
+    client = genai.Client(
+        vertexai=True, project=GCP_PROJECT_ID, location=GCP_LOCATION
+    )
 
-    if timestamps:
-        kwargs["response_format"] = "verbose_json"
-        kwargs["timestamp_granularities"] = ["segment"]
-    else:
-        kwargs["response_format"] = "verbose_json"
+    parts = [
+        types.Part.from_bytes(data=audio_bytes, mime_type="audio/mp3"),
+        types.Part.from_text(text=(
+            "Transcribe this audio precisely. This is a university lecture. "
+            "Output ONLY the transcription text — no timestamps, no speaker labels, "
+            "no commentary. Preserve the speaker's exact words including filler words "
+            "like 'um', 'so', 'okay'. Do not correct grammar or rephrase anything."
+        )),
+    ]
 
-    if prompt:
-        kwargs["prompt"] = prompt[:800]  # 224 tokens ≈ ~800 chars
+    response = client.models.generate_content(
+        model=CHUNKER_FALLBACK_MODEL,
+        contents=parts,
+        config={
+            "temperature": 0.0,
+            "max_output_tokens": 8192,
+        },
+    )
 
-    with open(audio_path, "rb") as f:
-        kwargs["file"] = (Path(audio_path).name, f)
-        result = client.audio.transcriptions.create(**kwargs)
+    return response.text.strip()
 
-    output = {"text": result.text}
-    if hasattr(result, "segments") and result.segments:
-        output["segments"] = [
-            {
-                "start": s.start if hasattr(s, "start") else s.get("start"),
-                "end": s.end if hasattr(s, "end") else s.get("end"),
-                "text": s.text if hasattr(s, "text") else s.get("text"),
-            }
-            for s in result.segments
-        ]
 
-    return output
+# Gemini has input limits — split audio into ~20 min chunks
+CHUNK_DURATION_MINUTES = 20
+MAX_SINGLE_FILE_MB = 20  # Send directly if under this size
 
 
 def transcribe(
@@ -155,16 +129,18 @@ def transcribe(
     medical_terms: list[str] = None,
     timestamps: bool = False,
 ) -> dict:
-    """Transcribe a video or audio file. Handles chunking for large files.
+    """Transcribe a video or audio file using Gemini Flash.
+
+    Handles chunking for long files. No rate limits, no external API keys needed.
 
     Args:
         input_path: Path to video (.mp4, .mkv, etc.) or audio (.mp3, .wav, etc.)
-        language: ISO-639-1 language code
-        medical_terms: Optional list of expected medical terms to improve accuracy
-        timestamps: If True, include segment-level timestamps
+        language: ISO-639-1 language code (currently unused — Gemini auto-detects)
+        medical_terms: Optional list of expected medical terms (unused with Gemini)
+        timestamps: If True, include segment-level timestamps (not supported with Gemini)
 
     Returns:
-        dict with 'text', optionally 'segments', and 'metadata'
+        dict with 'text' and 'metadata'
     """
     input_path = str(Path(input_path).resolve())
     ext = Path(input_path).suffix.lower()
@@ -183,57 +159,56 @@ def transcribe(
     else:
         raise ValueError(f"Unsupported format: {ext}. Supported: {video_exts | audio_exts}")
 
-    # Build prompt hint with medical terms for better accuracy
-    prompt = None
-    if medical_terms:
-        prompt = "Medical lecture transcript. Key terms: " + ", ".join(medical_terms[:30])
-
     try:
         file_size_mb = os.path.getsize(audio_path) / (1024 * 1024)
         duration = get_audio_duration(audio_path)
 
-        if file_size_mb <= MAX_FILE_SIZE_MB:
+        if file_size_mb <= MAX_SINGLE_FILE_MB:
             # Single file — no chunking needed
-            print(f"Transcribing {duration/60:.1f} min audio ({file_size_mb:.1f}MB)...")
-            result = transcribe_file(audio_path, language, prompt, timestamps)
+            print(f"Transcribing {duration/60:.1f} min audio ({file_size_mb:.1f}MB) with Gemini Flash...")
+            with open(audio_path, "rb") as f:
+                audio_bytes = f.read()
+            text = _transcribe_chunk_gemini(audio_bytes)
         else:
-            # Split into chunks
+            # Split into chunks for long lectures
             chunk_duration_s = CHUNK_DURATION_MINUTES * 60
-            n_chunks = math.ceil(duration / (chunk_duration_s - OVERLAP_SECONDS))
+            chunk_paths = split_audio(audio_path, chunk_duration_s)
+            n_chunks = len(chunk_paths)
             print(f"Audio is {file_size_mb:.1f}MB — splitting into {n_chunks} chunks...")
 
-            chunk_paths = split_audio(audio_path, chunk_duration_s, OVERLAP_SECONDS)
             all_text = []
-            all_segments = []
-            offset = 0.0
-
             for i, chunk_path in enumerate(chunk_paths):
-                print(f"  Transcribing chunk {i+1}/{len(chunk_paths)}...")
+                print(f"  Transcribing chunk {i+1}/{n_chunks}...")
                 try:
-                    chunk_result = transcribe_file(chunk_path, language, prompt, timestamps)
-                    all_text.append(chunk_result["text"])
-
-                    if "segments" in chunk_result:
-                        for seg in chunk_result["segments"]:
-                            seg["start"] += offset
-                            seg["end"] += offset
-                        all_segments.extend(chunk_result["segments"])
+                    with open(chunk_path, "rb") as f:
+                        chunk_bytes = f.read()
+                    chunk_text = _transcribe_chunk_gemini(chunk_bytes, i, n_chunks)
+                    all_text.append(chunk_text)
                 finally:
                     os.unlink(chunk_path)
 
-                offset += (CHUNK_DURATION_MINUTES * 60) - OVERLAP_SECONDS
+            text = " ".join(all_text)
 
-            result = {"text": " ".join(all_text)}
-            if all_segments:
-                result["segments"] = all_segments
+        word_count = len(text.split())
+        # Gemini Flash: ~32 tokens/sec audio, $0.10/M input tokens
+        estimated_tokens = duration * 32
+        estimated_cost = estimated_tokens / 1_000_000 * 0.10
 
-        result["metadata"] = {
-            "duration_seconds": duration,
-            "duration_minutes": round(duration / 60, 1),
-            "file_size_mb": round(file_size_mb, 1),
-            "model": TRANSCRIPTION_MODEL,
-            "estimated_cost_usd": round(duration / 3600 * 0.04, 4),
+        result = {
+            "text": text,
+            "metadata": {
+                "duration_seconds": duration,
+                "duration_minutes": round(duration / 60, 1),
+                "file_size_mb": round(file_size_mb, 1),
+                "model": CHUNKER_FALLBACK_MODEL,
+                "estimated_cost_usd": round(estimated_cost, 4),
+                "word_count": word_count,
+            },
         }
+        print(f"  Duration:  {duration/60:.1f} min")
+        print(f"  Est. cost: ${estimated_cost:.3f}")
+        print(f"  Words:     {word_count}")
+
         return result
 
     finally:

@@ -6,9 +6,10 @@ import os
 GCP_PROJECT_ID = os.environ.get("GCP_PROJECT_ID", "project-bc1fc31b-94c5-44b0-904")
 GCP_LOCATION = os.environ.get("GCP_LOCATION", "global")
 
-# Groq API settings (for Whisper STT)
+# Transcription now uses Gemini Flash (no separate STT API needed)
+# Groq API key kept for backward compat but no longer required
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
-TRANSCRIPTION_MODEL = "whisper-large-v3-turbo"  # $0.04/hr — cheapest available on Groq (distil was deprecated Aug 2025)
+TRANSCRIPTION_MODEL = "gemini-3-flash-preview"  # Gemini Flash multimodal audio — no rate limits
 
 # Model selection per stage — configurable via env vars
 # To switch cheap model to DeepSeek V3.2 ($0.28/$0.42 vs Flash $0.50/$3.00):
