@@ -1,7 +1,7 @@
 """Whisper STT service — GPU-accelerated transcription on Cloud Run.
 
 Receives audio file, returns full transcript. No chunking needed.
-Uses faster-whisper with large-v3-turbo for best speed/accuracy tradeoff.
+Uses faster-whisper with large-v3-turbo + batched inference for max speed.
 """
 
 import os
@@ -9,17 +9,18 @@ import tempfile
 import time
 
 from fastapi import FastAPI, File, UploadFile
-from faster_whisper import WhisperModel
+from faster_whisper import WhisperModel, BatchedInferencePipeline
 
 app = FastAPI()
 
 # Load model once at startup (already baked into Docker image)
 MODEL = None
+BATCHED = None
 
 
 @app.on_event("startup")
 def load_model():
-    global MODEL
+    global MODEL, BATCHED
     print("Loading Whisper model...")
     start = time.time()
     MODEL = WhisperModel(
@@ -27,6 +28,8 @@ def load_model():
         device="cuda",
         compute_type="float16",
     )
+    # Batched pipeline processes multiple audio chunks in parallel on the GPU
+    BATCHED = BatchedInferencePipeline(model=MODEL)
     print(f"Model loaded in {time.time() - start:.1f}s")
 
 
@@ -55,11 +58,13 @@ async def transcribe(file: UploadFile = File(...)):
         file_size_mb = len(content) / (1024 * 1024)
         print(f"Transcribing {file.filename} ({file_size_mb:.1f} MB)...")
 
-        # Transcribe with VAD filter to skip silence
-        segments, info = MODEL.transcribe(
+        # Batched inference — processes audio chunks in parallel on GPU
+        # batch_size=16 means 16 chunks at once (L4 has 24GB VRAM, plenty)
+        segments, info = BATCHED.transcribe(
             tmp_path,
             language="en",
-            beam_size=5,
+            beam_size=1,
+            batch_size=16,
             vad_filter=True,
             vad_parameters=dict(
                 min_silence_duration_ms=500,
