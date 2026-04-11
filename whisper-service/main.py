@@ -24,9 +24,9 @@ def load_model():
     print("Loading Whisper model...")
     start = time.time()
     MODEL = WhisperModel(
-        "large-v3-turbo",
+        "small",
         device="cuda",
-        compute_type="float16",
+        compute_type="int8",
     )
     # Batched pipeline processes multiple audio chunks in parallel on the GPU
     BATCHED = BatchedInferencePipeline(model=MODEL)
@@ -64,7 +64,7 @@ async def transcribe(file: UploadFile = File(...)):
             tmp_path,
             language="en",
             beam_size=1,
-            batch_size=16,
+            batch_size=64,
             vad_filter=True,
             vad_parameters=dict(
                 min_silence_duration_ms=500,
