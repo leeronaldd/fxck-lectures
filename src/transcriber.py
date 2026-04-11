@@ -59,16 +59,37 @@ def get_audio_duration(audio_path: str) -> float:
     return float(result.stdout.strip())
 
 
-def _get_id_token(audience: str) -> str:
-    """Get a Google ID token for authenticating to Cloud Run (no-allow-unauthenticated)."""
-    creds, _ = google.auth.default()
-    auth_req = google.auth.transport.requests.Request()
-    creds.refresh(auth_req)
+def _get_auth_headers(audience: str) -> dict:
+    """Get auth headers for Cloud Run service.
 
-    # Use the IAM credentials API to generate an ID token
-    from google.oauth2 import id_token
-    token = id_token.fetch_id_token(auth_req, audience)
-    return token
+    On Cloud Run (service-to-service): uses metadata server for ID token.
+    Locally: uses gcloud CLI identity token via subprocess.
+    """
+    # Try metadata server first (works on Cloud Run)
+    try:
+        from google.oauth2 import id_token as id_token_mod
+        import google.auth.transport.requests as gauth_requests
+        auth_req = gauth_requests.Request()
+        token = id_token_mod.fetch_id_token(auth_req, audience)
+        return {"Authorization": f"Bearer {token}"}
+    except Exception:
+        pass
+
+    # Fallback: use gcloud CLI (works locally)
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["gcloud", "auth", "print-identity-token", f"--audiences={audience}"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return {"Authorization": f"Bearer {result.stdout.strip()}"}
+    except Exception:
+        pass
+
+    # Last resort: no auth (will fail on --no-allow-unauthenticated services)
+    print("  WARNING: Could not get auth token for Whisper service")
+    return {}
 
 
 def _transcribe_via_whisper_service(audio_path: str) -> dict:
@@ -76,15 +97,14 @@ def _transcribe_via_whisper_service(audio_path: str) -> dict:
     print(f"Sending to Whisper service at {WHISPER_SERVICE_URL}...")
     start = time.time()
 
-    # Get ID token for Cloud Run auth
-    token = _get_id_token(WHISPER_SERVICE_URL)
+    headers = _get_auth_headers(WHISPER_SERVICE_URL)
 
     # Upload the audio file
     with open(audio_path, "rb") as f:
         response = requests.post(
             f"{WHISPER_SERVICE_URL}/transcribe",
             files={"file": (Path(audio_path).name, f, "audio/mpeg")},
-            headers={"Authorization": f"Bearer {token}"},
+            headers=headers,
             timeout=900,  # 15 min max for very long lectures
         )
 
@@ -113,7 +133,7 @@ def _transcribe_via_gemini(audio_path: str, duration: float) -> dict:
 
     file_size_mb = os.path.getsize(audio_path) / (1024 * 1024)
     print(f"Transcribing {duration/60:.1f} min audio ({file_size_mb:.1f}MB) with Gemini Flash (fallback)...")
-    print(f"  ⚠ Gemini Flash may be slow/unreliable for long audio. Set WHISPER_SERVICE_URL for production.")
+    print(f"  WARNING: Gemini Flash may be slow/unreliable for long audio. Set WHISPER_SERVICE_URL for production.")
 
     with open(audio_path, "rb") as f:
         audio_bytes = f.read()
