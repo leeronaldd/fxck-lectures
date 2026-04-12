@@ -91,7 +91,7 @@ def main():
             sys.exit(1)
 
     # Generate
-    sections = generate_lecture(
+    sections, _textbook_images = generate_lecture(
         chunks=all_chunks,
         lecture_slides_path=args.slides,
         screenshots_json=args.screenshots,

@@ -23,7 +23,7 @@ if sys.platform == "win32":
     except Exception:
         pass
 
-from src.config import GCP_PROJECT_ID, GCP_LOCATION, GENERATOR_MODEL, CHUNKER_FALLBACK_MODEL
+from src.config import GCP_PROJECT_ID, GCP_LOCATION, GENERATOR_MODEL, CHUNKER_FALLBACK_MODEL, GCS_SCREENSHOTS_BUCKET
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -93,7 +93,17 @@ Here's something important about the professors whose lectures you're rewriting.
 
 If the professor spent a long time on something, ask yourself: is this actually hard, or did he just ramble? If it's simple content with lots of transcript, condense aggressively. If the professor barely mentioned something but the textbook covers it in depth and it's commonly examined, that's your signal to expand \u2014 the professor failed the student here, and you need to fill the gap.
 
-The anatomy professor does this instinctively. Titin gets one sentence. The cross-bridge cycle gets 400 words. She allocates depth to difficulty, not to how much she feels like talking. The amount of transcript you receive for a topic tells you nothing about how much space it deserves in your output. The textbook and the exam relevance tell you everything."""
+The anatomy professor does this instinctively. Titin gets one sentence. The cross-bridge cycle gets 400 words. She allocates depth to difficulty, not to how much she feels like talking. The amount of transcript you receive for a topic tells you nothing about how much space it deserves in your output. The textbook and the exam relevance tell you everything.
+
+Here's how the system you're part of works. You're not writing in isolation — you're one of several parallel writers, each generating a different section of the same lecture document simultaneously. A faster, cheaper model (Flash) has already previewed every chunk of the lecture before you start. It identified the sub-concepts in each section, estimated exam importance, and — most importantly — a coordinator pass has assigned concept ownership across all sections. You'll receive this assignment with your chunk: which concepts are YOURS to teach, and which concepts another writer is already covering in a different section.
+
+Because you're running in parallel, you cannot see what the other writers produce. But the coordinator has already ensured there's no overlap. If your assignment says 'CALLBACK ONLY: lytic cycle — covered in Section 8', trust it. Writer 8 is teaching that concept right now in their section. Your job is a brief callback ('remember the lytic cycle from earlier') and then move on to what's actually new in your section.
+
+The student reads all sections in order as one continuous document. If you and Writer 8 both fully explain the lytic cycle, the student reads the same explanation twice. That's the one thing we need to avoid — a student should never encounter the same concept taught from scratch in two different sections.
+
+One thing we've noticed in your earlier outputs. When your assignment says 'CALLBACK ONLY: lytic cycle — covered in Section 8', you sometimes write something like 'Remember from our earlier discussion on the lytic cycle that a virus must complete several stages: attachment, penetration, synthesis...' — that's not a callback, that's a mini-explanation. You're listing the stages. A true callback is 'Remember the lytic cycle from Section 8' and move on. The moment you start listing steps, naming sub-components, or walking through a mechanism that another writer owns, you've crossed from callback into re-explanation. If a concept is in your CALLBACK ONLY list, mention it by name and move on. Don't summarise it, don't list its components, don't walk through any of its steps. Trust that the other writer covered it properly.
+
+We know this is sometimes genuinely hard. You might own the beginning and end of a process while another writer owns the middle — like owning 'prokaryotic entry' and 'cellular lysis' while another writer owns 'the lytic cycle' that connects them. The temptation is to bridge entry and lysis by summarising the cycle in between. Don't. Instead, trust the document order. Write 'the genome is now inside the host cell — the lytic cycle in Section N covers what happens next' and then pick up at lysis. The student reads the sections in order, so they will have read the lytic cycle by the time they reach your lysis section. You don't need to bridge across another writer's territory."""
 
 
 # Part 2: Anatomy Example 1 — Topic 2.5b (the one with motor units, ATP, fibre types)
@@ -766,6 +776,112 @@ def fetch_textbook_section(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# OpenStax image fetching — real figures for diagram cards
+# ═══════════════════════════════════════════════════════════════════════════
+
+def fetch_textbook_images(
+    topic_name: str,
+    key_terms: list[str] | None = None,
+    job_id: str = "",
+) -> list[dict]:
+    """Fetch OpenStax figures relevant to a chunk topic.
+
+    Uses the OpenStax index from textbook_search.py to find the right page,
+    extracts figure images with captions, and uploads them to GCS.
+
+    Returns list of dicts with keys: gcs_url, caption, figure_id.
+    Returns empty list if no images found — generation continues without them.
+    """
+    from src.textbook_search import _match_topic_to_index, _flash_pick_chapter, _fetch_and_extract, _get_cached_images, _store_cached_images
+
+    # Find the right OpenStax page
+    url = _match_topic_to_index(topic_name)
+    if not url:
+        url = _flash_pick_chapter(topic_name)
+    if not url:
+        return []
+
+    # Check for cached images first
+    cached_images = _get_cached_images(url)
+    if cached_images:
+        # If cached images already have GCS URLs, return as-is
+        if cached_images and cached_images[0].get("gcs_url"):
+            return cached_images
+
+    # Fetch the page and extract images
+    fetched = _fetch_and_extract(url)
+    if not fetched or not fetched.get("images"):
+        return []
+
+    images = fetched["images"]
+    print(f"    [images] Found {len(images)} figures for '{topic_name}'")
+
+    # Upload to GCS and build result
+    result = []
+    for img in images[:6]:  # Cap at 6 images per chunk
+        src = img.get("src", "")
+        if not src:
+            continue
+
+        gcs_url = _upload_openstax_image_to_gcs(src, job_id, img.get("figure_id", ""))
+        if gcs_url:
+            entry = {
+                "gcs_url": gcs_url,
+                "caption": img.get("caption", ""),
+                "figure_id": img.get("figure_id", ""),
+                "original_src": src,
+            }
+            result.append(entry)
+
+    if result:
+        _store_cached_images(url, result)
+        print(f"    [images] Uploaded {len(result)} figures to GCS")
+
+    return result
+
+
+def _upload_openstax_image_to_gcs(src_url: str, job_id: str, figure_id: str) -> str:
+    """Download an OpenStax image and upload to GCS.
+
+    Returns the public GCS URL, or empty string on failure.
+    """
+    import urllib.request
+
+    try:
+        # Download the image
+        req = urllib.request.Request(src_url, headers={"User-Agent": "Mozilla/5.0"})
+        resp = urllib.request.urlopen(req, timeout=15)
+        image_bytes = resp.read()
+
+        if len(image_bytes) < 500:  # Skip tiny/broken images
+            return ""
+
+        # Determine filename from figure_id or URL
+        ext = ".jpg"
+        if ".png" in src_url.lower():
+            ext = ".png"
+        elif ".svg" in src_url.lower():
+            ext = ".svg"
+
+        safe_id = re.sub(r"[^a-zA-Z0-9_.-]", "_", figure_id or "figure") or "figure"
+        blob_name = f"{job_id}/openstax_{safe_id}{ext}" if job_id else f"openstax/{safe_id}{ext}"
+
+        # Upload to GCS
+        from google.cloud import storage
+        client = storage.Client()
+        bucket = client.bucket(GCS_SCREENSHOTS_BUCKET)
+        blob = bucket.blob(blob_name)
+
+        content_type = resp.headers.get("Content-Type", "image/jpeg")
+        blob.upload_from_string(image_bytes, content_type=content_type)
+
+        return f"https://storage.googleapis.com/{GCS_SCREENSHOTS_BUCKET}/{blob_name}"
+    except Exception as e:
+        print(f"    [images] Failed to upload {src_url[:60]}: {e}")
+        return ""
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Flash prefetch — teaching summaries + term tracking for all chunks
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -780,6 +896,8 @@ class ChunkPreview:
     ei_estimate: int = 50       # Flash's quick EI% estimate (drives depth allocation)
     transcript_words: int = 0   # Word count of professor's transcript for this chunk
     sub_concepts: list[str] = field(default_factory=list)  # Content checklist for Pro
+    owns: list[str] = field(default_factory=list)           # Concepts this chunk should fully teach
+    callback_only: list[str] = field(default_factory=list)  # Concepts covered elsewhere — brief reference only
 
 
 def _generate_single_preview(
@@ -806,7 +924,10 @@ def _generate_single_preview(
     terms_str = ", ".join(real_terms[:15]) if real_terms else "none extracted"
 
     prompt = (
-        f"You're previewing this lecture section for a colleague who will teach it next.\n\n"
+        "You're part of a lecture-generation pipeline. Multiple writers will generate sections "
+        "of a lecture document in parallel — they can't see each other's output. Your role right "
+        "now is to preview this section so a coordinator can assign concept ownership and prevent "
+        "overlapping explanations across sections.\n\n"
         f"TOPIC: {topic_name}\n"
         f"KEY TERMS IN THIS SECTION: {terms_str}\n\n"
         f"TRANSCRIPT:\n{transcript[:6000]}\n\n"
@@ -916,15 +1037,147 @@ def _assign_term_ownership(previews: list[ChunkPreview]) -> None:
         seen.update(t.lower() for t in new)
 
 
+def _coordinate_concept_ownership(client, previews: list[ChunkPreview]) -> None:
+    """Flash coordinator: assign concept ownership across all sections.
+
+    One Flash call that sees ALL sub-concepts from ALL chunks and detects
+    semantic overlaps that string-matching misses. Assigns each concept to
+    exactly one section; other sections get callback-only instructions.
+
+    This replaces the Python string-matching in _format_previews_for_pro().
+    Mutates previews in place (sets .owns and .callback_only).
+    """
+    # Build the coordinator prompt — compact input to save tokens
+    sections_text = ""
+    for p in previews:
+        sc_str = ", ".join(p.sub_concepts) if p.sub_concepts else "(none)"
+        sections_text += f"S{p.group_index} [{p.group_name}] EI={p.ei_estimate}%: {sc_str}\n"
+
+    prompt = (
+        "You're the coordinator in a lecture-generation pipeline. After you finish, multiple "
+        "writers will generate sections of a lecture document in parallel — they can't see each "
+        "other's output. The student reads all sections in order as one continuous document. "
+        "If two writers both fully explain the same concept, the student reads it twice. Your job "
+        "is to prevent that by assigning concept ownership.\n\n"
+        "Below are the sub-concepts each section plans to cover. Detect overlapping concepts "
+        "across sections — even when described with different words (e.g. 'lytic cycle — 5 steps' "
+        "and 'viral multiplication — attachment to lysis' are the same concept). Assign each "
+        "concept to exactly ONE section (the one with the highest EI% or most detailed coverage). "
+        "Other sections get a callback instruction instead.\n\n"
+        f"SECTIONS:\n{sections_text}\n\n"
+        "Output ONLY the assignments. No internal reasoning. No 'Wait' or analysis. "
+        "ALL " + str(len(previews)) + " sections MUST appear. One line per section.\n"
+        "Keep concept names SHORT (2-4 words).\n\n"
+        "Format — one line per section, exactly like this:\n"
+        "S2: OWNS: acellular agents, obligate parasitism | CB: host specificity→S13\n"
+        "S3: OWNS: envelope acquisition | CB: none\n"
+        "S4: OWNS: none | CB: genome-size→S11, giant viruses→S11\n\n"
+        "Start output now:"
+    )
+
+    try:
+        response = client.models.generate_content(
+            model=CHUNKER_FALLBACK_MODEL,
+            contents=prompt,
+            config={
+                "temperature": 0.1,
+                # High limit because Flash thinking tokens count against output budget.
+                # Coordinator output is ~1500 chars but Flash may use ~7000 thinking tokens.
+                "max_output_tokens": 32768,
+            },
+        )
+        text = response.text.strip()
+        print(f"    [coordinator] Concept ownership assigned")
+
+        # Parse coordinator output — handles both compact and verbose formats
+        for line in text.split("\n"):
+            # Strip markdown formatting
+            clean = re.sub(r"\*\*([^*]+)\*\*", r"\1", line)
+            clean = re.sub(r"^\s*\*?\s*", "", clean).strip()
+            if not clean:
+                continue
+
+            # Try compact format: "S7: OWNS: ... | CB: ..."
+            compact = re.match(r"S(\d+)\s*:\s*(.+)", clean, re.IGNORECASE)
+            # Try verbose format: "SECTION 7: ..." or "Section 7 — ..."
+            verbose = re.match(r"Section\s+(\d+)\s*[—:\-]", clean, re.IGNORECASE)
+
+            idx = None
+            rest = ""
+            if compact:
+                idx = int(compact.group(1))
+                rest = compact.group(2)
+            elif verbose:
+                idx = int(verbose.group(1))
+                rest = clean[verbose.end():].strip()
+
+            if idx is None:
+                # Check if this is a continuation OWNS/CB line for a multi-line format
+                continue
+
+            # Find preview
+            preview = None
+            for p in previews:
+                if p.group_index == idx:
+                    preview = p
+                    break
+            if not preview:
+                continue
+
+            # Parse OWNS and CB from the rest of the line
+            # Split on | to separate OWNS from CB
+            owns_raw = ""
+            cb_raw = ""
+
+            if "|" in rest:
+                parts_split = rest.split("|", 1)
+                owns_raw = parts_split[0].strip()
+                cb_raw = parts_split[1].strip() if len(parts_split) > 1 else ""
+            else:
+                owns_raw = rest
+
+            # Extract OWNS
+            owns_match = re.search(r"OWNS:\s*(.+?)(?:\||$)", owns_raw, re.IGNORECASE)
+            if owns_match:
+                raw = owns_match.group(1).strip().rstrip(".")
+                if raw.lower() not in ("bridge only", "none"):
+                    preview.owns = [c.strip() for c in raw.split(",") if c.strip() and len(c.strip()) > 2]
+
+            # Extract CB/CALLBACK
+            cb_match = re.search(r"(?:CB|CALLBACK(?:\s+ONLY)?)\s*:\s*(.+)", cb_raw or rest, re.IGNORECASE)
+            if cb_match:
+                raw = cb_match.group(1).strip().rstrip(".")
+                if raw.lower() != "none":
+                    callbacks = []
+                    for part in re.split(r",\s*", raw):
+                        part = part.strip()
+                        if part and len(part) > 3:
+                            part = part.replace("->", "→").replace("→", "→")
+                            callbacks.append(part)
+                    preview.callback_only = callbacks
+
+        # Log summary
+        total_owns = sum(len(p.owns) for p in previews)
+        total_cb = sum(len(p.callback_only) for p in previews)
+        print(f"    → Coordinator: {total_owns} owned concepts, {total_cb} callbacks")
+
+    except Exception as e:
+        print(f"    [coordinator] Failed ({e}), falling back to no coordination")
+        # On failure, every section owns all its sub-concepts (current behavior)
+        for p in previews:
+            p.owns = list(p.sub_concepts)
+
+
 def prefetch_all_previews(
     client,
     chunks: list[dict],
 ) -> list[ChunkPreview]:
     """Generate teaching previews for ALL chunks via Flash in parallel.
 
-    Two phases:
+    Three phases:
     1. Parallel Flash calls (~10s): each chunk gets a teaching summary + all terms
     2. Sequential Python (~0s): assign term ownership (new vs prior) via set math
+    3. Flash coordinator (~5-10s): assign concept ownership across sections
 
     Returns ordered list of ChunkPreview objects with terms correctly split.
     """
@@ -964,6 +1217,9 @@ def prefetch_all_previews(
     total_prior = sum(len(p.prior_terms) for p in previews)
     print(f"    → Term assignment: {total_new} new, {total_prior} prior references")
 
+    # Phase 3: Flash coordinator — assign concept ownership across sections
+    _coordinate_concept_ownership(client, previews)
+
     return previews
 
 
@@ -972,75 +1228,57 @@ def _format_previews_for_pro(
     current_group_index: int,
     current_sub_concepts: list[str] | None = None,
 ) -> str:
-    """Format prior group previews as targeted constraints for Pro.
+    """Format coordinator assignments + prior context for Pro.
 
-    Only lists prior concepts that OVERLAP with this chunk's content.
-    This prevents over-constraining — Pro only sees "don't re-explain X"
-    for concepts it might actually try to repeat.
-
-    Also computes "WHAT IS NEW" by diffing current sub-concepts against prior.
+    Uses the Flash coordinator's concept ownership assignments (owns/callback_only)
+    instead of Python string-matching. Pro gets precise instructions about what
+    to teach and what to skip.
     """
-    prior = [p for p in previews if p.group_index < current_group_index]
-    if not prior:
-        return ""
-
-    # Collect all prior sub-concepts with their slide numbers
-    all_prior_concepts = {}  # lowercase concept → (slide_num, original text)
-    for p in prior:
-        slide_num = sum(1 for pp in previews if pp.group_index <= p.group_index
-                        and pp.group_index != current_group_index)
-        for sc in p.sub_concepts:
-            all_prior_concepts[sc.lower()[:50]] = (slide_num, sc)
-
-    # Find which prior concepts OVERLAP with current chunk's content
-    overlapping = []
-    new_concepts = []
-    current_sc = current_sub_concepts or []
-
-    for sc in current_sc:
-        sc_lower = sc.lower()[:50]
-        found_overlap = False
-        for prior_key, (slide_num, prior_text) in all_prior_concepts.items():
-            # Check for meaningful word overlap (not just substring)
-            sc_words = set(sc_lower.split())
-            prior_words = set(prior_key.split())
-            common = sc_words & prior_words - {"the", "a", "an", "of", "in", "to", "and", "or", "is"}
-            if len(common) >= 2 or prior_key in sc_lower or sc_lower in prior_key:
-                overlapping.append(f"- {prior_text} (Slide {slide_num})")
-                found_overlap = True
-                break
-        if not found_overlap:
-            new_concepts.append(sc)
+    # Find this chunk's preview
+    current_preview = None
+    for p in previews:
+        if p.group_index == current_group_index:
+            current_preview = p
+            break
 
     parts = []
 
-    # Only show constraint if there are actual overlaps
-    if overlapping:
-        # Deduplicate
-        overlapping = list(dict.fromkeys(overlapping))
+    # Coordinator assignments — the primary dedup mechanism
+    if current_preview and current_preview.callback_only:
+        # Strip concept details — only show "concept name → Section N"
+        # Giving Pro details (like "lytic cycle — 5 steps") tempts it to list those steps
+        cb_list = "\n".join(f"  - {cb}" for cb in current_preview.callback_only)
         parts.append(
-            "ALREADY TAUGHT - DO NOT RE-EXPLAIN:\n"
-            + "\n".join(overlapping)
-            + "\nReference these briefly but do NOT walk through them again."
+            "CALLBACK ONLY — another writer owns these. Mention by name only. "
+            "Do NOT list steps, components, or mechanisms. Just 'as we covered in Section N' "
+            "and move on:\n" + cb_list
         )
 
-    # Always show what's new
-    if new_concepts:
-        sc_list = "\n".join(f"  - {sc}" for sc in new_concepts)
+    if current_preview and current_preview.owns:
+        owns_list = "\n".join(f"  - {o}" for o in current_preview.owns)
         parts.append(
-            f"WHAT IS NEW IN THIS SECTION (focus your teaching here):\n{sc_list}"
+            "YOUR SECTION OWNS THESE CONCEPTS — teach them fully:\n" + owns_list
         )
 
-    # If no overlaps and no new concepts, fall back to simple summary
-    if not parts and prior:
+    # Prior sections summary for natural backwards connections
+    prior = [p for p in previews if p.group_index < current_group_index]
+    if prior:
         summary_lines = []
-        for p in prior[-3:]:  # Only last 3 sections for brevity
-            terms_str = ", ".join(p.new_terms[:8]) if p.new_terms else ""
-            summary_lines.append(f"  {p.group_name}: {p.teaching_summary[:80]}")
+        for p in prior[-4:]:
+            summary_lines.append(f"  Section {p.group_index}: {p.group_name} — {p.teaching_summary[:80]}")
         parts.append(
-            "PREVIOUSLY COVERED:\n" + "\n".join(summary_lines)
-            + "\nConnect backwards naturally where relevant."
+            "PREVIOUSLY COVERED (connect backwards naturally where relevant):\n"
+            + "\n".join(summary_lines)
         )
+
+    # Fallback: if coordinator didn't run, use sub-concepts as owns
+    if current_preview and not current_preview.owns and not current_preview.callback_only:
+        current_sc = current_sub_concepts or current_preview.sub_concepts
+        if current_sc:
+            sc_list = "\n".join(f"  - {sc}" for sc in current_sc)
+            parts.append(
+                f"SUB-CONCEPTS TO COVER:\n{sc_list}"
+            )
 
     return "\n\n".join(parts)
 
@@ -1078,6 +1316,7 @@ def build_user_prompt(
     ei_estimate: int = 50,
     transcript_words: int = 0,
     sub_concepts: list[str] | None = None,
+    textbook_images: list[dict] | None = None,
 ) -> list:
     """Build the per-chunk user prompt as a list of Parts.
 
@@ -1202,6 +1441,27 @@ def build_user_prompt(
         ))
         parts.extend(lecture_slide_parts)
 
+    # 5b. OpenStax textbook figures (available for diagram cards)
+    if textbook_images:
+        img_listing = "\n".join(
+            f"  - {img['figure_id'] or 'Figure'}: {img['caption'][:120]}\n"
+            f"    URL: {img['gcs_url']}"
+            for img in textbook_images
+            if img.get("gcs_url")
+        )
+        if img_listing:
+            parts.append(types.Part.from_text(text=
+                "OPENSTAX TEXTBOOK FIGURES AVAILABLE FOR THIS SECTION.\n"
+                "These are real images we've already downloaded — use them for diagram-type "
+                "slide cards instead of suggesting images. Reference them by their exact URL.\n\n"
+                f"{img_listing}\n\n"
+                "For diagram cards, embed the image like:\n"
+                "![Figure caption](https://storage.googleapis.com/...the-exact-url...)\n\n"
+                "Pick the figure that best illustrates the concept. If no figure fits, "
+                "you can still write a diagram card without an image.\n\n"
+                "Source: OpenStax. Download free at openstax.org. CC BY 4.0"
+            ))
+
     # 6. Depth guidance — checklist for high-EI, bridge framing for low-EI
     depth_parts = []
 
@@ -1242,8 +1502,10 @@ def build_user_prompt(
         "type: professor_slide OR diagram\n"
         "[If type is professor_slide: just the image reference and one exam tip — "
         "the slide already has labels and bullet points baked in, don't duplicate them.]\n"
-        "[If type is diagram: dot points providing context, then the diagram suggestion "
-        "or OpenStax/Wikimedia image reference below.]\n"
+        "[If type is diagram: dot points providing context, then embed the best matching "
+        "OpenStax figure from the AVAILABLE FIGURES list above using markdown: "
+        "![caption](https://storage.googleapis.com/...). If no figures were provided, "
+        "write a text suggestion instead.]\n"
         "[If this chunk needs multiple visuals, split them as Slide {slide_number}a, "
         f"Slide {slide_number}b, etc.]\n\n"
         "=== TRANSCRIPT ===\n"
@@ -1294,18 +1556,22 @@ def _parse_slide_cards(slide_content: str, slide_number: int, ei_percent: int) -
                 title = re.sub(r"^#+\s*", "", title)  # strip heading markers
                 break
 
-        # Detect image references
+        # Detect image references — professor screenshots OR GCS-hosted OpenStax images
         img_refs = re.findall(r"!\[.*?\]\((screenshots/[^\)]+)\)", block)
+        gcs_img_refs = re.findall(r"!\[.*?\]\((https://storage\.googleapis\.com/[^\)]+)\)", block)
         diagram_suggestions = re.findall(r"\[(?:Suggest(?:ed)?\s+)?[Dd]iagram.*?\].*", block)
 
         # Detect card type
         has_professor_slide = bool(img_refs)
         has_type_line = re.search(r"type:\s*(professor_slide|diagram)", block, re.IGNORECASE)
 
+        has_gcs_image = bool(gcs_img_refs)
         if has_type_line:
             card_type = has_type_line.group(1).lower().replace(" ", "_")
         elif has_professor_slide:
             card_type = "professor_slide"
+        elif has_gcs_image:
+            card_type = "diagram"  # diagram with real OpenStax image
         else:
             card_type = "diagram"
 
@@ -1338,6 +1604,8 @@ def _parse_slide_cards(slide_content: str, slide_number: int, ei_percent: int) -
                 exam_tip = exam_tip or f"Low priority: {s.strip()[:80]}"
 
         image_ref = img_refs[0] if img_refs else ""
+        if not image_ref and gcs_img_refs:
+            image_ref = gcs_img_refs[0]
         if not image_ref and diagram_suggestions:
             image_ref = diagram_suggestions[0]
 
@@ -1385,10 +1653,34 @@ def parse_output(raw_output: str, slide_number: int = 1, group_name: str = "") -
     ei_percent = 50
     ei_reasoning = ""
 
-    # Split on delimiters
-    slide_match = re.search(r"===\s*SLIDE\s*===\s*\n(.*?)(?====\s*TRANSCRIPT\s*===)", raw_output, re.DOTALL)
-    transcript_match = re.search(r"===\s*TRANSCRIPT\s*===\s*\n(.*?)(?====\s*EI%?\s*===)", raw_output, re.DOTALL)
-    ei_match = re.search(r"===\s*EI%?\s*===\s*\n(.*)", raw_output, re.DOTALL)
+    # Split on delimiters — handle variations in spacing, case, and formatting
+    # Pro sometimes uses "== SLIDE ==" or "=== Slide ===" or extra whitespace
+    slide_match = re.search(
+        r"={2,}\s*SLIDE\s*={2,}\s*\n(.*?)(?=={2,}\s*TRANSCRIPT\s*={2,})",
+        raw_output, re.DOTALL | re.IGNORECASE
+    )
+    transcript_match = re.search(
+        r"={2,}\s*TRANSCRIPT\s*={2,}\s*\n(.*?)(?=={2,}\s*EI%?\s*={2,})",
+        raw_output, re.DOTALL | re.IGNORECASE
+    )
+    ei_match = re.search(
+        r"={2,}\s*EI%?\s*={2,}\s*\n(.*)",
+        raw_output, re.DOTALL | re.IGNORECASE
+    )
+
+    # Fallback: try markdown-style headers if delimiter format wasn't used
+    if not slide_match:
+        slide_match = re.search(
+            r"#+\s*SLIDE.*?\n(.*?)(?=#+\s*TRANSCRIPT|$)", raw_output, re.DOTALL | re.IGNORECASE
+        )
+    if not transcript_match:
+        transcript_match = re.search(
+            r"#+\s*TRANSCRIPT.*?\n(.*?)(?=#+\s*EI|$)", raw_output, re.DOTALL | re.IGNORECASE
+        )
+    if not ei_match:
+        ei_match = re.search(
+            r"#+\s*EI%?.*?\n(.*)", raw_output, re.DOTALL | re.IGNORECASE
+        )
 
     if slide_match:
         slide_content = slide_match.group(1).strip()
@@ -1407,6 +1699,22 @@ def parse_output(raw_output: str, slide_number: int = 1, group_name: str = "") -
     if not slide_content and not transcript:
         transcript = raw_output.strip()
         slide_content = f"Slide {slide_number}: [Content]"
+        print(f"  [parse] WARNING: No delimiters found for Slide {slide_number} ({group_name}), using raw output as transcript")
+    elif not transcript and slide_content:
+        # Slide parsed but transcript didn't — likely a delimiter mismatch
+        # Try to extract transcript as everything after the slide section
+        remaining = raw_output[raw_output.find(slide_content) + len(slide_content):]
+        # Look for "Slide N" as transcript start
+        tx_start = re.search(rf"Slide\s+{slide_number}\b", remaining)
+        if tx_start:
+            transcript = remaining[tx_start.start():].strip()
+            # Remove trailing EI section if present
+            ei_cut = re.search(r"\n\d+\s*%\s*[—\-]", transcript)
+            if ei_cut:
+                transcript = transcript[:ei_cut.start()].strip()
+            print(f"  [parse] WARNING: Transcript delimiter missing for Slide {slide_number} ({group_name}), recovered {len(transcript.split())}w from fallback")
+        else:
+            print(f"  [parse] ERROR: Empty transcript for Slide {slide_number} ({group_name}) — delimiter parse failed")
 
     # Parse slide content into structured cards
     slide_cards = _parse_slide_cards(slide_content, slide_number, ei_percent)
@@ -1445,6 +1753,7 @@ def generate_section(
     ei_estimate: int = 50,
     transcript_words: int = 0,
     sub_concepts: list[str] | None = None,
+    textbook_images: list[dict] | None = None,
 ) -> GeneratedSection:
     """Generate one section: slide + transcript + EI%.
 
@@ -1479,6 +1788,7 @@ def generate_section(
         ei_estimate=ei_estimate,
         transcript_words=transcript_words,
         sub_concepts=sub_concepts,
+        textbook_images=textbook_images,
     )
     all_user_parts.extend(chunk_parts)
 
@@ -1560,6 +1870,7 @@ def generate_lecture(
     model: str | None = None,
     dry_run: bool = False,
     parallel: bool = True,
+    job_id: str = "",
 ) -> list[GeneratedSection]:
     """Generate a complete lecture replacement from Stage 1 chunks.
 
@@ -1623,10 +1934,8 @@ def generate_lecture(
         screenshots_dir = Path(screenshots_json).parent / "screenshots"
         print(f"  [slides] Loaded {len(all_screenshots)} screenshot(s)")
 
-    fallback_slide_parts = None
-    if not all_screenshots and lecture_slides_path:
-        fallback_slide_parts = _load_lecture_slides(lecture_slides_path)
-        print(f"  [slides] Loaded {len(fallback_slide_parts)} lecture slide(s) (fallback)")
+    # PDF slides are now extracted as individual images by pipeline.py
+    # and passed via screenshots_json — no whole-PDF fallback needed
 
     # ── Filter teaching chunks ──
     teaching_chunks = []
@@ -1653,6 +1962,7 @@ def generate_lecture(
     t0_both = time.time()
 
     textbook_sections: dict[int, str] = {}
+    textbook_images: dict[int, list[dict]] = {}
     previews = []
 
     if parallel:
@@ -1667,6 +1977,14 @@ def generate_lecture(
                 subject=subject,
             )
 
+        def _fetch_images_one(idx_chunk):
+            idx, chunk = idx_chunk
+            return idx, fetch_textbook_images(
+                topic_name=chunk.get("topic_name", ""),
+                key_terms=chunk.get("key_terms", []),
+                job_id=job_id,
+            )
+
         with ThreadPoolExecutor(max_workers=8) as executor:
             # Submit prefetch as one big task
             prefetch_future = executor.submit(_do_prefetch)
@@ -1674,12 +1992,20 @@ def generate_lecture(
             # Submit all textbook fetches individually
             textbook_futures = {executor.submit(_fetch_one, ic): ic[0] for ic in teaching_chunks}
 
+            # Submit all image fetches in parallel too
+            image_futures = {executor.submit(_fetch_images_one, ic): ic[0] for ic in teaching_chunks}
+
             # Collect textbook results as they complete
             for future in as_completed(textbook_futures):
                 idx, text = future.result()
                 textbook_sections[idx] = text
                 topic = teaching_chunks[[i for i, (ci, _) in enumerate(teaching_chunks) if ci == idx][0]][1].get("topic_name", "")
                 print(f"    [textbook {idx}] {topic}: {len(text)} chars")
+
+            # Collect image results
+            for future in as_completed(image_futures):
+                idx, images = future.result()
+                textbook_images[idx] = images
 
             # Collect prefetch result
             previews = prefetch_future.result()
@@ -1693,9 +2019,15 @@ def generate_lecture(
                 subject=subject,
             )
             textbook_sections[idx] = text
+            textbook_images[idx] = fetch_textbook_images(
+                topic_name=chunk.get("topic_name", ""),
+                key_terms=chunk.get("key_terms", []),
+                job_id=job_id,
+            )
 
+    total_images = sum(len(imgs) for imgs in textbook_images.values())
     t_both = time.time() - t0_both
-    print(f"  → {len(previews)} previews + {len(textbook_sections)} textbooks in {t_both:.1f}s")
+    print(f"  → {len(previews)} previews + {len(textbook_sections)} textbooks + {total_images} images in {t_both:.1f}s")
 
     if dry_run:
         for p in previews:
@@ -1740,8 +2072,7 @@ def generate_lecture(
             chunk_slide_parts, chunk_slide_meta = _get_chunk_slides(
                 chunk_index, all_screenshots, screenshots_dir
             )
-        elif fallback_slide_parts:
-            chunk_slide_parts = fallback_slide_parts
+        # (PDF slides come via screenshots_json, no whole-PDF fallback)
 
         chunk_contexts.append({
             "orig_idx": orig_idx,
@@ -1750,6 +2081,7 @@ def generate_lecture(
             "transcript": chunk.get("transcript_text", ""),
             "key_terms": chunk.get("key_terms", []),
             "textbook": textbook_sections.get(orig_idx, ""),
+            "textbook_images": textbook_images.get(orig_idx, []),
             "previews_ctx": previews_ctx,
             "new_terms": new_terms,
             "prior_terms": prior_terms,
@@ -1780,6 +2112,7 @@ def generate_lecture(
             ei_estimate=ctx["ei_estimate"],
             transcript_words=ctx["transcript_words"],
             sub_concepts=ctx["sub_concepts"],
+            textbook_images=ctx.get("textbook_images", []),
         )
 
     if parallel:
@@ -1811,7 +2144,7 @@ def generate_lecture(
     print(f"    Generate:          {t_gen:.1f}s")
     print(f"  {'='*50}\n")
 
-    return sections
+    return sections, textbook_images
 
 
 # ═══════════════════════════════════════════════════════════════════════════

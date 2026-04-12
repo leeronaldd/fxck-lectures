@@ -122,6 +122,7 @@ def run_pipeline(
                     chunks_path=str(chunks_temp_path),
                     output_dir=str(screenshots_dir),
                     output_json=str(output_dir / f"{job_id}_screenshots.json"),
+                    job_id=job_id,
                 )
                 if results:
                     screenshots_json = str(output_dir / f"{job_id}_screenshots.json")
@@ -150,6 +151,38 @@ def run_pipeline(
             yield {"status": "running", "stage": "Validating slides", "progress": 18,
                    "result": "Slides match confirmed"}
 
+            # Extract PDF pages as individual slide images
+            yield {"status": "running", "stage": "Extracting slides from PDF", "progress": 19}
+            _check_cancelled(cancel_event)
+            try:
+                from src.screenshot_extractor import extract_pdf_slides
+                screenshots_dir = output_dir / "screenshots"
+                screenshots_dir.mkdir(exist_ok=True)
+
+                pdf_slides = extract_pdf_slides(
+                    pdf_path=slides_path,
+                    output_dir=str(screenshots_dir),
+                    output_json=str(output_dir / f"{job_id}_screenshots.json"),
+                    job_id=job_id,
+                )
+
+                if pdf_slides:
+                    # Map pages to chunks round-robin
+                    num_chunks = len(chunks_dicts)
+                    for i, entry in enumerate(pdf_slides):
+                        entry["matched_chunk_index"] = i % num_chunks
+                        entry["image_filename"] = entry.get("image_filename", f"slide_{i+1:03d}.png")
+
+                    ss_json_path = str(output_dir / f"{job_id}_screenshots.json")
+                    with open(ss_json_path, "w", encoding="utf-8") as f:
+                        json.dump(pdf_slides, f, indent=2, ensure_ascii=False)
+                    screenshots_json = ss_json_path
+
+                    yield {"status": "running", "stage": "Extracting slides from PDF", "progress": 20,
+                           "result": f"{len(pdf_slides)} slide pages extracted"}
+            except Exception as e:
+                print(f"  PDF slide extraction failed (non-fatal): {e}")
+
         # ── Stage 3: V2 Generation (prefetch + textbook + Pro, all inside) ──
         _check_cancelled(cancel_event)
         yield {"status": "running", "stage": "Preparing teaching context", "progress": 20}
@@ -166,13 +199,15 @@ def run_pipeline(
         _check_cancelled(cancel_event)
         yield {"status": "running", "stage": "Generating lecture", "progress": 30}
 
-        sections = generate_lecture(
+        result = generate_lecture(
             chunks=chunks_dicts,
             lecture_slides_path=slides_path,
             screenshots_json=screenshots_json,
             subject=subject,
             parallel=True,
+            job_id=job_id,
         )
+        sections, textbook_images = result
 
         if not sections:
             yield {"status": "error", "stage": "Generating lecture", "progress": 30,
@@ -183,6 +218,64 @@ def run_pipeline(
 
         # Build V2 API response
         api_response = assemble_api_response(sections)
+
+        # Replace local screenshot refs with persistent GCS URLs
+        if screenshots_json:
+            try:
+                with open(screenshots_json, "r", encoding="utf-8") as f:
+                    ss_meta = json.load(f)
+                # Build lookup by filename stem (Pro sometimes writes .jpg instead of .png)
+                gcs_lookup = {}
+                for s in ss_meta:
+                    if s.get("gcs_url"):
+                        fname = s['image_filename']
+                        stem = fname.rsplit('.', 1)[0] if '.' in fname else fname
+                        gcs_lookup[f"screenshots/{fname}"] = s["gcs_url"]
+                        # Also index by stem so .jpg/.png mismatches still resolve
+                        gcs_lookup[stem] = s["gcs_url"]
+                if gcs_lookup:
+                    replaced = 0
+                    for slide in api_response.get("slides", []):
+                        ref = slide.get("image_ref", "")
+                        if ref in gcs_lookup:
+                            slide["image_ref"] = gcs_lookup[ref]
+                            replaced += 1
+                        elif ref.startswith("screenshots/"):
+                            # Try stem match: "screenshots/slide_005.jpg" → stem "slide_005"
+                            ref_stem = ref.split("/", 1)[1].rsplit(".", 1)[0] if "." in ref else ref
+                            if ref_stem in gcs_lookup:
+                                slide["image_ref"] = gcs_lookup[ref_stem]
+                                replaced += 1
+                    print(f"  Replaced {replaced} screenshot refs with GCS URLs")
+            except Exception as e:
+                print(f"  Warning: GCS URL replacement failed: {e}")
+
+        # Auto-fill diagram cards that have no image with the first available OpenStax figure
+        if textbook_images:
+            filled = 0
+            for slide in api_response.get("slides", []):
+                if slide.get("card_type") == "diagram" and not slide.get("image_ref"):
+                    # Find which chunk this slide belongs to (by slide_id number)
+                    try:
+                        slide_num = int(slide["slide_id"].rstrip("abcdefgh")) - 1
+                    except (ValueError, KeyError):
+                        continue
+                    # Get the chunk index from teaching order
+                    chunk_idx = slide_num  # slide_number is 1-based, maps to teaching_chunks order
+                    images = textbook_images.get(chunk_idx, [])
+                    if not images:
+                        # Try all chunk indices (textbook_images keyed by original chunk index)
+                        for idx, imgs in textbook_images.items():
+                            if imgs:
+                                images = imgs
+                                break
+                    if images:
+                        best = images[0]  # First figure is usually the most relevant
+                        if best.get("gcs_url"):
+                            slide["image_ref"] = best["gcs_url"]
+                            filled += 1
+            if filled:
+                print(f"  Auto-filled {filled} diagram cards with OpenStax figures")
 
         # Serialize as JSON string into the markdown field (no schema migration needed)
         # Frontend detects JSON vs plain markdown and renders accordingly
