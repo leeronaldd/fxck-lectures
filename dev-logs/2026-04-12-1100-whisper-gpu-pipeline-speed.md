@@ -72,6 +72,15 @@
 - **Zustand computed getters** — JS `get` accessors don't work with Zustand. Fixed with `subscribe()` sync.
 - **Vercel preview URLs** — each push creates new URL, old ones 404. Need to promote to production.
 
+## Critical Finding: Depth Inversion Not Working
+- Creative brief has the depth inversion instructions but Pro is ignoring them
+- Every section gets ~100-200 words regardless of EI% or complexity
+- Section 4 (Bacterial Envelope, EI 100%) got 117 words — should be 400+
+- Section 5b (Transport, EI 95%) got 79 words — professor spent 1000+ words on this
+- **Fix:** Pass EI% in per-chunk prompt with word count floors. E.g. "EI 90-100%: minimum 350 words"
+- Test transcript saved: `data/transcripts/lecture2_local_turbo.txt` (14,688 words, lecture 2)
+- Test video: `C:\Users\leewa\Downloads\lecture 2 .mp4`
+
 ## Still TODO (Next Session)
 1. **UI overhaul** — study Claude/ChatGPT session management UX, redesign from scratch
    - Create session on "New Session" click (before upload)
