@@ -202,23 +202,22 @@ export default function AppSidebar() {
                     }}
                   >
                     <input
-                      ref={(el) => {
-                        // Focus after React commit — avoids autoFocus race
-                        if (el) requestAnimationFrame(() => { el.focus(); el.select(); });
-                      }}
+                      autoFocus
                       defaultValue={session.name}
-                      onBlur={(e) => {
-                        const val = e.target.value.trim();
-                        const sid = session.id;
-                        const oldName = session.name;
-                        if (val && val !== oldName) {
-                          import("@/lib/api").then(({ renameSession: apiRename }) =>
-                            apiRename(sid, val).then(() => useAppStore.getState().loadSessions())
-                          );
+                      onKeyDown={async (e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          const val = e.currentTarget.value.trim();
+                          if (val && val !== session.name) {
+                            const { renameSession: apiRename } = await import("@/lib/api");
+                            await apiRename(session.id, val);
+                            useAppStore.getState().loadSessions();
+                          }
+                          setRenaming(null);
+                        } else if (e.key === "Escape") {
+                          setRenaming(null);
                         }
-                        setRenaming(null);
                       }}
-                      onKeyDown={(e) => { if (e.key === "Escape") setRenaming(null); }}
                       className="w-full text-sm px-2 py-1 rounded-lg outline-none"
                       style={{
                         background: "var(--bg-base)",
