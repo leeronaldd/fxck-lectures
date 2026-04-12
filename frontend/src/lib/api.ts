@@ -162,6 +162,20 @@ export async function createCheckoutSession(period: "monthly" | "yearly"): Promi
   return data.url;
 }
 
+export async function createSession(name: string = "New Lecture"): Promise<{ id: string; name: string } | null> {
+  const token = await getToken();
+  const res = await fetch(`${API_URL}/api/sessions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
 export async function renameSession(sessionId: string, name: string): Promise<boolean> {
   const token = await getToken();
   const res = await fetch(`${API_URL}/api/sessions/${sessionId}`, {
@@ -189,6 +203,7 @@ export function runPipeline(
   onUpdate: (event: PipelineEvent) => void,
   onError: (error: string) => void,
   onDone: (output: PipelineEvent["output"]) => void,
+  sessionId?: string,
 ): () => void {
   let cancelled = false;
   const controller = new AbortController();
@@ -196,7 +211,10 @@ export function runPipeline(
   (async () => {
     try {
       const token = await getToken();
-      const res = await fetch(`${API_URL}/api/run/${fileId}`, {
+      const url = sessionId
+        ? `${API_URL}/api/run/${fileId}?session_id=${sessionId}`
+        : `${API_URL}/api/run/${fileId}`;
+      const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
         signal: controller.signal,
       });

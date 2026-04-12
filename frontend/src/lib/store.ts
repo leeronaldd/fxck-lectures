@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { toast } from "sonner";
 import { ConceptGroup, VerificationClaim, TrustStats } from "./types";
 import { computeTrustStats } from "./data";
-import { uploadFile, uploadSlides, runPipeline, fetchSessions, fetchSession } from "./api";
+import { uploadFile, uploadSlides, runPipeline, fetchSessions, fetchSession, createSession as apiCreateSession } from "./api";
 import type { PipelineEvent } from "./api";
 
 export interface PipelineStage {
@@ -65,9 +65,11 @@ interface AppState {
 
   // Sessions
   sessions: Session[];
+  activeSessionId: string | null;
   loadSessions: () => Promise<void>;
   loadSession: (sessionId: string) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
+  createNewSession: () => Promise<string | null>;
 
   // Sidebar
   sidebarOpen: boolean;
@@ -179,6 +181,7 @@ export const useAppStore = create<AppState>((set, get) => {
 
   // Sessions
   sessions: INITIAL_SESSIONS,
+  activeSessionId: null,
   loadSessions: async () => {
     try {
       const data = await fetchSessions();
@@ -194,6 +197,7 @@ export const useAppStore = create<AppState>((set, get) => {
     }
   },
   loadSession: async (sessionId: string) => {
+    set({ activeSessionId: sessionId });
     const data = await fetchSession(sessionId);
     if (data) {
       get().setOutput(
@@ -202,6 +206,21 @@ export const useAppStore = create<AppState>((set, get) => {
         (data.verification_report || []) as VerificationClaim[],
       );
     }
+  },
+  createNewSession: async () => {
+    const result = await apiCreateSession("New Lecture");
+    if (result) {
+      set({ activeSessionId: result.id });
+      // Add to sessions list immediately so sidebar shows it
+      set((s) => ({
+        sessions: [
+          { id: result.id, name: result.name, date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), groups: 0 },
+          ...s.sessions,
+        ],
+      }));
+      return result.id;
+    }
+    return null;
   },
   deleteSession: async (sessionId: string) => {
     const { deleteSession: apiDelete } = await import("./api");
@@ -256,6 +275,20 @@ export const useAppStore = create<AppState>((set, get) => {
     // Generate a temporary ID (will be replaced by fileId after upload)
     const tempId = `pending-${Date.now()}`;
     const sessionName = file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
+
+    // If we have an active session, rename it to the file name
+    const currentSessionId = get().activeSessionId;
+    if (currentSessionId) {
+      import("./api").then(({ renameSession }) => {
+        renameSession(currentSessionId, sessionName);
+      });
+      // Update sidebar immediately
+      set((s) => ({
+        sessions: s.sessions.map((sess) =>
+          sess.id === currentSessionId ? { ...sess, name: sessionName } : sess
+        ),
+      }));
+    }
 
     // Create the pipeline run
     const run: PipelineRun = {
@@ -313,6 +346,7 @@ export const useAppStore = create<AppState>((set, get) => {
         toast.success("Upload complete!", { id: `upload-${tempId}` });
         toast.loading("Processing lecture...", { id: `pipeline-${file_id}` });
 
+        const activeSession = get().activeSessionId;
         const cancelFn = runPipeline(
           file_id,
           // onUpdate
@@ -366,6 +400,7 @@ export const useAppStore = create<AppState>((set, get) => {
               return { pipelineRuns: runs };
             });
           },
+          activeSession || undefined,
         );
 
         // Store the cancel function
@@ -432,6 +467,7 @@ export const useAppStore = create<AppState>((set, get) => {
       videoFile: null,
       slidesFile: null,
       activePipelineId: null,
+      activeSessionId: null,
       markdown: "",
       groups: [],
       trustStats: { totalClaims: 0, correctClaims: 0, verifiedPercent: 0 },

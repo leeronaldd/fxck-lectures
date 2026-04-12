@@ -52,15 +52,50 @@ export default function ReaderPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[80vh]">
-        <div className="flex flex-col items-center gap-4">
-          <div
-            className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin"
-            style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }}
-          />
-          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-            Loading lecture...
-          </p>
+      <div className="flex-1 min-w-0">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-8 pb-16">
+          {/* Skeleton: mimics the real split-view layout */}
+          {[1, 2, 3].map((n) => (
+            <div key={n} className="mb-12">
+              <div className="hidden md:grid gap-8" style={{ gridTemplateColumns: "1fr 1fr" }}>
+                {/* Left: slide card skeleton */}
+                <div className="space-y-3">
+                  <div className="rounded-2xl overflow-hidden border animate-pulse" style={{ background: "var(--bg-surface)", borderColor: "var(--border)" }}>
+                    <div className="px-4 py-3 flex items-center gap-2 border-b" style={{ borderColor: "var(--border)" }}>
+                      <div className="h-5 w-12 rounded-md" style={{ background: "var(--bg-elevated)" }} />
+                      <div className="h-4 w-32 rounded" style={{ background: "var(--bg-elevated)" }} />
+                    </div>
+                    <div className="px-3 py-3">
+                      <div className="w-full rounded-xl" style={{ background: "var(--bg-elevated)", height: "180px" }} />
+                    </div>
+                  </div>
+                </div>
+                {/* Right: narrative skeleton */}
+                <div className="pl-8 border-l animate-pulse" style={{ borderColor: "var(--border)" }}>
+                  <div className="h-6 w-48 rounded mb-6" style={{ background: "var(--bg-elevated)" }} />
+                  <div className="space-y-3">
+                    <div className="h-4 w-full rounded" style={{ background: "var(--bg-elevated)" }} />
+                    <div className="h-4 w-[90%] rounded" style={{ background: "var(--bg-elevated)" }} />
+                    <div className="h-4 w-[95%] rounded" style={{ background: "var(--bg-elevated)" }} />
+                    <div className="h-4 w-[80%] rounded" style={{ background: "var(--bg-elevated)" }} />
+                    <div className="h-4 w-0" />
+                    <div className="h-4 w-full rounded" style={{ background: "var(--bg-elevated)" }} />
+                    <div className="h-4 w-[85%] rounded" style={{ background: "var(--bg-elevated)" }} />
+                  </div>
+                </div>
+              </div>
+              {/* Mobile skeleton */}
+              <div className="md:hidden space-y-4 animate-pulse">
+                <div className="rounded-2xl border" style={{ background: "var(--bg-surface)", borderColor: "var(--border)", height: "200px" }} />
+                <div className="space-y-3">
+                  <div className="h-5 w-40 rounded" style={{ background: "var(--bg-elevated)" }} />
+                  <div className="h-4 w-full rounded" style={{ background: "var(--bg-elevated)" }} />
+                  <div className="h-4 w-[90%] rounded" style={{ background: "var(--bg-elevated)" }} />
+                  <div className="h-4 w-[80%] rounded" style={{ background: "var(--bg-elevated)" }} />
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );

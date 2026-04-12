@@ -73,10 +73,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
           {/* Logo — dashboard if logged in, sales page if guest */}
           <button
-            onClick={() => {
+            onClick={async () => {
               if (user.isLoggedIn) {
+                useAppStore.getState().reset();
+                const { createNewSession } = useAppStore.getState();
+                await createNewSession();
                 router.push("/upload");
-                setTimeout(() => useAppStore.getState().reset(), 100);
               } else {
                 router.push("/");
               }
