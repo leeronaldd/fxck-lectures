@@ -425,17 +425,12 @@ export const useAppStore = create<AppState>((set, get) => {
   updateSettings: (partial) =>
     set((state) => ({ settings: { ...state.settings, ...partial } })),
 
-  // Reset
+  // Reset — clears upload state for a new session, but keeps running pipelines alive
   reset: () => {
-    // Cancel all active runs
-    const runs = get().pipelineRuns;
-    Object.values(runs).forEach((r) => { if (r.cancel) r.cancel(); });
-
     set({
       transcriptFile: null,
       videoFile: null,
       slidesFile: null,
-      pipelineRuns: {},
       activePipelineId: null,
       markdown: "",
       groups: [],
