@@ -837,6 +837,14 @@ def detect_multi_concept_chunks(chunks: list[dict]) -> list[dict]:
             chunk["concept_count"] = distinct_concepts
             chunk["words_per_concept"] = words_per_concept
 
+        # Mega-chunk override: any chunk over 2000 words almost certainly
+        # covers multiple topics even if the regex patterns don't catch them.
+        # The professor rambles across topic boundaries without clear markers.
+        elif word_count > 1500 and not chunk.get("needs_sub_chunking"):
+            chunk["needs_sub_chunking"] = True
+            chunk["concept_count"] = max(3, word_count // 500)
+            chunk["words_per_concept"] = 500
+
     return chunks
 
 
@@ -904,7 +912,7 @@ This chunk covers multiple distinct concepts that each need their own explanatio
 
 TRANSCRIPT CHUNK:
 \"\"\"
-{chunk['text'][:4000]}
+{chunk['text'][:12000]}
 \"\"\"
 
 Split this into separate sub-topics. For each sub-topic, provide:
@@ -985,7 +993,7 @@ def chunk_transcript(text: str, use_llm: bool = True) -> list[Chunk]:
     raw_chunks = split_on_markers(text, markers)
 
     # Step 2b: Post-process — merge tiny chunks
-    raw_chunks = merge_tiny_chunks(raw_chunks, min_words=200)
+    raw_chunks = merge_tiny_chunks(raw_chunks, min_words=100)
 
     # Step 2c: Detect multi-concept chunks and sub-chunk them
     raw_chunks = detect_multi_concept_chunks(raw_chunks)

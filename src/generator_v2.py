@@ -896,6 +896,7 @@ class ChunkPreview:
     ei_estimate: int = 50       # Flash's quick EI% estimate (drives depth allocation)
     transcript_words: int = 0   # Word count of professor's transcript for this chunk
     sub_concepts: list[str] = field(default_factory=list)  # Content checklist for Pro
+    prof_signals: str = ""      # Professor's own exam/skip signals from transcript
     owns: list[str] = field(default_factory=list)           # Concepts this chunk should fully teach
     callback_only: list[str] = field(default_factory=list)  # Concepts covered elsewhere — brief reference only
 
@@ -947,7 +948,13 @@ def _generate_single_preview(
         "EI%: [0-100] — Quick estimate of exam importance for a health/medical student. "
         "Core mechanisms (cell transport, immune response, drug targets) score 90-100%. "
         "Classification/naming that a table handles scores 50-70%. "
-        "History, discovery stories, tangential context scores below 40%."
+        "History, discovery stories, tangential context scores below 40%.\n\n"
+        "PROFESSOR SIGNALS: [List any phrases where the professor explicitly tells "
+        "students to skip, ignore, or not memorize something (e.g. 'don't worry about "
+        "that', 'you don't need to know', 'we'll cover that later'). Also list phrases "
+        "where the professor says something IS important (e.g. 'you'll need to remember', "
+        "'this will be on the exam', 'make sure you know'). Quote the exact phrase. "
+        "If no explicit signals, write 'None detected.']"
     )
 
     try:
@@ -968,6 +975,7 @@ def _generate_single_preview(
         terms_match = re.search(r"SCIENTIFIC TERMS:\s*(.+?)(?=SUB-CONCEPTS:|$)", text, re.DOTALL)
         subconcepts_match = re.search(r"SUB-CONCEPTS:\s*(.+?)(?=EI%:|$)", text, re.DOTALL)
         ei_match = re.search(r"EI%:\s*(\d+)", text)
+        signals_match = re.search(r"PROFESSOR SIGNALS:\s*(.+?)$", text, re.DOTALL)
 
         if summary_match:
             summary = summary_match.group(1).strip()
@@ -983,6 +991,11 @@ def _generate_single_preview(
                     sub_concepts.append(line)
         if ei_match:
             ei_est = max(0, min(100, int(ei_match.group(1))))
+        prof_signals_text = ""
+        if signals_match:
+            raw_signals = signals_match.group(1).strip()
+            if raw_signals.lower() != "none detected." and raw_signals.lower() != "none detected":
+                prof_signals_text = raw_signals
 
         transcript_wc = len(transcript.split())
 
@@ -995,6 +1008,7 @@ def _generate_single_preview(
             ei_estimate=ei_est,
             transcript_words=transcript_wc,
             sub_concepts=sub_concepts,
+            prof_signals=prof_signals_text,
         )
     except Exception as e:
         print(f"    [preview] Failed for '{topic_name}': {e}")
@@ -1317,6 +1331,7 @@ def build_user_prompt(
     transcript_words: int = 0,
     sub_concepts: list[str] | None = None,
     textbook_images: list[dict] | None = None,
+    prof_signals: str = "",
 ) -> list:
     """Build the per-chunk user prompt as a list of Parts.
 
@@ -1486,6 +1501,15 @@ def build_user_prompt(
             "Your transcript is 2-4 sentences: point at the slide, give the 'so what', "
             "and transition to the next topic. Like the anatomy professor between "
             "major topics — quick, confident, no hand-holding."
+        )
+
+    # Professor's own exam/skip signals (from transcript)
+    if prof_signals:
+        depth_parts.append(
+            f"PROFESSOR'S OWN SIGNALS FROM THE LECTURE:\n{prof_signals}\n"
+            "Respect these — if the professor said 'don't worry about X', "
+            "give X a one-liner at most. If the professor said 'you need to "
+            "know X', make sure X gets thorough coverage."
         )
 
     if depth_parts:
@@ -1754,6 +1778,7 @@ def generate_section(
     transcript_words: int = 0,
     sub_concepts: list[str] | None = None,
     textbook_images: list[dict] | None = None,
+    prof_signals: str = "",
 ) -> GeneratedSection:
     """Generate one section: slide + transcript + EI%.
 
@@ -1789,6 +1814,7 @@ def generate_section(
         transcript_words=transcript_words,
         sub_concepts=sub_concepts,
         textbook_images=textbook_images,
+        prof_signals=prof_signals,
     )
     all_user_parts.extend(chunk_parts)
 
@@ -2054,11 +2080,13 @@ def generate_lecture(
         ei_est = 50
         transcript_wc = 0
         sub_concepts = []
+        prof_signals = ""
         for p in previews:
             if p.group_index == orig_idx:
                 ei_est = p.ei_estimate
                 transcript_wc = p.transcript_words
                 sub_concepts = p.sub_concepts
+                prof_signals = p.prof_signals
                 break
 
         # Prior previews context (hard constraint format)
@@ -2090,6 +2118,7 @@ def generate_lecture(
             "ei_estimate": ei_est,
             "transcript_words": transcript_wc,
             "sub_concepts": sub_concepts,
+            "prof_signals": prof_signals,
         })
 
     sections: list[GeneratedSection] = [None] * len(chunk_contexts)  # type: ignore
@@ -2113,6 +2142,7 @@ def generate_lecture(
             transcript_words=ctx["transcript_words"],
             sub_concepts=ctx["sub_concepts"],
             textbook_images=ctx.get("textbook_images", []),
+            prof_signals=ctx.get("prof_signals", ""),
         )
 
     if parallel:
