@@ -777,6 +777,10 @@ class ChunkPreview:
     teaching_summary: str       # 2-3 sentence tutor framing
     new_terms: list[str]        # Terms introduced for the first time here
     prior_terms: list[str]      # Terms already known from earlier groups
+    ei_estimate: int = 50       # Flash's quick EI% estimate (drives depth allocation)
+    transcript_words: int = 0   # Word count of professor's transcript for this chunk
+    sub_concepts: list[str] = field(default_factory=list)  # Content checklist for Pro
+    style_hint: str = ""        # Flash's style reference (which anatomy slide this feels like)
 
 
 def _generate_single_preview(
@@ -806,30 +810,51 @@ def _generate_single_preview(
         f"You're previewing this lecture section for a colleague who will teach it next.\n\n"
         f"TOPIC: {topic_name}\n"
         f"KEY TERMS IN THIS SECTION: {terms_str}\n\n"
-        f"TRANSCRIPT (excerpt):\n{transcript[:1000]}\n\n"
+        f"TRANSCRIPT:\n{transcript[:6000]}\n\n"
         "Respond in this exact format:\n\n"
         "TEACHING SUMMARY: [2-3 sentences: what's the core concept, what's the key "
         "visual or mental model a student would remember, and what's the one exam-testable "
         "takeaway. Don't explain the content — just describe how a great tutor would frame it.]\n\n"
         "SCIENTIFIC TERMS: [comma-separated list of ALL scientific/medical terms that appear "
         "in this section. Include terms from the key terms list plus any others you identify "
-        "in the transcript. Only real scientific vocabulary — not sentence fragments or filler.]"
+        "in the transcript. Only real scientific vocabulary — not sentence fragments or filler.]\n\n"
+        "SUB-CONCEPTS: [numbered list of the distinct mechanisms, processes, or ideas a "
+        "student needs to understand from this section. Each one should be a specific thing "
+        "that needs its own explanation — not just a term, but a mechanism or relationship. "
+        "E.g. '1. Lytic cycle — attachment, penetration, biosynthesis, maturation, release' "
+        "not just '1. Lytic cycle'. Be thorough — if the professor covered 5 things, list 5 things. "
+        "Include the key sub-steps or components within each.]\n\n"
+        "EI%: [0-100] — Quick estimate of exam importance for a health/medical student. "
+        "Core mechanisms (cell transport, immune response, drug targets) score 90-100%. "
+        "Classification/naming that a table handles scores 50-70%. "
+        "History, discovery stories, tangential context scores below 40%.\n\n"
+        "STYLE HINT: [One sentence telling your colleague how to pitch this section's depth. "
+        "Reference how a great anatomy professor would handle a similar topic. Examples:\n"
+        "  - 'This is like the cross-bridge cycle — needs step-by-step with numbered stages and an analogy.'\n"
+        "  - 'This is like the muscle types comparison — quick confident table, one paragraph, move on.'\n"
+        "  - 'This is like naming bone markings — just embed the terms in flow, no deep explanation needed.'\n"
+        "Match the complexity of THIS section to the closest teaching pattern.]"
     )
 
     try:
         response = client.models.generate_content(
             model=CHUNKER_FALLBACK_MODEL,
             contents=prompt,
-            config={"temperature": 0.1, "max_output_tokens": 1024},
+            config={"temperature": 0.1, "max_output_tokens": 2048},
         )
         text = response.text.strip()
 
         # Parse the response
         summary = ""
         all_terms = []
+        ei_est = 50
+        sub_concepts = []
 
         summary_match = re.search(r"TEACHING SUMMARY:\s*(.+?)(?=SCIENTIFIC TERMS:|$)", text, re.DOTALL)
-        terms_match = re.search(r"SCIENTIFIC TERMS:\s*(.+)", text, re.DOTALL)
+        terms_match = re.search(r"SCIENTIFIC TERMS:\s*(.+?)(?=SUB-CONCEPTS:|$)", text, re.DOTALL)
+        subconcepts_match = re.search(r"SUB-CONCEPTS:\s*(.+?)(?=EI%:|$)", text, re.DOTALL)
+        ei_match = re.search(r"EI%:\s*(\d+)", text)
+        style_match = re.search(r"STYLE HINT:\s*(.+?)$", text, re.DOTALL)
 
         if summary_match:
             summary = summary_match.group(1).strip()
@@ -838,6 +863,22 @@ def _generate_single_preview(
             all_terms = [t.strip().strip("*").strip() for t in raw_terms.split(",") if t.strip()]
             # Filter out noise that slipped through
             all_terms = [t for t in all_terms if len(t) >= 3 and len(t.split()) <= 4]
+        if subconcepts_match:
+            raw_sc = subconcepts_match.group(1).strip()
+            # Parse numbered list: "1. Foo\n2. Bar" → ["Foo", "Bar"]
+            for line in raw_sc.split("\n"):
+                line = line.strip()
+                # Strip leading number + dot/paren
+                line = re.sub(r"^\d+[\.\)]\s*", "", line).strip()
+                if line and len(line) > 5:
+                    sub_concepts.append(line)
+        if ei_match:
+            ei_est = max(0, min(100, int(ei_match.group(1))))
+        style_hint_text = ""
+        if style_match:
+            style_hint_text = style_match.group(1).strip()
+
+        transcript_wc = len(transcript.split())
 
         return ChunkPreview(
             group_index=group_index,
@@ -845,6 +886,10 @@ def _generate_single_preview(
             teaching_summary=summary,
             new_terms=all_terms,  # Temporarily holds ALL terms; split into new/prior post-hoc
             prior_terms=[],
+            ei_estimate=ei_est,
+            transcript_words=transcript_wc,
+            sub_concepts=sub_concepts,
+            style_hint=style_hint_text,
         )
     except Exception as e:
         print(f"    [preview] Failed for '{topic_name}': {e}")
@@ -854,6 +899,9 @@ def _generate_single_preview(
             teaching_summary=f"Covers {topic_name}.",
             new_terms=real_terms[:5],
             prior_terms=[],
+            ei_estimate=50,
+            transcript_words=len(transcript.split()),
+            sub_concepts=[],
         )
 
 
@@ -919,7 +967,8 @@ def prefetch_all_previews(
             idx, preview = future.result()
             previews_by_index[idx] = preview
             n_terms = len(preview.new_terms)
-            print(f"    [{idx}] {preview.group_name}: {n_terms} terms extracted")
+            n_sc = len(preview.sub_concepts)
+            print(f"    [{idx}] {preview.group_name}: {n_terms} terms, {n_sc} sub-concepts, EI~{preview.ei_estimate}%")
 
     # Reassemble in order
     previews = [previews_by_index[idx] for idx, _ in teaching if idx in previews_by_index]
@@ -976,6 +1025,80 @@ def _get_new_terms_for_chunk(
 # Per-chunk user prompt builder
 # ═══════════════════════════════════════════════════════════════════════════
 
+def _ei_depth_nudge(ei_percent: int, transcript_words: int, has_textbook: bool) -> str:
+    """Build a contextual depth nudge for the per-chunk prompt.
+
+    This is the mechanism that backs up the creative brief's depth-inversion
+    principle. The creative brief teaches Pro HOW to write. This tells Pro
+    HOW MUCH to write for THIS specific section, framed as collegial context
+    rather than a hard rule.
+    """
+    # Classify the gap between professor attention and exam importance
+    prof_verbose = transcript_words > 600
+    prof_brief = transcript_words < 250
+
+    if ei_percent >= 90:
+        nudge = (
+            f"This section scored EI {ei_percent}% — core curriculum that will "
+            f"almost certainly appear on exams. A student should be able to read "
+            f"your explanation and fully understand every mechanism without "
+            f"needing to Google anything or rewatch the lecture."
+        )
+        if prof_brief:
+            nudge += (
+                f" The professor only spent ~{transcript_words} words on it, which "
+                "is a serious gap. Go well beyond the transcript"
+            )
+            if has_textbook:
+                nudge += " — the textbook has the depth you need"
+            nudge += ". Write 600-1000 words. Each sub-concept deserves its own paragraph."
+        else:
+            nudge += (
+                " Write 600-1000 words. If there are multiple sub-concepts "
+                "(e.g. 7 classes, 4 stages, 3 mechanisms), each one needs its "
+                "own paragraph with a concrete example, not just a sentence. "
+                "Think about what the anatomy professor would do — she'd make "
+                "each sub-concept a mini-lesson. Do the same."
+            )
+    elif ei_percent >= 70:
+        nudge = (
+            f"This section scored EI {ei_percent}% — important and likely examined. "
+            "Write 350-600 words. The student should walk away understanding "
+            "the mechanism, not just knowing the vocabulary."
+        )
+        if prof_verbose:
+            nudge += (
+                f" The professor spent ~{transcript_words} words, much of which "
+                "was rambling. Cut the fluff but keep every mechanism and example "
+                "that matters."
+            )
+        else:
+            nudge += (
+                " If the mechanism is complex, expand with step-by-step "
+                "explanations. Don't compress just because the transcript was short."
+            )
+    elif ei_percent >= 50:
+        nudge = (
+            f"This section scored EI {ei_percent}% — supporting knowledge. "
+            "Keep it to 150-300 words. A clear overview is enough."
+        )
+        if prof_verbose:
+            nudge += (
+                f" The professor rambled for ~{transcript_words} words but this is "
+                "mostly descriptive or categorical. Condense aggressively — "
+                "a table or brief overview is fine."
+            )
+    else:
+        nudge = (
+            f"This section scored EI {ei_percent}% — low priority. "
+            "50-150 words or a one-liner."
+        )
+        if ei_percent < 30:
+            nudge += " Consider strikethrough if it's truly tangential."
+
+    return nudge
+
+
 def build_user_prompt(
     chunk_transcript: str,
     topic_name: str,
@@ -988,6 +1111,10 @@ def build_user_prompt(
     previews_context: str = "",
     new_terms: list[str] | None = None,
     prior_terms: list[str] | None = None,
+    ei_estimate: int = 50,
+    transcript_words: int = 0,
+    sub_concepts: list[str] | None = None,
+    style_hint: str = "",
 ) -> list:
     """Build the per-chunk user prompt as a list of Parts.
 
@@ -1065,30 +1192,75 @@ def build_user_prompt(
             ))
 
     # 5. Lecture slides (if available)
-    if lecture_slide_parts and slide_metadata:
-        # Tell Pro exactly which files these are so it can reference them in output
-        slide_listing = "\n".join(
-            f"  - {s['image_filename']} [{s.get('timestamp_display', '')}]: {s.get('description', '')[:120]}"
-            for s in slide_metadata
-        )
-        parts.append(types.Part.from_text(text=
-            "PROFESSOR'S LECTURE SLIDES FOR THIS SECTION. These are the actual "
-            "slides the student sees in class. Use them as the primary visual in your "
-            "slide doc — reference the filename so we can embed it.\n\n"
-            f"{slide_listing}\n\n"
-            "In your === SLIDE === output, reference the professor's slide image like:\n"
-            "![description](screenshots/screenshot_00X.jpg)\n"
-            "Your transcript should physically point at these slides at least once per "
-            "section ('Looking at the slide, notice...', 'On the diagram you can see...')."
-        ))
-        parts.extend(lecture_slide_parts)
-    elif lecture_slide_parts:
-        parts.append(types.Part.from_text(text=
-            "PROFESSOR'S LECTURE SLIDES FOR THIS SECTION:"
-        ))
-        parts.extend(lecture_slide_parts)
+    # 5. Lecture slides
+    if True:
+        if lecture_slide_parts and slide_metadata:
+            slide_listing = "\n".join(
+                f"  - {s['image_filename']} [{s.get('timestamp_display', '')}]: {s.get('description', '')[:120]}"
+                for s in slide_metadata
+            )
+            parts.append(types.Part.from_text(text=
+                "PROFESSOR'S LECTURE SLIDES FOR THIS SECTION. These are the actual "
+                "slides the student sees in class. Use them as the primary visual in your "
+                "slide doc — reference the filename so we can embed it.\n\n"
+                f"{slide_listing}\n\n"
+                "In your === SLIDE === output, reference the professor's slide image like:\n"
+                "![description](screenshots/screenshot_00X.jpg)\n"
+                "Your transcript should physically point at these slides at least once per "
+                "section ('Looking at the slide, notice...', 'On the diagram you can see...')."
+            ))
+            parts.extend(lecture_slide_parts)
+        elif lecture_slide_parts:
+            parts.append(types.Part.from_text(text=
+                "PROFESSOR'S LECTURE SLIDES FOR THIS SECTION:"
+            ))
+            parts.extend(lecture_slide_parts)
 
-    # 6. Output instruction
+    # 6. Depth guidance — sub-concept checklist for high-EI, gentle nudge for low-EI
+    depth_parts = []
+
+    if ei_estimate >= 90:
+        depth_parts.append(
+            f"This section scored EI {ei_estimate}% — core curriculum. "
+            "A student should fully understand every mechanism here without "
+            "needing to Google anything."
+        )
+    elif ei_estimate >= 70:
+        depth_parts.append(
+            f"This section scored EI {ei_estimate}% — important and likely examined."
+        )
+    elif ei_estimate >= 50:
+        depth_parts.append(
+            f"This section scored EI {ei_estimate}% — supporting knowledge. "
+            "A clear overview is enough — condense if the professor rambled."
+        )
+    else:
+        depth_parts.append(
+            f"This section scored EI {ei_estimate}% — low priority. "
+            "Brief treatment only."
+        )
+
+    # Sub-concept checklist for EI >= 70 (drives expansion on hard topics)
+    if sub_concepts and ei_estimate >= 70:
+        sc_list = "\n".join(f"  {i+1}. {sc}" for i, sc in enumerate(sub_concepts))
+        depth_parts.append(
+            f"SUB-CONCEPTS TO COVER (each needs its own paragraph with the "
+            f"mechanism explained step by step):\n{sc_list}\n\n"
+            "Don't just mention these — teach each one. A student reading your "
+            "explanation of each sub-concept should understand how it works, "
+            "not just know it exists."
+        )
+
+    # Style hint from Flash (which anatomy professor slide this feels like)
+    if style_hint:
+        depth_parts.append(f"STYLE: {style_hint}")
+
+    if depth_parts:
+        parts.append(types.Part.from_text(text=
+            "DEPTH GUIDANCE:\n" + "\n\n".join(depth_parts)
+        ))
+
+    # 7. Output instruction (single format for all sections — let Pro decide depth)
     parts.append(types.Part.from_text(text=
         f"\nWrite this as Slide {slide_number}. "
         "Output in this exact format:\n\n"
@@ -1297,6 +1469,10 @@ def generate_section(
     previews_context: str = "",
     new_terms: list[str] | None = None,
     prior_terms: list[str] | None = None,
+    ei_estimate: int = 50,
+    transcript_words: int = 0,
+    sub_concepts: list[str] | None = None,
+    style_hint: str = "",
 ) -> GeneratedSection:
     """Generate one section: slide + transcript + EI%.
 
@@ -1328,6 +1504,10 @@ def generate_section(
         previews_context=previews_context,
         new_terms=new_terms,
         prior_terms=prior_terms,
+        ei_estimate=ei_estimate,
+        transcript_words=transcript_words,
+        sub_concepts=sub_concepts,
+        style_hint=style_hint,
     )
     all_user_parts.extend(chunk_parts)
 
@@ -1581,6 +1761,19 @@ def generate_lecture(
         elif fallback_slide_parts:
             chunk_slide_parts = fallback_slide_parts
 
+        # Look up Flash's EI estimate, sub-concepts, and style hint for this chunk
+        ei_est = 50
+        transcript_wc = 0
+        sub_concepts = []
+        style_hint = ""
+        for p in previews:
+            if p.group_index == orig_idx:
+                ei_est = p.ei_estimate
+                transcript_wc = p.transcript_words
+                sub_concepts = p.sub_concepts
+                style_hint = p.style_hint
+                break
+
         chunk_contexts.append({
             "orig_idx": orig_idx,
             "slide_number": slide_number,
@@ -1593,6 +1786,10 @@ def generate_lecture(
             "prior_terms": prior_terms,
             "slide_parts": chunk_slide_parts,
             "slide_meta": chunk_slide_meta,
+            "ei_estimate": ei_est,
+            "transcript_words": transcript_wc,
+            "sub_concepts": sub_concepts,
+            "style_hint": style_hint,
         })
 
     sections: list[GeneratedSection] = [None] * len(chunk_contexts)  # type: ignore
@@ -1612,6 +1809,10 @@ def generate_lecture(
             previews_context=ctx["previews_ctx"],
             new_terms=ctx["new_terms"],
             prior_terms=ctx["prior_terms"],
+            ei_estimate=ctx["ei_estimate"],
+            transcript_words=ctx["transcript_words"],
+            sub_concepts=ctx["sub_concepts"],
+            style_hint=ctx["style_hint"],
         )
 
     if parallel:
