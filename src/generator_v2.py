@@ -1494,31 +1494,20 @@ def generate_lecture(
     print(f"{'='*60}")
 
     # ══════════════════════════════════════════════════════════════
-    # Stage 1: Flash prefetch — teaching summaries + term tracking
-    # Must be sequential (each chunk's terms depend on prior chunks)
+    # Stage 1+2: Flash prefetch + textbook fetch IN PARALLEL
+    # These are independent — prefetch needs transcript, textbook needs topic/terms
+    # Running together saves ~20-30s vs sequential
     # ══════════════════════════════════════════════════════════════
-    print(f"\n  Stage 1: Flash prefetch (teaching summaries + terms)...")
-    t0_prefetch = time.time()
-    previews = prefetch_all_previews(client, [c for _, c in teaching_chunks])
-    t_prefetch = time.time() - t0_prefetch
-    print(f"  → {len(previews)} previews in {t_prefetch:.1f}s")
+    print(f"\n  Stage 1+2: Flash prefetch + textbook fetch (parallel)...")
+    t0_both = time.time()
 
-    if dry_run:
-        for p in previews:
-            print(f"\n  [{p.group_index+1}] {p.group_name}")
-            print(f"    Summary: {p.teaching_summary[:100]}...")
-            print(f"    New terms: {', '.join(p.new_terms[:8])}")
-        print("\n  [dry-run] Done.")
-        return []
-
-    # ══════════════════════════════════════════════════════════════
-    # Stage 2: Flash textbook fetch — parallel for all chunks
-    # ══════════════════════════════════════════════════════════════
-    print(f"\n  Stage 2: Textbook fetch ({'parallel' if parallel else 'sequential'})...")
-    t0_textbook = time.time()
     textbook_sections: dict[int, str] = {}
+    previews = []
 
     if parallel:
+        def _do_prefetch():
+            return prefetch_all_previews(client, [c for _, c in teaching_chunks])
+
         def _fetch_one(idx_chunk):
             idx, chunk = idx_chunk
             return idx, fetch_textbook_section(
@@ -1527,14 +1516,25 @@ def generate_lecture(
                 subject=subject,
             )
 
-        with ThreadPoolExecutor(max_workers=6) as executor:
-            futures = {executor.submit(_fetch_one, ic): ic[0] for ic in teaching_chunks}
-            for future in as_completed(futures):
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            # Submit prefetch as one big task
+            prefetch_future = executor.submit(_do_prefetch)
+
+            # Submit all textbook fetches individually
+            textbook_futures = {executor.submit(_fetch_one, ic): ic[0] for ic in teaching_chunks}
+
+            # Collect textbook results as they complete
+            for future in as_completed(textbook_futures):
                 idx, text = future.result()
                 textbook_sections[idx] = text
                 topic = teaching_chunks[[i for i, (ci, _) in enumerate(teaching_chunks) if ci == idx][0]][1].get("topic_name", "")
-                print(f"    [{idx}] {topic}: {len(text)} chars")
+                print(f"    [textbook {idx}] {topic}: {len(text)} chars")
+
+            # Collect prefetch result
+            previews = prefetch_future.result()
+            print(f"    [prefetch] {len(previews)} previews done")
     else:
+        previews = prefetch_all_previews(client, [c for _, c in teaching_chunks])
         for idx, chunk in teaching_chunks:
             text = fetch_textbook_section(
                 topic_name=chunk.get("topic_name", ""),
@@ -1542,10 +1542,17 @@ def generate_lecture(
                 subject=subject,
             )
             textbook_sections[idx] = text
-            print(f"    [{idx}] {chunk.get('topic_name', '')}: {len(text)} chars")
 
-    t_textbook = time.time() - t0_textbook
-    print(f"  → {len(textbook_sections)} textbooks in {t_textbook:.1f}s")
+    t_both = time.time() - t0_both
+    print(f"  → {len(previews)} previews + {len(textbook_sections)} textbooks in {t_both:.1f}s")
+
+    if dry_run:
+        for p in previews:
+            print(f"\n  [{p.group_index+1}] {p.group_name}")
+            print(f"    Summary: {p.teaching_summary[:100]}...")
+            print(f"    New terms: {', '.join(p.new_terms[:8])}")
+        print("\n  [dry-run] Done.")
+        return []
 
     # ══════════════════════════════════════════════════════════════
     # Stage 3: Pro generation — parallel with Flash previews as context
@@ -1608,7 +1615,7 @@ def generate_lecture(
         )
 
     if parallel:
-        with ThreadPoolExecutor(max_workers=4) as executor:
+        with ThreadPoolExecutor(max_workers=8) as executor:
             futures = {executor.submit(_generate_one, ctx): ctx["slide_number"] for ctx in chunk_contexts}
             for future in as_completed(futures):
                 slide_num, section = future.result()
@@ -1629,12 +1636,11 @@ def generate_lecture(
     # Clean up cache
     clear_cache(client)
 
-    t_total = time.time() - t0_prefetch
+    t_total = time.time() - t0_both
     print(f"\n  {'='*50}")
     print(f"  Done. {len(sections)} sections in {t_total:.0f}s")
-    print(f"    Prefetch:  {t_prefetch:.1f}s")
-    print(f"    Textbook:  {t_textbook:.1f}s")
-    print(f"    Generate:  {t_gen:.1f}s")
+    print(f"    Prefetch+Textbook: {t_both:.1f}s")
+    print(f"    Generate:          {t_gen:.1f}s")
     print(f"  {'='*50}\n")
 
     return sections
