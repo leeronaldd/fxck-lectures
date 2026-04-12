@@ -40,6 +40,21 @@ export interface Session {
   groups: number;
 }
 
+// Per-session pipeline state for concurrent processing
+export interface PipelineRun {
+  sessionName: string;
+  fileId: string;
+  stages: PipelineStage[];
+  currentStageIndex: number;
+  subProgress: number;
+  isProcessing: boolean;
+  isDone: boolean;
+  error: string | null;
+  isUploading: boolean;
+  uploadProgress: number;
+  cancel: (() => void) | null;
+}
+
 interface AppState {
   // User
   user: UserState;
@@ -67,17 +82,21 @@ interface AppState {
   setVideoFile: (f: File | null) => void;
   setSlidesFile: (f: File | null) => void;
 
-  // Pipeline
+  // Pipeline — per-session concurrent runs
+  pipelineRuns: Record<string, PipelineRun>;  // keyed by fileId
+  activePipelineId: string | null;            // which run is currently viewed
+  startPipeline: () => void;
+  cancelPipeline: (fileId?: string) => void;
+
+  // Legacy accessors — read from active pipeline run
   stages: PipelineStage[];
   currentStageIndex: number;
   subProgress: number;
   isProcessing: boolean;
   isDone: boolean;
   pipelineError: string | null;
-  uploadProgress: number; // 0-100 upload percentage
+  uploadProgress: number;
   isUploading: boolean;
-  startPipeline: () => void;
-  cancelPipeline: () => void;
 
   // Output
   markdown: string;
@@ -93,7 +112,6 @@ interface AppState {
   reset: () => void;
 }
 
-// Sessions will be loaded from Supabase DB in the future
 const INITIAL_SESSIONS: Session[] = [];
 
 const TEXT_STAGES: PipelineStage[] = [
@@ -123,10 +141,15 @@ const DEFAULT_SETTINGS: AppSettings = {
   dryRun: false,
 };
 
-let cancelStream: (() => void) | null = null;
+// Helper to get active pipeline run's state
+function getActiveRun(state: AppState): PipelineRun | null {
+  if (!state.activePipelineId) return null;
+  return state.pipelineRuns[state.activePipelineId] || null;
+}
+
+const EMPTY_STAGES = TEXT_STAGES.map((s) => ({ ...s }));
 
 export const useAppStore = create<AppState>((set, get) => {
-  // Expose store for debugging (remove in production)
   if (typeof window !== "undefined") {
     (window as unknown as Record<string, unknown>).__store = { getState: () => get(), setState: set };
   }
@@ -186,21 +209,23 @@ export const useAppStore = create<AppState>((set, get) => {
   setVideoFile: (f) => set({ videoFile: f }),
   setSlidesFile: (f) => set({ slidesFile: f }),
 
-  // Pipeline
-  stages: TEXT_STAGES.map((s) => ({ ...s })),
-  currentStageIndex: -1,
-  subProgress: 0,
-  isProcessing: false,
-  isDone: false,
-  pipelineError: null,
+  // Pipeline runs
+  pipelineRuns: {},
+  activePipelineId: null,
 
-  uploadProgress: 0,
-  isUploading: false,
+  // Legacy computed accessors — read from active run
+  get stages() { const run = getActiveRun(get()); return run?.stages || EMPTY_STAGES; },
+  get currentStageIndex() { const run = getActiveRun(get()); return run?.currentStageIndex ?? -1; },
+  get subProgress() { const run = getActiveRun(get()); return run?.subProgress ?? 0; },
+  get isProcessing() { const run = getActiveRun(get()); return run?.isProcessing ?? false; },
+  get isDone() { const run = getActiveRun(get()); return run?.isDone ?? false; },
+  get pipelineError() { const run = getActiveRun(get()); return run?.error ?? null; },
+  get uploadProgress() { const run = getActiveRun(get()); return run?.uploadProgress ?? 0; },
+  get isUploading() { const run = getActiveRun(get()); return run?.isUploading ?? false; },
 
   startPipeline: () => {
     const file = get().transcriptFile || get().videoFile;
     if (!file) {
-      set({ isProcessing: false, isUploading: false, pipelineError: "No file selected" });
       toast.error("No file selected");
       return;
     }
@@ -209,95 +234,163 @@ export const useAppStore = create<AppState>((set, get) => {
     const stageTemplate = isVideo ? VIDEO_STAGES : TEXT_STAGES;
     const stages = stageTemplate.map((s) => ({ ...s, status: "pending" as const }));
 
-    // Build stageMap dynamically from chosen stages
     const stageMap: Record<string, number> = {};
     stages.forEach((s, i) => { stageMap[s.name] = i; });
     stageMap["Done"] = stages.length - 1;
 
-    set({ stages, currentStageIndex: -1, subProgress: 0, isProcessing: true, isDone: false, pipelineError: null, uploadProgress: 0, isUploading: true });
+    // Generate a temporary ID (will be replaced by fileId after upload)
+    const tempId = `pending-${Date.now()}`;
+    const sessionName = file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
 
-    // Upload file with progress, then stream pipeline via SSE
+    // Create the pipeline run
+    const run: PipelineRun = {
+      sessionName,
+      fileId: tempId,
+      stages,
+      currentStageIndex: -1,
+      subProgress: 0,
+      isProcessing: true,
+      isDone: false,
+      error: null,
+      isUploading: true,
+      uploadProgress: 0,
+      cancel: null,
+    };
+
+    set((s) => ({
+      pipelineRuns: { ...s.pipelineRuns, [tempId]: run },
+      activePipelineId: tempId,
+    }));
+
     (async () => {
       try {
-        toast.loading("Uploading lecture...", { id: "upload" });
+        toast.loading("Uploading lecture...", { id: `upload-${tempId}` });
 
         const { file_id } = await uploadFile(file, (percent) => {
-          set({ uploadProgress: percent });
+          set((s) => {
+            const runs = { ...s.pipelineRuns };
+            if (runs[tempId]) runs[tempId] = { ...runs[tempId], uploadProgress: percent };
+            return { pipelineRuns: runs };
+          });
         });
 
         // Upload slides PDF if provided
         const slidesFile = get().slidesFile;
         if (slidesFile) {
-          toast.loading("Uploading slides...", { id: "upload" });
+          toast.loading("Uploading slides...", { id: `upload-${tempId}` });
           await uploadSlides(file_id, slidesFile);
         }
 
-        set({ isUploading: false, uploadProgress: 100, currentStageIndex: 0 });
-        toast.success("Upload complete!", { id: "upload" });
-        toast.loading("Processing lecture...", { id: "pipeline" });
+        // Migrate from tempId to real fileId
+        set((s) => {
+          const runs = { ...s.pipelineRuns };
+          const r = runs[tempId];
+          if (r) {
+            delete runs[tempId];
+            runs[file_id] = { ...r, fileId: file_id, isUploading: false, uploadProgress: 100, currentStageIndex: 0 };
+          }
+          return {
+            pipelineRuns: runs,
+            activePipelineId: s.activePipelineId === tempId ? file_id : s.activePipelineId,
+          };
+        });
 
-        // Run pipeline via SSE — connection stays alive the entire time
-        cancelStream = runPipeline(
+        toast.success("Upload complete!", { id: `upload-${tempId}` });
+        toast.loading("Processing lecture...", { id: `pipeline-${file_id}` });
+
+        const cancelFn = runPipeline(
           file_id,
           // onUpdate
           (event: PipelineEvent) => {
             const stageIndex = event.current_stage ? (stageMap[event.current_stage] ?? -1) : -1;
-            set((state) => {
-              const newStages = [...state.stages];
+            set((s) => {
+              const runs = { ...s.pipelineRuns };
+              const r = runs[file_id];
+              if (!r) return s;
+              const newStages = [...r.stages];
               for (let i = 0; i < newStages.length; i++) {
-                if (i < stageIndex) {
-                  newStages[i] = { ...newStages[i], status: "done" };
-                } else if (i === stageIndex) {
-                  newStages[i] = { ...newStages[i], status: "running" };
-                }
+                if (i < stageIndex) newStages[i] = { ...newStages[i], status: "done" };
+                else if (i === stageIndex) newStages[i] = { ...newStages[i], status: "running" };
               }
-              return { stages: newStages, currentStageIndex: stageIndex, subProgress: event.progress };
+              runs[file_id] = { ...r, stages: newStages, currentStageIndex: stageIndex, subProgress: event.progress };
+              return { pipelineRuns: runs };
             });
           },
           // onError
           (error) => {
-            cancelStream = null;
-            set({ isProcessing: false, pipelineError: error });
-            toast.error(`Pipeline failed: ${error}`, { id: "pipeline" });
+            set((s) => {
+              const runs = { ...s.pipelineRuns };
+              const r = runs[file_id];
+              if (r) runs[file_id] = { ...r, isProcessing: false, error, cancel: null };
+              return { pipelineRuns: runs };
+            });
+            toast.error(`Pipeline failed: ${error}`, { id: `pipeline-${file_id}` });
           },
           // onDone
           async (output) => {
-            cancelStream = null;
-            toast.success("Your lecture is ready!", { id: "pipeline", duration: 5000 });
+            toast.success("Your lecture is ready!", { id: `pipeline-${file_id}`, duration: 5000 });
 
-            if (output) {
+            // Only set output if this is the active run
+            if (output && get().activePipelineId === file_id) {
               get().setOutput(
                 output.markdown,
                 (output.concept_groups || []) as ConceptGroup[],
                 (output.verification_report || []) as VerificationClaim[],
               );
             }
-            // Refresh sessions list BEFORE marking done (so sidebar updates before navigation)
+
             await get().loadSessions();
-            set((state) => {
-              const newStages = state.stages.map((s) => ({ ...s, status: "done" as const }));
-              return { stages: newStages, isProcessing: false, isDone: true };
+
+            set((s) => {
+              const runs = { ...s.pipelineRuns };
+              const r = runs[file_id];
+              if (r) {
+                const doneStages = r.stages.map((st) => ({ ...st, status: "done" as const }));
+                runs[file_id] = { ...r, stages: doneStages, isProcessing: false, isDone: true, cancel: null };
+              }
+              return { pipelineRuns: runs };
             });
           },
         );
+
+        // Store the cancel function
+        set((s) => {
+          const runs = { ...s.pipelineRuns };
+          if (runs[file_id]) runs[file_id] = { ...runs[file_id], cancel: cancelFn };
+          return { pipelineRuns: runs };
+        });
+
       } catch (err) {
         console.error("[Pipeline] Error:", err);
         const message = err instanceof Error ? err.message : "Upload failed";
-        set({ isProcessing: false, isUploading: false, pipelineError: message });
-        toast.error(message, { id: "upload" });
+        set((s) => {
+          const runs = { ...s.pipelineRuns };
+          const r = runs[tempId] || runs[Object.keys(runs).find((k) => runs[k]?.sessionName === sessionName) || ""];
+          if (r) {
+            const key = Object.keys(runs).find((k) => runs[k] === r) || tempId;
+            runs[key] = { ...r, isProcessing: false, isUploading: false, error: message };
+          }
+          return { pipelineRuns: runs };
+        });
+        toast.error(message, { id: `upload-${tempId}` });
       }
     })();
   },
 
-  cancelPipeline: () => {
-    if (cancelStream) cancelStream();
-    cancelStream = null;
-    set({
-      isProcessing: false,
-      isDone: false,
-      pipelineError: null,
-      currentStageIndex: -1,
-      stages: TEXT_STAGES.map((s) => ({ ...s })),
+  cancelPipeline: (fileId?: string) => {
+    const id = fileId || get().activePipelineId;
+    if (!id) return;
+
+    const run = get().pipelineRuns[id];
+    if (run?.cancel) run.cancel();
+
+    set((s) => {
+      const runs = { ...s.pipelineRuns };
+      delete runs[id];
+      return {
+        pipelineRuns: runs,
+        activePipelineId: s.activePipelineId === id ? null : s.activePipelineId,
+      };
     });
   },
 
@@ -319,17 +412,16 @@ export const useAppStore = create<AppState>((set, get) => {
 
   // Reset
   reset: () => {
-    if (cancelStream) cancelStream();
-    cancelStream = null;
+    // Cancel all active runs
+    const runs = get().pipelineRuns;
+    Object.values(runs).forEach((r) => { if (r.cancel) r.cancel(); });
+
     set({
       transcriptFile: null,
       videoFile: null,
       slidesFile: null,
-      stages: TEXT_STAGES.map((s) => ({ ...s })),
-      currentStageIndex: -1,
-      subProgress: 0,
-      isProcessing: false,
-      isDone: false,
+      pipelineRuns: {},
+      activePipelineId: null,
       markdown: "",
       groups: [],
       trustStats: { totalClaims: 0, correctClaims: 0, verifiedPercent: 0 },

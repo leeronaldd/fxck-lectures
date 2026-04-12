@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase";
 
 export default function AppSidebar() {
   const router = useRouter();
-  const { user, sessions, sidebarOpen, settings, updateSettings, loadSession, deleteSession } = useAppStore();
+  const { user, sessions, sidebarOpen, settings, updateSettings, loadSession, deleteSession, pipelineRuns } = useAppStore();
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
@@ -60,6 +60,49 @@ export default function AppSidebar() {
 
         {/* Sessions list */}
         <div className="flex-1 overflow-y-auto px-2">
+          {/* Active pipeline runs */}
+          {Object.entries(pipelineRuns).filter(([, r]) => r.isProcessing).length > 0 && (
+            <>
+              <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest"
+                style={{ color: "var(--accent)" }}>
+                Processing
+              </p>
+              {Object.entries(pipelineRuns)
+                .filter(([, r]) => r.isProcessing)
+                .map(([id, run]) => (
+                  <button
+                    key={id}
+                    onClick={() => {
+                      useAppStore.setState({ activePipelineId: id });
+                      router.push(`/processing?id=${id}`);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl mb-0.5 transition-all text-left"
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-elevated)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                  >
+                    {/* Spinner */}
+                    <svg
+                      width="14" height="14" viewBox="0 0 24 24" fill="none"
+                      stroke="var(--accent)" strokeWidth="2" strokeLinecap="round"
+                      className="animate-spin shrink-0"
+                    >
+                      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                    </svg>
+                    <div className="min-w-0">
+                      <p className="text-sm truncate" style={{ color: "var(--text-primary)" }}>
+                        {run.sessionName}
+                      </p>
+                      <p className="text-xs" style={{ color: "var(--accent)" }}>
+                        {run.isUploading
+                          ? `Uploading ${run.uploadProgress}%`
+                          : `${run.subProgress}%`}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+            </>
+          )}
+
           <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest"
             style={{ color: "var(--text-muted)" }}>
             Recent

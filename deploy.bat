@@ -55,7 +55,7 @@ IF %ERRORLEVEL% NEQ 0 (
 )
 
 echo Deploying Whisper to Cloud Run with GPU...
-call gcloud run deploy fxck-lectures-whisper --project %PROJECT_ID% --image %WHISPER_IMAGE% --region %WHISPER_REGION% --platform managed --no-allow-unauthenticated --gpu 1 --gpu-type nvidia-l4 --cpu 4 --memory 16Gi --timeout 900 --concurrency 1 --min-instances 0 --max-instances 2 --execution-environment gen2
+call gcloud run deploy fxck-lectures-whisper --project %PROJECT_ID% --image %WHISPER_IMAGE% --region %WHISPER_REGION% --platform managed --no-allow-unauthenticated --gpu 1 --gpu-type nvidia-l4 --cpu 4 --memory 16Gi --timeout 900 --concurrency 1 --min-instances 0 --max-instances 10 --execution-environment gen2
 IF %ERRORLEVEL% NEQ 0 (
     echo WHISPER DEPLOY FAILED - You may need to request GPU quota first.
     pause
@@ -91,7 +91,7 @@ IF DEFINED SUPA_JWT SET ENV_VARS=%ENV_VARS%,SUPABASE_JWT_SECRET=%SUPA_JWT%
 IF DEFINED GROQ_KEY SET ENV_VARS=%ENV_VARS%,GROQ_API_KEY=%GROQ_KEY%
 
 echo Deploying backend to Cloud Run...
-call gcloud run deploy fxck-lectures-api --project %PROJECT_ID% --image %BACKEND_IMAGE% --region %BACKEND_REGION% --platform managed --allow-unauthenticated --use-http2 --memory 2Gi --cpu 4 --timeout 900 --concurrency 1 --min-instances 0 --max-instances 3 --set-env-vars "%ENV_VARS%"
+call gcloud run deploy fxck-lectures-api --project %PROJECT_ID% --image %BACKEND_IMAGE% --region %BACKEND_REGION% --platform managed --allow-unauthenticated --use-http2 --memory 2Gi --cpu 4 --timeout 900 --concurrency 1 --min-instances 0 --max-instances 100 --set-env-vars "%ENV_VARS%"
 IF %ERRORLEVEL% NEQ 0 (
     echo BACKEND DEPLOY FAILED
     pause

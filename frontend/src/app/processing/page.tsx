@@ -1,15 +1,37 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import * as Progress from "@radix-ui/react-progress";
 import { useAppStore } from "@/lib/store";
 import PipelineStepper from "@/components/PipelineStepper";
 
 export default function ProcessingPage() {
   const router = useRouter();
-  const { stages, currentStageIndex, subProgress, isProcessing, isDone, pipelineError, cancelPipeline, isUploading, uploadProgress } =
-    useAppStore();
+  const searchParams = useSearchParams();
+  const pipelineId = searchParams.get("id");
+
+  const { pipelineRuns, activePipelineId, cancelPipeline } = useAppStore();
+
+  // If a specific pipeline ID is requested, switch to it
+  useEffect(() => {
+    if (pipelineId && pipelineId !== activePipelineId) {
+      useAppStore.setState({ activePipelineId: pipelineId });
+    }
+  }, [pipelineId, activePipelineId]);
+
+  // Get the active run
+  const viewId = pipelineId || activePipelineId;
+  const run = viewId ? pipelineRuns[viewId] : null;
+
+  const stages = run?.stages || [];
+  const currentStageIndex = run?.currentStageIndex ?? -1;
+  const subProgress = run?.subProgress ?? 0;
+  const isProcessing = run?.isProcessing ?? false;
+  const isDone = run?.isDone ?? false;
+  const pipelineError = run?.error ?? null;
+  const isUploading = run?.isUploading ?? false;
+  const uploadProgress = run?.uploadProgress ?? 0;
 
   // Redirect to reader when done
   useEffect(() => {
@@ -19,16 +41,16 @@ export default function ProcessingPage() {
     }
   }, [isDone, router]);
 
-  // Redirect to home only if pipeline was never started (and no error)
+  // Redirect to home only if no active pipeline
   useEffect(() => {
-    if (!isProcessing && !isDone && !pipelineError && currentStageIndex === -1) {
-      router.replace("/");
+    if (!run && !pipelineError) {
+      router.replace("/upload");
     }
-  }, [isProcessing, isDone, pipelineError, currentStageIndex, router]);
+  }, [run, pipelineError, router]);
 
   const handleCancel = () => {
-    cancelPipeline();
-    router.push("/");
+    if (viewId) cancelPipeline(viewId);
+    router.push("/upload");
   };
 
   return (
@@ -126,11 +148,20 @@ export default function ProcessingPage() {
           )}
         </div>
 
+        {/* Active pipelines count */}
+        {Object.values(pipelineRuns).filter((r) => r.isProcessing).length > 1 && (
+          <div className="mt-4 text-center">
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              {Object.values(pipelineRuns).filter((r) => r.isProcessing).length} lectures processing simultaneously
+            </p>
+          </div>
+        )}
+
         {/* Actions */}
         <div className="mt-6 flex justify-center gap-3">
           {pipelineError && (
             <button
-              onClick={() => { cancelPipeline(); router.push("/"); }}
+              onClick={() => { if (viewId) cancelPipeline(viewId); router.push("/upload"); }}
               className="btn-glow px-6 py-2.5 text-sm font-semibold rounded-xl transition-all"
               style={{
                 background: "linear-gradient(135deg, var(--accent), #FF8555)",
