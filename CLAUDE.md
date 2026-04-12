@@ -60,8 +60,10 @@ V2 pipeline (3-stage parallel architecture, replaced V1's 8 stages):
 
 ```
 Stage 0: Transcription (src/transcriber.py) — optional, if input is video/audio
-    → Gemini Flash multimodal audio (~$0.02/2hr lecture, no rate limits)
-    → auto audio extraction via ffmpeg, chunking for large files
+    → Self-hosted faster-whisper on Cloud Run GPU (L4, asia-southeast1)
+    → Model: small, int8 quantized, batch_size=64 (~70s for 2hr lecture, $0.016)
+    → Fallback: Gemini Flash multimodal (for local dev without Whisper service)
+    → auto audio extraction via ffmpeg
     ↓
 Stage 0.5: Screenshot Extraction (src/screenshot_extractor.py) — if video input
     → OpenCV frame detection + Gemini Flash descriptions
@@ -72,14 +74,12 @@ Stage 1: Chunking (src/chunker.py)
     ↓
 Stage 2: V2 Generation (src/generator_v2.py) — all parallel
     ↓
-    ├── Flash prefetch (parallel, ~10s)
-    │   → teaching summaries + term tracking for all chunks
-    │   → term ownership assigned by Python set arithmetic
+    ├── Flash prefetch + textbook fetch (parallel together, ~30s)
+    │   ├── teaching summaries + term tracking for all chunks
+    │   ├── term ownership assigned by Python set arithmetic
+    │   └── OpenStax content via Google Search grounding per chunk
     │
-    ├── Flash textbook fetch (parallel, ~30s)
-    │   → OpenStax content via Google Search grounding per chunk
-    │
-    └── Pro generation (parallel, ~60s)
+    └── Pro generation (parallel, 8 workers, ~45-60s)
         → creative brief with anatomy professor style transfer
         → context caching (system instruction cached once)
         → per-chunk: prior previews + textbook + transcript + slides
