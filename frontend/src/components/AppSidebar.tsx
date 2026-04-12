@@ -205,19 +205,17 @@ export default function AppSidebar() {
                       autoFocus
                       value={renameValue}
                       onChange={(e) => setRenameValue(e.target.value)}
-                      onBlur={() => {
-                        // Capture values now — state may change by the time setTimeout fires
-                        const val = renameValue.trim();
+                      onBlur={(e) => {
+                        // Read directly from DOM — React state may be stale in closure
+                        const val = (e.target as HTMLInputElement).value.trim();
                         const sid = session.id;
                         const oldName = session.name;
-                        setTimeout(async () => {
-                          if (val && val !== oldName) {
-                            const { renameSession: apiRename } = await import("@/lib/api");
-                            await apiRename(sid, val);
-                            useAppStore.getState().loadSessions();
-                          }
-                          setRenaming(null);
-                        }, 100);
+                        if (val && val !== oldName) {
+                          import("@/lib/api").then(({ renameSession: apiRename }) =>
+                            apiRename(sid, val).then(() => useAppStore.getState().loadSessions())
+                          );
+                        }
+                        setRenaming(null);
                       }}
                       onKeyDown={(e) => { if (e.key === "Escape") { setRenameValue(session.name); setRenaming(null); } }}
                       className="w-full text-sm px-2 py-1 rounded-lg outline-none"
