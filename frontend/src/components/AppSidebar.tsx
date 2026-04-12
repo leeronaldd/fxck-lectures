@@ -191,33 +191,30 @@ export default function AppSidebar() {
                     className="flex-1 px-3 py-2 min-w-0"
                     onSubmit={async (e) => {
                       e.preventDefault();
-                      if (renameValue.trim()) {
+                      const input = e.currentTarget.querySelector("input");
+                      const val = input?.value.trim() || "";
+                      if (val && val !== session.name) {
                         const { renameSession: apiRename } = await import("@/lib/api");
-                        const ok = await apiRename(session.id, renameValue.trim());
-                        if (ok) {
-                          useAppStore.getState().loadSessions();
-                        }
+                        await apiRename(session.id, val);
+                        useAppStore.getState().loadSessions();
                       }
                       setRenaming(null);
                     }}
                   >
                     <input
                       autoFocus
-                      value={renameValue}
-                      onChange={(e) => setRenameValue(e.target.value)}
+                      defaultValue={session.name}
                       onBlur={(e) => {
-                        // Read directly from DOM — React state may be stale in closure
-                        const val = (e.target as HTMLInputElement).value.trim();
-                        const sid = session.id;
-                        const oldName = session.name;
-                        if (val && val !== oldName) {
+                        const val = e.target.value.trim();
+                        if (val && val !== session.name) {
+                          const sid = session.id;
                           import("@/lib/api").then(({ renameSession: apiRename }) =>
                             apiRename(sid, val).then(() => useAppStore.getState().loadSessions())
                           );
                         }
                         setRenaming(null);
                       }}
-                      onKeyDown={(e) => { if (e.key === "Escape") { setRenameValue(session.name); setRenaming(null); } }}
+                      onKeyDown={(e) => { if (e.key === "Escape") setRenaming(null); }}
                       className="w-full text-sm px-2 py-1 rounded-lg outline-none"
                       style={{
                         background: "var(--bg-base)",
