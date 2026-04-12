@@ -204,6 +204,7 @@ export default function AppSidebar() {
                     <input
                       autoFocus
                       defaultValue={session.name}
+                      onBlur={() => setRenaming(null)}
                       onKeyDown={(e) => { if (e.key === "Escape") setRenaming(null); }}
                       className="w-full text-sm px-2 py-1 rounded-lg outline-none"
                       style={{
