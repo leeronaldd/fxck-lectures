@@ -204,20 +204,7 @@ export default function AppSidebar() {
                     <input
                       autoFocus
                       defaultValue={session.name}
-                      onKeyDown={async (e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          const val = e.currentTarget.value.trim();
-                          if (val && val !== session.name) {
-                            const { renameSession: apiRename } = await import("@/lib/api");
-                            await apiRename(session.id, val);
-                            useAppStore.getState().loadSessions();
-                          }
-                          setRenaming(null);
-                        } else if (e.key === "Escape") {
-                          setRenaming(null);
-                        }
-                      }}
+                      onKeyDown={(e) => { if (e.key === "Escape") setRenaming(null); }}}
                       className="w-full text-sm px-2 py-1 rounded-lg outline-none"
                       style={{
                         background: "var(--bg-base)",
