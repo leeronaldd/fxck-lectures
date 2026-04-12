@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useAppStore } from "@/lib/store";
@@ -8,12 +8,53 @@ import { createClient } from "@/lib/supabase";
 
 export default function AppSidebar() {
   const router = useRouter();
-  const { user, sessions, sidebarOpen, settings, updateSettings, loadSession, deleteSession, pipelineRuns } = useAppStore();
+  const { user, sessions, activeSessionId, sidebarOpen, settings, updateSettings, loadSession, deleteSession, createNewSession, pipelineRuns } = useAppStore();
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close account menu on click outside
+  useEffect(() => {
+    if (!accountMenuOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (accountMenuRef.current && !accountMenuRef.current.contains(e.target as Node)) {
+        setAccountMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [accountMenuOpen]);
+
+  // Close account menu on ESC
+  useEffect(() => {
+    if (!accountMenuOpen) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setAccountMenuOpen(false);
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [accountMenuOpen]);
+
+  // Close sidebar on ESC (mobile)
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (deleteConfirm) {
+          setDeleteConfirm(null);
+        } else if (renaming) {
+          setRenaming(null);
+        } else if (window.innerWidth < 1024) {
+          useAppStore.getState().setSidebarOpen(false);
+        }
+      }
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [deleteConfirm, renaming]);
 
   if (!sidebarOpen) return null;
 
@@ -40,9 +81,15 @@ export default function AppSidebar() {
         {/* New Session button */}
         <div className="p-3">
           <button
-            onClick={() => {
-              router.push("/upload");
-              setTimeout(() => useAppStore.getState().reset(), 100);
+            onClick={async () => {
+              useAppStore.getState().reset();
+              const sessionId = await createNewSession();
+              if (sessionId) {
+                router.push("/upload");
+              } else {
+                // Fallback if API fails
+                router.push("/upload");
+              }
             }}
             className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
             style={{
@@ -108,19 +155,35 @@ export default function AppSidebar() {
             Recent
           </p>
           {sessions.length === 0 ? (
-            <p className="px-3 py-4 text-xs" style={{ color: "var(--text-muted)" }}>
-              No sessions yet. Upload a lecture to get started.
-            </p>
+            <div className="px-3 py-8 flex flex-col items-center text-center gap-2">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+                style={{ color: "var(--text-muted)", opacity: 0.5 }}>
+                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                <polyline points="14,2 14,8 20,8" />
+              </svg>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                No sessions yet
+              </p>
+              <p className="text-[10px]" style={{ color: "var(--text-muted)", opacity: 0.6 }}>
+                Upload a lecture to get started
+              </p>
+            </div>
           ) : (
-            sessions.map((session) => (
-              <div
+            sessions.map((session) => {
+              const isActive = session.id === activeSessionId;
+              return (
+                <div
                 key={session.id}
                 className="flex items-center rounded-xl mb-0.5 transition-all group"
+                style={{
+                  background: isActive ? "var(--accent-dim)" : "transparent",
+                  borderLeft: isActive ? "2px solid var(--accent)" : "2px solid transparent",
+                }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "var(--bg-elevated)";
+                  if (!isActive) e.currentTarget.style.background = "var(--bg-elevated)";
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "transparent";
+                  if (!isActive) e.currentTarget.style.background = "transparent";
                 }}
               >
                 {renaming === session.id ? (
@@ -142,15 +205,19 @@ export default function AppSidebar() {
                       autoFocus
                       value={renameValue}
                       onChange={(e) => setRenameValue(e.target.value)}
-                      onBlur={async (e) => {
-                        // Delay to let onSubmit fire first if Enter was pressed
+                      onBlur={() => {
+                        // Capture values now — state may change by the time setTimeout fires
                         const val = renameValue.trim();
-                        if (val && val !== session.name) {
-                          const { renameSession: apiRename } = await import("@/lib/api");
-                          const ok = await apiRename(session.id, val);
-                          if (ok) useAppStore.getState().loadSessions();
-                        }
-                        setRenaming(null);
+                        const sid = session.id;
+                        const oldName = session.name;
+                        setTimeout(async () => {
+                          if (val && val !== oldName) {
+                            const { renameSession: apiRename } = await import("@/lib/api");
+                            await apiRename(sid, val);
+                            useAppStore.getState().loadSessions();
+                          }
+                          setRenaming(null);
+                        }, 100);
                       }}
                       onKeyDown={(e) => { if (e.key === "Escape") { setRenameValue(session.name); setRenaming(null); } }}
                       className="w-full text-sm px-2 py-1 rounded-lg outline-none"
@@ -240,12 +307,13 @@ export default function AppSidebar() {
                   </div>
                 )}
               </div>
-            ))
+              );
+            })
           )}
         </div>
 
         {/* Account section */}
-        <div className="relative p-2" style={{ borderTop: "1px solid var(--border)" }}>
+        <div ref={accountMenuRef} className="relative p-2" style={{ borderTop: "1px solid var(--border)" }}>
           {/* Account menu dropdown */}
           {accountMenuOpen && (
             <div
