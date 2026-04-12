@@ -207,10 +207,11 @@ export default function AppSidebar() {
                       suppressContentEditableWarning
                       onBlur={async (e) => {
                         const val = e.currentTarget.textContent?.trim() || "";
+                        console.log("[rename] blur fired, val:", JSON.stringify(val), "old:", JSON.stringify(session.name), "different:", val !== session.name);
                         if (val && val !== session.name) {
-                          // Optimistic: update sidebar text immediately
                           const { renameSession: apiRename } = await import("@/lib/api");
-                          await apiRename(session.id, val);
+                          const ok = await apiRename(session.id, val);
+                          console.log("[rename] API response:", ok);
                           useAppStore.getState().loadSessions();
                         }
                         setRenaming(null);
