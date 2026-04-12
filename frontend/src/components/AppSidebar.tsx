@@ -204,15 +204,21 @@ export default function AppSidebar() {
                     <input
                       autoFocus
                       defaultValue={session.name}
+                      onFocus={(e) => { e.target.select(); }}
                       onBlur={(e) => {
+                        // Guard: skip if input was just mounted (blur from autoFocus race)
                         const val = e.target.value.trim();
-                        if (val && val !== session.name) {
-                          const sid = session.id;
-                          import("@/lib/api").then(({ renameSession: apiRename }) =>
-                            apiRename(sid, val).then(() => useAppStore.getState().loadSessions())
-                          );
-                        }
-                        setRenaming(null);
+                        const sid = session.id;
+                        const oldName = session.name;
+                        // Delay to avoid race with form submit
+                        setTimeout(() => {
+                          if (val && val !== oldName) {
+                            import("@/lib/api").then(({ renameSession: apiRename }) =>
+                              apiRename(sid, val).then(() => useAppStore.getState().loadSessions())
+                            );
+                          }
+                          setRenaming(null);
+                        }, 200);
                       }}
                       onKeyDown={(e) => { if (e.key === "Escape") setRenaming(null); }}
                       className="w-full text-sm px-2 py-1 rounded-lg outline-none"
