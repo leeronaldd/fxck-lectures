@@ -3,6 +3,59 @@
 import { useState } from "react";
 import type { SlideCard } from "@/lib/types";
 
+/** Render inline markdown (bold, italic) to HTML */
+function inlineMarkdown(text: string): string {
+  return text
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/\*\*([\s\S]+?)\*\*/g, '<strong style="color: var(--accent)">$1</strong>')
+    .replace(/(?<!\*)\*(?!\*)([\s\S]+?)(?<!\*)\*(?!\*)/g, "<em>$1</em>");
+}
+
+function SlideImage({ src, alt, onClick }: { src: string; alt: string; onClick: () => void }) {
+  const [status, setStatus] = useState<"loading" | "loaded" | "error">("loading");
+
+  if (status === "error") {
+    return (
+      <div className="px-3 pb-3">
+        <div className="w-full rounded-xl flex flex-col items-center justify-center py-8 gap-2"
+          style={{ background: "var(--bg-elevated)", border: "1px dashed var(--border)" }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text-muted)" }}>
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            <circle cx="8.5" cy="8.5" r="1.5"/>
+            <polyline points="21,15 16,10 5,21"/>
+          </svg>
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>Slide image unavailable</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-3 pb-3">
+      <button
+        onClick={onClick}
+        className="w-full rounded-xl overflow-hidden bg-white cursor-zoom-in hover:ring-2 hover:ring-[var(--accent)] transition-all relative"
+      >
+        {status === "loading" && (
+          <div className="absolute inset-0 flex items-center justify-center" style={{ background: "var(--bg-elevated)" }}>
+            <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin"
+              style={{ borderColor: "var(--text-muted)", borderTopColor: "transparent" }} />
+          </div>
+        )}
+        <img
+          src={src}
+          alt={alt}
+          className="w-full h-auto transition-opacity duration-200"
+          style={{ opacity: status === "loaded" ? 1 : 0 }}
+          loading="lazy"
+          onLoad={() => setStatus("loaded")}
+          onError={() => setStatus("error")}
+        />
+      </button>
+    </div>
+  );
+}
+
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/+$/, "");
 
 /** Resolve a slide image_ref to a full URL.
@@ -79,7 +132,7 @@ export function SlideCardComponent({
               <span style={{ color: "var(--accent)" }} className="mt-0.5 shrink-0">
                 {"\u2022"}
               </span>
-              <span style={{ color: "var(--text-primary)" }}>{bp}</span>
+              <span style={{ color: "var(--text-primary)" }} dangerouslySetInnerHTML={{ __html: inlineMarkdown(bp) }} />
             </div>
           ))}
         </div>
@@ -87,18 +140,11 @@ export function SlideCardComponent({
 
       {/* Image — clickable to expand */}
       {card.image_ref && !card.image_ref.startsWith("[") && (
-        <div className="px-3 pb-3">
-          <button
-            onClick={() => onImageClick?.(resolveImageUrl(card.image_ref))}
-            className="w-full rounded-xl overflow-hidden bg-white cursor-zoom-in hover:ring-2 hover:ring-[var(--accent)] transition-all"
-          >
-            <img
-              src={resolveImageUrl(card.image_ref)}
-              alt={card.title}
-              className="w-full h-auto"
-            />
-          </button>
-        </div>
+        <SlideImage
+          src={resolveImageUrl(card.image_ref)}
+          alt={card.title}
+          onClick={() => onImageClick?.(resolveImageUrl(card.image_ref))}
+        />
       )}
 
       {/* Diagram suggestion (no image available) */}
@@ -118,7 +164,8 @@ export function SlideCardComponent({
             color: "var(--ci-high)",
           }}
         >
-          <span className="font-semibold">Exam tip:</span> {card.exam_tip}
+          <span className="font-semibold">Exam tip:</span>{" "}
+          <span dangerouslySetInnerHTML={{ __html: inlineMarkdown(card.exam_tip) }} />
         </div>
       )}
     </div>

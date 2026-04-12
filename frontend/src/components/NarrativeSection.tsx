@@ -3,16 +3,21 @@
 import type { TranscriptSection } from "@/lib/types";
 
 export default function NarrativeSection({ section }: { section: TranscriptSection }) {
+  function escapeHtml(str: string): string {
+    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
   function renderMarkdown(text: string) {
     return text.split("\n\n").map((para, i) => {
       const isStruck = para.startsWith("~~") && para.endsWith("~~");
       const cleanPara = isStruck ? para.slice(2, -2) : para;
 
-      // Process inline markdown
-      const html = cleanPara
-        .replace(/\*\*(.+?)\*\*/g, '<strong style="color: var(--accent)">$1</strong>')
-        .replace(/\*(.+?)\*/g, "<em>$1</em>")
-        .replace(/~~(.+?)~~/g, '<del style="opacity: 0.4">$1</del>');
+      // Escape HTML first to prevent XSS, then apply markdown formatting
+      // Use [\s\S] instead of . to match across line breaks within a paragraph
+      const html = escapeHtml(cleanPara)
+        .replace(/\*\*([\s\S]+?)\*\*/g, '<strong style="color: var(--accent)">$1</strong>')
+        .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, "<em>$1</em>")
+        .replace(/~~([\s\S]+?)~~/g, '<del style="opacity: 0.4">$1</del>');
 
       return (
         <p
