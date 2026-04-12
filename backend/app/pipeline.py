@@ -59,7 +59,6 @@ def run_pipeline(
 
     try:
         from src.chunker import chunk_transcript
-        from concurrent.futures import ThreadPoolExecutor, Future
 
         input_file = Path(input_path)
         job_id = input_file.stem
@@ -67,35 +66,7 @@ def run_pipeline(
         is_video = input_file.suffix in video_extensions
 
         # ── Stage 0 (conditional): Transcribe video ──
-        # For video: kick off screenshot extraction in parallel with transcription
-        screenshot_future: Future | None = None
-        screenshot_executor: ThreadPoolExecutor | None = None
-
         if is_video:
-            # Start screenshot extraction in background immediately
-            # (doesn't need transcript — works directly from video)
-            if not slides_path:
-                from src.screenshot_extractor import extract_all
-                screenshots_dir = output_dir / "screenshots"
-                screenshots_dir.mkdir(exist_ok=True)
-
-                def _extract_screenshots():
-                    """Run screenshot extraction in background thread."""
-                    try:
-                        # extract_all without chunks_path does frame-based extraction
-                        return extract_all(
-                            video_path=input_path,
-                            chunks_path=None,
-                            output_dir=str(screenshots_dir),
-                            output_json=str(output_dir / f"{job_id}_screenshots.json"),
-                        )
-                    except Exception as e:
-                        print(f"  Screenshot extraction failed: {e}")
-                        return None
-
-                screenshot_executor = ThreadPoolExecutor(max_workers=1)
-                screenshot_future = screenshot_executor.submit(_extract_screenshots)
-
             yield {"status": "running", "stage": "Transcribing lecture", "progress": 2}
             from src.transcriber import transcribe
             result = transcribe(input_path)
@@ -133,20 +104,34 @@ def run_pipeline(
                "result": f"{len(chunks)} chunks"}
         _check_cancelled(cancel_event)
 
-        # ── Collect screenshots (wait for background thread if still running) ──
+        # ── Stage 1.5: Extract screenshots from video (if no slides PDF uploaded) ──
         screenshots_json = None
-        if screenshot_future is not None:
+        if not slides_path and is_video:
             yield {"status": "running", "stage": "Extracting lecture slides", "progress": 16}
-            results = screenshot_future.result(timeout=300)  # wait up to 5 min
-            if screenshot_executor:
-                screenshot_executor.shutdown(wait=False)
-            if results:
-                screenshots_json = str(output_dir / f"{job_id}_screenshots.json")
-                yield {"status": "running", "stage": "Extracting lecture slides", "progress": 19,
-                       "result": f"{len(results)} slides extracted"}
-            else:
-                yield {"status": "running", "stage": "Extracting lecture slides", "progress": 19,
-                       "result": "No slide transitions detected"}
+            try:
+                from src.screenshot_extractor import extract_all
+                screenshots_dir = output_dir / "screenshots"
+                screenshots_dir.mkdir(exist_ok=True)
+
+                chunks_temp_path = output_dir / f"{job_id}_chunks.json"
+                with open(chunks_temp_path, "w", encoding="utf-8") as f:
+                    json.dump(chunks_dicts, f, indent=2, ensure_ascii=False)
+
+                results = extract_all(
+                    video_path=input_path,
+                    chunks_path=str(chunks_temp_path),
+                    output_dir=str(screenshots_dir),
+                    output_json=str(output_dir / f"{job_id}_screenshots.json"),
+                )
+                if results:
+                    screenshots_json = str(output_dir / f"{job_id}_screenshots.json")
+                    yield {"status": "running", "stage": "Extracting lecture slides", "progress": 19,
+                           "result": f"{len(results)} slides extracted"}
+                else:
+                    yield {"status": "running", "stage": "Extracting lecture slides", "progress": 19,
+                           "result": "No slide transitions detected"}
+            except Exception as e:
+                print(f"  Screenshot extraction failed: {e}")
 
         # ── Stage 2: Validate slides match (if PDF provided) ──
         if slides_path:
