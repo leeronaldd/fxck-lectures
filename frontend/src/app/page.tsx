@@ -148,7 +148,7 @@ export default function LandingPage() {
                   </div>
                   {/* Exam tip */}
                   <div className="px-4 py-2.5 text-[11px] border-t" style={{ borderColor: "var(--border)", background: "var(--exam-bg)", color: "var(--ci-high)" }}>
-                    <span className="font-semibold">Exam tip:</span> Positive-sense (+ssRNA) viruses can be translated directly by host ribosomes, whereas negative-sense (&minus;ssRNA) viruses must carry RNA-dependent RNA polymerase to synthesize a readable positive strand first.
+                    <span className="font-semibold">Exam tip:</span> All 7 Baltimore classes must produce +sense mRNA. Positive-sense RNA viruses (Class IV) skip straight to translation. Negative-sense (Class V) and retroviruses (Class VI) need extra enzymatic steps first.
                   </div>
                 </div>
 
@@ -168,49 +168,43 @@ export default function LandingPage() {
 
                   <div className="demo-reveal demo-reveal-2">
                     <p className="text-[13px] mb-4 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                      Remember back in Module 1, we established that cellular DNA replicates via semi-conservative replication. The two double-helix strands separate, and each acts as a physical template to synthesize a new complementary strand.
+                      We&apos;ve established how viruses are categorized by their physical structures, like the capsids and stolen envelopes we covered in Section 1. But if you&apos;re a virus, looking pretty doesn&apos;t replicate your genome. How do you actually hijack a cell? To understand how viruses function, we have to look at their genetic architecture.
                     </p>
                   </div>
 
                   <div className="demo-reveal demo-reveal-3">
                     <p className="text-[13px] mb-4 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                      Viruses, however, are essentially genetic hijackers. Every virus has one ultimate goal when it enters a host cell: to synthesize viral proteins. But to make proteins, you need messenger RNA. Where does a virus get it?
+                      Nucleic acids have a physical direction. One end exposes the fifth carbon&mdash;the <strong style={{ color: "var(--accent)" }}>5&apos; end</strong>. The opposite end exposes the third carbon&mdash;the <strong style={{ color: "var(--accent)" }}>3&apos; end</strong>. We call the 5&apos; to 3&apos; strand the <strong style={{ color: "var(--accent)" }}>positive sense</strong> strand. It &ldquo;makes sense&rdquo; to the host cell&mdash;it reads exactly like the host&apos;s own messenger RNA. The opposite strand is the <strong style={{ color: "var(--accent)" }}>negative sense</strong> strand. Think of it like a photographic negative.
                     </p>
                   </div>
 
                   <div className="demo-reveal demo-reveal-4">
                     <p className="text-[13px] mb-4 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                      Look at the diagram on the slide. Right in the middle, you see mRNA highlighted in yellow. Notice how every single grey arrow points directly to it. This is the <strong style={{ color: "var(--accent)" }}>Baltimore classification system</strong>. It categorizes all viruses based on two physical traits: the structure of their genome, and the specific enzymatic pathway they use to reach that central mRNA step.
+                      This brings us to the central problem every virus faces. To survive, it must force the host cell to build viral <strong style={{ color: "var(--accent)" }}>proteins</strong>. But ribosomes only read one language: positive-sense mRNA. Every single virus must eventually produce a positive-sense mRNA intermediate.
                     </p>
                   </div>
 
                   <div className="demo-reveal demo-reveal-5">
                     <p className="text-[13px] mb-4 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                      A nucleic acid strand has a direction. We call the 5&apos; to 3&apos; orientation <strong style={{ color: "var(--accent)" }}>positive sense</strong>. The reverse direction is <strong style={{ color: "var(--accent)" }}>negative sense</strong>. Messenger RNA is <em>always</em> positive sense. If a virus carries a negative sense genome, it cannot be translated directly; it must be converted first.
+                      Look at the diagram on the slide. This is the <strong style={{ color: "var(--accent)" }}>Baltimore classification system</strong>. Notice how all seven pathways converge on that same central box: mRNA. It categorizes all viruses into 7 groups based on their nucleic acid type, their strandedness, and the specific pathway they use to reach that mRNA step.
                     </p>
                   </div>
 
                   <div className="demo-reveal demo-reveal-6">
                     <p className="text-[13px] mb-4 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                      Your professor glossed over the individual viral classes, but you will consistently see them on board exams. Let&apos;s walk through the main pathways.
+                      <strong style={{ color: "var(--accent)" }}>Class I</strong> (dsDNA) uses host RNA polymerase directly. <strong style={{ color: "var(--accent)" }}>Class II</strong> (ssDNA) must first build a complementary strand. <strong style={{ color: "var(--accent)" }}>Class IV</strong> (+ssRNA) is the most direct&mdash;the genome itself functions as mRNA, and ribosomes begin translation immediately.
                     </p>
                   </div>
 
                   <div className="demo-reveal demo-reveal-7">
                     <p className="text-[13px] mb-3 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                      Classes I and II start with DNA. <strong style={{ color: "var(--accent)" }}>Class I</strong> viruses possess double-stranded DNA, so they use the host&apos;s own RNA polymerase to transcribe mRNA. <strong style={{ color: "var(--accent)" }}>Class II</strong> viruses possess single-stranded DNA, so they must first build a complementary strand to form a double-stranded intermediate.
+                      <strong style={{ color: "var(--accent)" }}>Class V</strong> (&minus;ssRNA), like <em>influenza</em>, must first transcribe its negative-sense genome into positive-sense mRNA. <strong style={{ color: "var(--accent)" }}>Class VI</strong> retroviruses deploy <strong style={{ color: "var(--accent)" }}>reverse transcriptase</strong> to convert RNA backwards into DNA that integrates into the host genome. HIV is the classic example.
                     </p>
                   </div>
 
                   <div className="demo-reveal demo-reveal-8">
                     <p className="text-[13px] mb-3 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                      Classes III, IV, and V start with RNA. Host cells lack enzymes to copy RNA from RNA, so these viruses encode their own <strong style={{ color: "var(--accent)" }}>RNA-dependent RNA polymerase</strong>. Class IV (+ssRNA) acts directly as mRNA. Class V (&minus;ssRNA) must first be transcribed into a positive-sense copy.
-                    </p>
-                  </div>
-
-                  <div className="demo-reveal demo-reveal-9">
-                    <p className="text-[13px] mb-3 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                      Class VI and VII use <strong style={{ color: "var(--accent)" }}>reverse transcriptase</strong>. Class VI retroviruses convert their +ssRNA into double-stranded DNA that integrates into the host genome permanently. HIV is the classic example.
+                      <strong style={{ color: "var(--accent)" }}>Class VII</strong> (hepadnaviruses, like Hepatitis B) contains gapped DNA. The host repairs the gap, transcribes mRNA normally, but then reverse-transcribes that mRNA back into gapped DNA to replicate. So we know all roads lead to mRNA. Let&apos;s trace how these viruses actually get inside a host cell...
                     </p>
                   </div>
                 </div>
