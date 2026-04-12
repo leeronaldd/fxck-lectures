@@ -187,33 +187,55 @@ export default function AppSidebar() {
                 }}
               >
                 {renaming === session.id ? (
-                  <form
-                    className="flex-1 px-3 py-2 min-w-0"
-                    onSubmit={async (e) => {
-                      e.preventDefault();
-                      const input = e.currentTarget.querySelector("input");
-                      const val = input?.value.trim() || "";
-                      if (val && val !== session.name) {
-                        const { renameSession: apiRename } = await import("@/lib/api");
-                        await apiRename(session.id, val);
-                        useAppStore.getState().loadSessions();
-                      }
-                      setRenaming(null);
-                    }}
-                  >
-                    <input
-                      autoFocus
-                      defaultValue={session.name}
-                      onBlur={() => setRenaming(null)}
-                      onKeyDown={(e) => { if (e.key === "Escape") setRenaming(null); }}
-                      className="w-full text-sm px-2 py-1 rounded-lg outline-none"
+                  <div className="flex-1 px-3 py-2 min-w-0">
+                    <p
+                      ref={(el) => {
+                        if (el && !el.dataset.focused) {
+                          el.dataset.focused = "1";
+                          // Select all text on first focus
+                          requestAnimationFrame(() => {
+                            el.focus();
+                            const range = document.createRange();
+                            range.selectNodeContents(el);
+                            const sel = window.getSelection();
+                            sel?.removeAllRanges();
+                            sel?.addRange(range);
+                          });
+                        }
+                      }}
+                      contentEditable
+                      suppressContentEditableWarning
+                      onBlur={async (e) => {
+                        const val = e.currentTarget.textContent?.trim() || "";
+                        if (val && val !== session.name) {
+                          // Optimistic: update sidebar text immediately
+                          const { renameSession: apiRename } = await import("@/lib/api");
+                          await apiRename(session.id, val);
+                          useAppStore.getState().loadSessions();
+                        }
+                        setRenaming(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          e.currentTarget.blur(); // triggers onBlur → save
+                        } else if (e.key === "Escape") {
+                          e.currentTarget.textContent = session.name;
+                          setRenaming(null);
+                        }
+                      }}
+                      className="text-sm truncate outline-none px-2 py-1 rounded-lg"
                       style={{
                         background: "var(--bg-base)",
                         border: "1px solid var(--accent)",
                         color: "var(--text-primary)",
+                        cursor: "text",
+                        minHeight: "1.5em",
                       }}
-                    />
-                  </form>
+                    >
+                      {session.name}
+                    </p>
+                  </div>
                 ) : (
                   <button
                     onClick={async () => {
