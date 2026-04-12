@@ -149,6 +149,21 @@ function getActiveRun(state: AppState): PipelineRun | null {
 
 const EMPTY_STAGES = TEXT_STAGES.map((s) => ({ ...s }));
 
+/** Derive legacy pipeline fields from active run — call after any pipelineRuns update */
+function syncLegacyFields(runs: Record<string, PipelineRun>, activeId: string | null) {
+  const run = activeId ? runs[activeId] : null;
+  return {
+    stages: run?.stages || EMPTY_STAGES,
+    currentStageIndex: run?.currentStageIndex ?? -1,
+    subProgress: run?.subProgress ?? 0,
+    isProcessing: run?.isProcessing ?? false,
+    isDone: run?.isDone ?? false,
+    pipelineError: run?.error ?? null,
+    uploadProgress: run?.uploadProgress ?? 0,
+    isUploading: run?.isUploading ?? false,
+  };
+}
+
 export const useAppStore = create<AppState>((set, get) => {
   if (typeof window !== "undefined") {
     (window as unknown as Record<string, unknown>).__store = { getState: () => get(), setState: set };
@@ -213,15 +228,15 @@ export const useAppStore = create<AppState>((set, get) => {
   pipelineRuns: {},
   activePipelineId: null,
 
-  // Legacy computed accessors — read from active run
-  get stages() { const run = getActiveRun(get()); return run?.stages || EMPTY_STAGES; },
-  get currentStageIndex() { const run = getActiveRun(get()); return run?.currentStageIndex ?? -1; },
-  get subProgress() { const run = getActiveRun(get()); return run?.subProgress ?? 0; },
-  get isProcessing() { const run = getActiveRun(get()); return run?.isProcessing ?? false; },
-  get isDone() { const run = getActiveRun(get()); return run?.isDone ?? false; },
-  get pipelineError() { const run = getActiveRun(get()); return run?.error ?? null; },
-  get uploadProgress() { const run = getActiveRun(get()); return run?.uploadProgress ?? 0; },
-  get isUploading() { const run = getActiveRun(get()); return run?.isUploading ?? false; },
+  // Legacy pipeline fields — derived from active run on each state update
+  stages: EMPTY_STAGES,
+  currentStageIndex: -1,
+  subProgress: 0,
+  isProcessing: false,
+  isDone: false,
+  pipelineError: null,
+  uploadProgress: 0,
+  isUploading: false,
 
   startPipeline: () => {
     const file = get().transcriptFile || get().videoFile;
@@ -428,3 +443,22 @@ export const useAppStore = create<AppState>((set, get) => {
     });
   },
 })});
+
+// Auto-sync legacy pipeline fields whenever pipelineRuns or activePipelineId changes
+useAppStore.subscribe((state, prev) => {
+  if (state.pipelineRuns !== prev.pipelineRuns || state.activePipelineId !== prev.activePipelineId) {
+    const legacy = syncLegacyFields(state.pipelineRuns, state.activePipelineId);
+    // Only update if values actually changed to avoid infinite loop
+    if (
+      state.isProcessing !== legacy.isProcessing ||
+      state.isDone !== legacy.isDone ||
+      state.currentStageIndex !== legacy.currentStageIndex ||
+      state.subProgress !== legacy.subProgress ||
+      state.pipelineError !== legacy.pipelineError ||
+      state.isUploading !== legacy.isUploading ||
+      state.uploadProgress !== legacy.uploadProgress
+    ) {
+      useAppStore.setState(legacy);
+    }
+  }
+});
