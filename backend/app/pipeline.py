@@ -68,8 +68,8 @@ def run_pipeline(
         job_id = input_file.stem
         video_extensions = {".mp4", ".mkv", ".avi", ".mov", ".webm"}
         audio_extensions = {".mp3", ".m4a", ".wav", ".ogg", ".flac", ".aac"}
-        is_video = input_file.suffix in video_extensions
-        is_audio = input_file.suffix in audio_extensions
+        is_video = input_file.suffix.lower() in video_extensions
+        is_audio = input_file.suffix.lower() in audio_extensions
 
         # ── Stage 0 (conditional): Transcribe video/audio ──
         if is_video or is_audio:
@@ -85,7 +85,7 @@ def run_pipeline(
             yield {"status": "running", "stage": "Transcribing lecture", "progress": 10,
                    "result": f"{word_count:,} words transcribed"}
             _check_cancelled(cancel_event)
-        elif input_file.suffix == ".txt":
+        elif input_file.suffix.lower() == ".txt":
             text = input_file.read_text(encoding="utf-8")
         else:
             yield {"status": "error", "stage": "Reading file", "progress": 5,
