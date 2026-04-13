@@ -44,6 +44,7 @@ export interface Session {
 export interface PipelineRun {
   sessionName: string;
   fileId: string;
+  sessionId?: string;          // Supabase session ID linked to this run
   stages: PipelineStage[];
   currentStageIndex: number;
   subProgress: number;
@@ -300,6 +301,7 @@ export const useAppStore = create<AppState>((set, get) => {
     const run: PipelineRun = {
       sessionName,
       fileId: tempId,
+      sessionId: currentSessionId || undefined,
       stages,
       currentStageIndex: -1,
       subProgress: 0,

@@ -1,14 +1,15 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
 import { useAppStore } from "@/lib/store";
 import { createClient } from "@/lib/supabase";
 
 export default function AppSidebar() {
   const router = useRouter();
-  const { user, sessions, activeSessionId, sidebarOpen, settings, updateSettings, loadSession, deleteSession, createNewSession, pipelineRuns } = useAppStore();
+  const pathname = usePathname();
+  const { user, sessions, activeSessionId, sidebarOpen, settings, updateSettings, loadSession, deleteSession, createNewSession, pipelineRuns, activePipelineId } = useAppStore();
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
@@ -117,7 +118,9 @@ export default function AppSidebar() {
               </p>
               {Object.entries(pipelineRuns)
                 .filter(([, r]) => r.isProcessing)
-                .map(([id, run]) => (
+                .map(([id, run]) => {
+                  const isActivePipeline = id === activePipelineId && pathname === "/upload";
+                  return (
                   <button
                     key={id}
                     onClick={() => {
@@ -125,8 +128,12 @@ export default function AppSidebar() {
                       router.push("/upload");
                     }}
                     className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl mb-0.5 transition-all text-left"
-                    onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-elevated)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                    style={{
+                      background: isActivePipeline ? "var(--accent-dim)" : "transparent",
+                      borderLeft: isActivePipeline ? "2px solid var(--accent)" : "2px solid transparent",
+                    }}
+                    onMouseEnter={(e) => { if (!isActivePipeline) e.currentTarget.style.background = "var(--bg-elevated)"; }}
+                    onMouseLeave={(e) => { if (!isActivePipeline) e.currentTarget.style.background = "transparent"; }}
                   >
                     {/* Spinner */}
                     <svg
@@ -147,7 +154,8 @@ export default function AppSidebar() {
                       </p>
                     </div>
                   </button>
-                ))}
+                  );
+                })}
             </>
           )}
 

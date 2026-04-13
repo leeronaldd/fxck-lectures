@@ -26,13 +26,16 @@ export default function ReaderPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-poll when session exists but content isn't ready yet (e.g. after page reload mid-processing)
-  // useRef guards against stale closure: if user navigates to a different session, the old interval
-  // won't call loadSession with a stale id and overwrite the new session's content
+  // Auto-poll only when we have an active pipeline run for this session and are waiting for content
   const pollingSessionId = useRef<string | null>(null);
   useEffect(() => {
     if (store.markdown || !store.activeSessionId) return;
     const id = store.activeSessionId;
+    // Only poll if there's a live pipeline run tracking this session
+    const hasActivePipeline = Object.values(store.pipelineRuns).some(
+      (r) => r.isProcessing && r.sessionId === id
+    );
+    if (!hasActivePipeline) return;
     pollingSessionId.current = id;
     const interval = setInterval(() => {
       if (pollingSessionId.current === id) store.loadSession(id);
@@ -42,7 +45,7 @@ export default function ReaderPage() {
       pollingSessionId.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store.markdown, store.activeSessionId]);
+  }, [store.markdown, store.activeSessionId, store.pipelineRuns]);
 
   // Load data — detect V2 JSON vs legacy markdown
   useEffect(() => {
@@ -119,9 +122,14 @@ export default function ReaderPage() {
     );
   }
 
-  // Empty state — check if there's an active session (might still be processing)
+  // Empty state — only show "still processing" when we have an active pipeline run for this session
   if (!store.markdown) {
-    const hasActiveSession = !!store.activeSessionId;
+    // Find an active pipeline run for the current session (tracked this tab, not lost on refresh)
+    const activePipelineRun = Object.values(store.pipelineRuns).find(
+      (r) => r.isProcessing && r.sessionId === store.activeSessionId
+    );
+    const isActivelyProcessing = !!activePipelineRun;
+
     return (
       <div className="flex-1 flex items-center justify-center px-4 py-24">
         <div className="text-center max-w-md">
@@ -129,7 +137,7 @@ export default function ReaderPage() {
             className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6"
             style={{ background: "var(--accent-dim)", color: "var(--accent)" }}
           >
-            {hasActiveSession ? (
+            {isActivelyProcessing ? (
               <div
                 className="w-7 h-7 rounded-full border-2 border-t-transparent animate-spin"
                 style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }}
@@ -142,24 +150,40 @@ export default function ReaderPage() {
             )}
           </div>
           <h2 className="text-xl font-bold mb-2" style={{ color: "var(--text-primary)" }}>
-            {hasActiveSession ? "Still processing..." : "No lecture loaded"}
+            {isActivelyProcessing ? "Processing in background..." : "No lecture loaded"}
           </h2>
           <p className="text-sm mb-6" style={{ color: "var(--text-secondary)" }}>
-            {hasActiveSession
-              ? "This lecture is still being generated. It'll appear here automatically when ready."
+            {isActivelyProcessing
+              ? "Your lecture is being generated. View the progress or wait here — it'll appear automatically when ready."
               : "Upload a lecture recording or transcript to get started."}
           </p>
-          <button
-            onClick={() => hasActiveSession ? window.location.reload() : router.push("/upload")}
-            className="btn-glow px-6 py-3 rounded-xl text-sm font-semibold"
-            style={{
-              background: "linear-gradient(135deg, var(--accent), #FF8555)",
-              color: "#fff",
-              boxShadow: "0 8px 32px var(--accent-glow)",
-            }}
-          >
-            {hasActiveSession ? "Refresh" : "Upload a Lecture"}
-          </button>
+          {isActivelyProcessing ? (
+            <div className="flex items-center justify-center gap-3">
+              <button
+                onClick={() => router.push("/upload")}
+                className="btn-glow px-6 py-3 rounded-xl text-sm font-semibold"
+                style={{
+                  background: "linear-gradient(135deg, var(--accent), #FF8555)",
+                  color: "#fff",
+                  boxShadow: "0 8px 32px var(--accent-glow)",
+                }}
+              >
+                View progress
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => router.push("/upload")}
+              className="btn-glow px-6 py-3 rounded-xl text-sm font-semibold"
+              style={{
+                background: "linear-gradient(135deg, var(--accent), #FF8555)",
+                color: "#fff",
+                boxShadow: "0 8px 32px var(--accent-glow)",
+              }}
+            >
+              Upload a Lecture
+            </button>
+          )}
         </div>
       </div>
     );
