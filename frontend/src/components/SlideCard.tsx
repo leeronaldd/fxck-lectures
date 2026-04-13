@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import type { SlideCard } from "@/lib/types";
 
 /** Render inline markdown (bold, italic) to HTML */
@@ -13,6 +13,14 @@ function inlineMarkdown(text: string): string {
 
 function SlideImage({ src, alt, onClick }: { src: string; alt: string; onClick: () => void }) {
   const [status, setStatus] = useState<"loading" | "loaded" | "error">("loading");
+  const imgRef = React.useRef<HTMLImageElement>(null);
+
+  // Handle case where image loads before React hydration attaches onLoad
+  React.useEffect(() => {
+    if (imgRef.current?.complete && imgRef.current.naturalWidth > 0) {
+      setStatus("loaded");
+    }
+  }, [src]);
 
   if (status === "error") {
     return (
@@ -43,6 +51,7 @@ function SlideImage({ src, alt, onClick }: { src: string; alt: string; onClick: 
           </div>
         )}
         <img
+          ref={imgRef}
           src={src}
           alt={alt}
           className="w-full h-auto transition-opacity duration-200"
@@ -63,6 +72,7 @@ const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").rep
  */
 function resolveImageUrl(imageRef: string): string {
   if (imageRef.startsWith("http")) return imageRef;
+  if (imageRef.startsWith("/")) return imageRef;
   if (imageRef.startsWith("screenshots/")) {
     const filename = imageRef.replace("screenshots/", "");
     return `${API_URL}/api/screenshots/${filename}`;

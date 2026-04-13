@@ -1,7 +1,108 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
+import { SlideCardGroup } from "@/components/SlideCard";
+import ImageLightbox from "@/components/ImageLightbox";
+import type { SlideCard, TranscriptSection } from "@/lib/types";
+
+// ── Demo data from V3.1 pipeline ──────────────────────────────────────
+
+interface DemoSection {
+  label: string;
+  slides: SlideCard[];
+  transcript: TranscriptSection;
+}
+
+const DEMO_SECTIONS: DemoSection[] = [
+  {
+    label: "Baltimore Classification",
+    slides: [
+      {
+        slide_id: "3a",
+        title: "The Baltimore Classification System",
+        card_type: "professor_slide",
+        image_ref: "/screenshots/screenshot_005.jpg",
+        bullet_points: [],
+        exam_tip:
+          "All 7 Baltimore classes must produce +sense mRNA. Positive-sense RNA viruses (Class IV) skip straight to translation. Negative-sense (Class V) and retroviruses (Class VI) need extra enzymatic steps first.",
+        ei_percent: 90,
+      },
+      {
+        slide_id: "3b",
+        title: "Animal Virus Families by Baltimore Class",
+        card_type: "professor_slide",
+        image_ref: "/screenshots/screenshot_009.jpg",
+        bullet_points: [],
+        exam_tip:
+          "DNA viruses generally replicate in the host nucleus using host enzymes, while RNA viruses generally replicate in the host cytoplasm using virally encoded RNA-dependent RNA polymerases.",
+        ei_percent: 90,
+      },
+    ],
+    transcript: {
+      slide_number: 3,
+      title: "Baltimore Classification System",
+      narrative: `Remember the viral structures we covered earlier\u2014the capsid and the lipid envelope. Those structures protect the viral payload. But what exactly is that payload, and how does it hijack the host cell?
+
+Viruses do not have their own ribosomes. To manufacture their proteins, they must use the host cell\u2019s machinery. The host ribosome only reads one language: messenger RNA (mRNA). Therefore, no matter what genetic material a virus carries inside its capsid, it must find a way to produce mRNA.
+
+This \u201Call roads lead to mRNA\u201D principle is the foundation of the **Baltimore Classification System**. It categorizes viruses into seven distinct classes based on two features: the type of nucleic acid genome they carry, and the specific pathway they use to generate that functional mRNA.
+
+Look at the diagram on the slide. Notice how the arrows from all seven classes converge on that central, golden strand labeled \u201CmRNA (+)\u201D. That is the mandatory destination for every virus.
+
+A positive-sense (+) RNA genome is oriented in the 5\u2019 to 3\u2019 direction, making it physically identical to host mRNA. This means the moment it enters the host cell, the host ribosomes can attach and start translating it directly into viral proteins.
+
+Now look at Class V, the negative-sense (-) ssRNA viruses, which includes the Influenza virus. A negative-sense strand runs in the 3\u2019 to 5\u2019 direction. It is the mirror image to mRNA. A host ribosome cannot read it. Therefore, an Influenza virus must physically carry its own viral enzyme\u2014an **RNA-dependent RNA polymerase**\u2014inside its virion to transcribe that negative strand into a readable positive-sense mRNA.
+
+Both Class IV and Class VI carry a positive-sense ssRNA genome, but use completely different pathways. Class IV, like Poliovirus, uses its +ssRNA directly as mRNA. Class VI, which includes HIV, is a **retrovirus**. Instead of using its +ssRNA directly, it uses **reverse transcriptase** to convert its RNA into a double-stranded DNA intermediate that physically integrates into the host cell\u2019s own chromosome.
+
+The genome dictates the pathway, and the pathway dictates which specific enzymes the virus must bring with it.`,
+      ei_percent: 90,
+      ei_reasoning: "The Baltimore classification system and the distinction between positive/negative sense RNA are fundamental virology concepts universally tested in medical microbiology curricula.",
+    },
+  },
+  {
+    label: "Bacteriophage Structure",
+    slides: [
+      {
+        slide_id: "4a",
+        title: "Bacteriophage Anatomy",
+        card_type: "professor_slide",
+        image_ref: "/screenshots/screenshot_006.jpg",
+        bullet_points: [],
+        exam_tip:
+          "The protein capsid never enters the bacterial cell. It remains outside as an empty \u201Cghost\u201D once the DNA is injected through the contractile sheath.",
+        ei_percent: 70,
+      },
+      {
+        slide_id: "4b",
+        title: "Receptor Specificity and Genome Entry",
+        card_type: "professor_slide",
+        image_ref: "/screenshots/screenshot_007.jpg",
+        bullet_points: [],
+        exam_tip:
+          "Different phages bind different bacterial surface structures (flagellum, pilus, outer membrane proteins). Receptor specificity determines host range.",
+        ei_percent: 70,
+      },
+    ],
+    transcript: {
+      slide_number: 4,
+      title: "Bacteriophage Anatomy and Infection",
+      narrative: `We\u2019ve previously discussed how viruses are classified by their genomes, but how do they actually get that genetic material inside a host? To understand this, we look at **Bacteriophages**\u2014viruses that specifically infect **Prokaryotes**.
+
+Looking at Slide 4a, notice the complex, almost robotic structure of the T4 phage. It consists of an icosahedral **capsid** (head) containing the DNA, attached to a contractile **sheath**. At the base, you\u2019ll see the **tail fibers**. Think of these fibers as landing gear; they recognize and bind to specific receptors on the bacterial surface.
+
+Once anchored, the real magic happens. The helical sheath contracts\u2014powered by ATP\u2014driving the internal hollow core through the bacterial cell wall like a hypodermic needle. This process, known as **Genome Entry**, is purely mechanical.
+
+On Slide 4b, you can see this receptor specificity in action. Different phages bind to completely different bacterial surface structures\u2014the flagellum, the pilus, outer membrane proteins, even the LPS layer.
+
+A critical distinction for your exams: the protein capsid never enters the cell. It remains outside as an empty \u201Cghost\u201D once the DNA is injected. The virus has now successfully hijacked the host\u2019s machinery, leading us directly into the two pathways it can take: the lytic or lysogenic cycles.`,
+      ei_percent: 70,
+      ei_reasoning: "Bacteriophage structure and the unique injection mechanism are high-yield topics in microbiology.",
+    },
+  },
+];
 
 const FEATURES = [
   {
@@ -52,6 +153,9 @@ export default function LandingPage() {
   const router = useRouter();
   const { user } = useAppStore();
   const isLoggedIn = user.isLoggedIn;
+  const [activeSection, setActiveSection] = useState(0);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const demo = DEMO_SECTIONS[activeSection];
 
   return (
     <div className="flex-1 relative overflow-hidden">
@@ -110,20 +214,35 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ───── V2 App Demo — Two-Panel Layout ───── */}
+        {/* ───── App Demo — Two-Panel Layout ───── */}
         <section className="pb-20">
+          {lightboxSrc && (
+            <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
+          )}
+
           <div className="rounded-xl overflow-hidden shadow-2xl" style={{ border: "1px solid var(--border)", background: "var(--bg-elevated)" }}>
-            {/* Browser chrome */}
+            {/* Browser chrome + section tabs */}
             <div className="flex items-center gap-2 px-4 py-2.5" style={{ borderBottom: "1px solid var(--border)" }}>
               <div className="flex gap-1.5">
                 <div className="w-3 h-3 rounded-full" style={{ background: "#ff5f57" }} />
                 <div className="w-3 h-3 rounded-full" style={{ background: "#febc2e" }} />
                 <div className="w-3 h-3 rounded-full" style={{ background: "#28c840" }} />
               </div>
-              <div className="flex-1 mx-4">
-                <div className="text-xs px-3 py-1 rounded-md text-center" style={{ background: "var(--bg-base)", color: "var(--text-muted)" }}>
-                  fxck-lectures.vercel.app/reader
-                </div>
+              <div className="flex-1 mx-4 flex items-center justify-center gap-2">
+                {DEMO_SECTIONS.map((s, i) => (
+                  <button
+                    key={s.label}
+                    onClick={() => setActiveSection(i)}
+                    className="text-xs px-3 py-1 rounded-md transition-all"
+                    style={{
+                      background: i === activeSection ? "var(--accent-dim)" : "var(--bg-base)",
+                      color: i === activeSection ? "var(--accent)" : "var(--text-muted)",
+                      border: `1px solid ${i === activeSection ? "rgba(255,107,53,0.3)" : "transparent"}`,
+                    }}
+                  >
+                    {s.label}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -131,82 +250,29 @@ export default function LandingPage() {
             <div className="flex" style={{ background: "var(--bg-base)", height: 520 }}>
               {/* Left: Slide Card */}
               <div className="hidden sm:flex flex-col w-[45%] shrink-0 p-4 overflow-y-auto" style={{ borderRight: "1px solid var(--border)" }}>
-                <div className="demo-reveal demo-reveal-1 rounded-xl overflow-hidden border" style={{ background: "var(--bg-surface)", borderColor: "var(--border)" }}>
-                  {/* Card header */}
-                  <div className="px-4 py-2.5 flex items-center justify-between border-b" style={{ borderColor: "var(--border)" }}>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono font-bold px-1.5 py-0.5 rounded-md" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>1a</span>
-                      <span className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>The Baltimore Classification System</span>
-                    </div>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "rgba(255,176,32,0.15)", color: "var(--ci-high)" }}>EI 90%</span>
-                  </div>
-                  {/* Slide image */}
-                  <div className="p-2.5">
-                    <div className="rounded-lg overflow-hidden bg-white">
-                      <img src="/screenshots/screenshot_005.jpg" alt="Baltimore Classification System" className="w-full h-auto" />
-                    </div>
-                  </div>
-                  {/* Exam tip */}
-                  <div className="px-4 py-2.5 text-[11px] border-t" style={{ borderColor: "var(--border)", background: "var(--exam-bg)", color: "var(--ci-high)" }}>
-                    <span className="font-semibold">Exam tip:</span> All 7 Baltimore classes must produce +sense mRNA. Positive-sense RNA viruses (Class IV) skip straight to translation. Negative-sense (Class V) and retroviruses (Class VI) need extra enzymatic steps first.
-                  </div>
-                </div>
-
-                {/* Sub-slide indicators */}
-                <div className="demo-reveal demo-reveal-2 flex items-center justify-center gap-2 py-3">
-                  <span className="text-[10px] px-2 py-1 rounded-full border font-mono" style={{ background: "var(--accent-dim)", color: "var(--accent)", borderColor: "var(--accent)" }}>1a</span>
-                  <span className="text-[10px] px-2 py-1 rounded-full border font-mono" style={{ color: "var(--text-muted)", borderColor: "var(--border)" }}>1b</span>
-                </div>
+                <SlideCardGroup cards={demo.slides} onImageClick={setLightboxSrc} />
               </div>
 
               {/* Right: Transcript */}
               <div className="flex-1 overflow-y-auto relative">
-                <div className="demo-scroll-content px-5 sm:px-8 py-5">
-                  <div className="demo-reveal demo-reveal-1">
-                    <h2 className="text-lg font-bold mb-4" style={{ color: "var(--text-primary)" }}>Baltimore Classification System</h2>
-                  </div>
-
-                  <div className="demo-reveal demo-reveal-2">
-                    <p className="text-[13px] mb-4 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                      We&apos;ve established how viruses are categorized by their physical structures, like the capsids and stolen envelopes we covered in Section 1. But if you&apos;re a virus, looking pretty doesn&apos;t replicate your genome. How do you actually hijack a cell? To understand how viruses function, we have to look at their genetic architecture.
-                    </p>
-                  </div>
-
-                  <div className="demo-reveal demo-reveal-3">
-                    <p className="text-[13px] mb-4 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                      Nucleic acids have a physical direction. One end exposes the fifth carbon&mdash;the <strong style={{ color: "var(--accent)" }}>5&apos; end</strong>. The opposite end exposes the third carbon&mdash;the <strong style={{ color: "var(--accent)" }}>3&apos; end</strong>. We call the 5&apos; to 3&apos; strand the <strong style={{ color: "var(--accent)" }}>positive sense</strong> strand. It &ldquo;makes sense&rdquo; to the host cell&mdash;it reads exactly like the host&apos;s own messenger RNA. The opposite strand is the <strong style={{ color: "var(--accent)" }}>negative sense</strong> strand. Think of it like a photographic negative.
-                    </p>
-                  </div>
-
-                  <div className="demo-reveal demo-reveal-4">
-                    <p className="text-[13px] mb-4 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                      This brings us to the central problem every virus faces. To survive, it must force the host cell to build viral <strong style={{ color: "var(--accent)" }}>proteins</strong>. But ribosomes only read one language: positive-sense mRNA. Every single virus must eventually produce a positive-sense mRNA intermediate.
-                    </p>
-                  </div>
-
-                  <div className="demo-reveal demo-reveal-5">
-                    <p className="text-[13px] mb-4 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                      Look at the diagram on the slide. This is the <strong style={{ color: "var(--accent)" }}>Baltimore classification system</strong>. Notice how all seven pathways converge on that same central box: mRNA. It categorizes all viruses into 7 groups based on their nucleic acid type, their strandedness, and the specific pathway they use to reach that mRNA step.
-                    </p>
-                  </div>
-
-                  <div className="demo-reveal demo-reveal-6">
-                    <p className="text-[13px] mb-4 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                      <strong style={{ color: "var(--accent)" }}>Class I</strong> (dsDNA) uses host RNA polymerase directly. <strong style={{ color: "var(--accent)" }}>Class II</strong> (ssDNA) must first build a complementary strand. <strong style={{ color: "var(--accent)" }}>Class IV</strong> (+ssRNA) is the most direct&mdash;the genome itself functions as mRNA, and ribosomes begin translation immediately.
-                    </p>
-                  </div>
-
-                  <div className="demo-reveal demo-reveal-7">
-                    <p className="text-[13px] mb-3 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                      <strong style={{ color: "var(--accent)" }}>Class V</strong> (&minus;ssRNA), like <em>influenza</em>, must first transcribe its negative-sense genome into positive-sense mRNA. <strong style={{ color: "var(--accent)" }}>Class VI</strong> retroviruses deploy <strong style={{ color: "var(--accent)" }}>reverse transcriptase</strong> to convert RNA backwards into DNA that integrates into the host genome. HIV is the classic example.
-                    </p>
-                  </div>
-
-                  <div className="demo-reveal demo-reveal-8">
-                    <p className="text-[13px] mb-3 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                      <strong style={{ color: "var(--accent)" }}>Class VII</strong> (hepadnaviruses, like Hepatitis B) contains gapped DNA. The host repairs the gap, transcribes mRNA normally, but then reverse-transcribes that mRNA back into gapped DNA to replicate. So we know all roads lead to mRNA. Let&apos;s trace how these viruses actually get inside a host cell...
-                    </p>
-                  </div>
+                <div className="px-5 sm:px-8 py-5">
+                  <h2 className="text-lg font-bold mb-4" style={{ color: "var(--text-primary)" }}>
+                    {demo.transcript.title}
+                  </h2>
+                  {demo.transcript.narrative.split("\n\n").map((para, i) => {
+                    const html = para
+                      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+                      .replace(/\*\*([\s\S]+?)\*\*/g, '<strong style="color: var(--accent)">$1</strong>')
+                      .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, "<em>$1</em>");
+                    return (
+                      <p
+                        key={i}
+                        className="text-[13px] mb-4 leading-relaxed"
+                        style={{ color: "var(--text-secondary)" }}
+                        dangerouslySetInnerHTML={{ __html: html }}
+                      />
+                    );
+                  })}
                 </div>
 
                 {/* Fade overlays */}

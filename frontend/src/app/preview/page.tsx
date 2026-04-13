@@ -6,64 +6,97 @@ import NarrativeSection from "@/components/NarrativeSection";
 import ImageLightbox from "@/components/ImageLightbox";
 import type { SlideCard, TranscriptSection } from "@/lib/types";
 
-// ── Test data from V2 pipeline (Baltimore Classification — all 7 classes) ────
-const TEST_SLIDES: SlideCard[] = [
+// ── V3.1 pipeline output (Lecture 2 — Virology) ────────────────────────
+
+interface PreviewSection {
+  slides: SlideCard[];
+  transcript: TranscriptSection;
+}
+
+const SECTIONS: PreviewSection[] = [
   {
-    slide_id: "1a",
-    title: "The Baltimore Classification System",
-    card_type: "professor_slide",
-    image_ref: "screenshots/screenshot_005.jpg",
-    bullet_points: [],
-    exam_tip:
-      "Positive-sense (+ssRNA) viruses can be translated directly by host ribosomes, whereas negative-sense (\u2212ssRNA) viruses must carry RNA-dependent RNA polymerase in their virion to synthesize a readable positive strand first.",
-    ei_percent: 90,
+    slides: [
+      {
+        slide_id: "3a",
+        title: "The Baltimore Classification System",
+        card_type: "professor_slide",
+        image_ref: "/screenshots/screenshot_005.jpg",
+        bullet_points: [],
+        exam_tip:
+          "All 7 Baltimore classes must produce +sense mRNA. Positive-sense RNA viruses (Class IV) skip straight to translation. Negative-sense (Class V) and retroviruses (Class VI) need extra enzymatic steps first.",
+        ei_percent: 90,
+      },
+      {
+        slide_id: "3b",
+        title: "Animal Virus Families by Baltimore Class",
+        card_type: "professor_slide",
+        image_ref: "/screenshots/screenshot_009.jpg",
+        bullet_points: [],
+        exam_tip:
+          "DNA viruses generally replicate in the host nucleus using host enzymes, while RNA viruses generally replicate in the host cytoplasm using virally encoded RNA-dependent RNA polymerases.",
+        ei_percent: 90,
+      },
+    ],
+    transcript: {
+      slide_number: 3,
+      title: "Baltimore Classification System",
+      narrative: `Remember the viral structures we covered earlier\u2014the capsid and the lipid envelope. Those structures protect the viral payload. But what exactly is that payload, and how does it hijack the host cell?
+
+Viruses do not have their own ribosomes. To manufacture their proteins, they must use the host cell\u2019s machinery. The host ribosome only reads one language: messenger RNA (mRNA). Therefore, no matter what genetic material a virus carries inside its capsid, it must find a way to produce mRNA.
+
+This \u201Call roads lead to mRNA\u201D principle is the foundation of the **Baltimore Classification System**. It categorizes viruses into seven distinct classes based on two features: the type of nucleic acid genome they carry, and the specific pathway they use to generate that functional mRNA.
+
+Look at the diagram on the slide. Notice how the arrows from all seven classes converge on that central, golden strand labeled \u201CmRNA (+)\u201D. That is the mandatory destination for every virus.
+
+A positive-sense (+) RNA genome is oriented in the 5\u2019 to 3\u2019 direction, making it physically identical to host mRNA. This means the moment it enters the host cell, the host ribosomes can attach and start translating it directly into viral proteins.
+
+Now look at Class V, the negative-sense (-) ssRNA viruses, which includes the Influenza virus. A negative-sense strand runs in the 3\u2019 to 5\u2019 direction. It is the mirror image to mRNA. A host ribosome cannot read it. Therefore, an Influenza virus must physically carry its own viral enzyme\u2014an **RNA-dependent RNA polymerase**\u2014inside its virion to transcribe that negative strand into a readable positive-sense mRNA.
+
+Both Class IV and Class VI carry a positive-sense ssRNA genome, but use completely different pathways. Class IV, like Poliovirus, uses its +ssRNA directly as mRNA. Class VI, which includes HIV, is a **retrovirus**. Instead of using its +ssRNA directly, it uses **reverse transcriptase** to convert its RNA into a double-stranded DNA intermediate that physically integrates into the host cell\u2019s own chromosome.
+
+The genome dictates the pathway, and the pathway dictates which specific enzymes the virus must bring with it.`,
+      ei_percent: 90,
+      ei_reasoning: "The Baltimore classification system and the distinction between positive/negative sense RNA are fundamental virology concepts universally tested in medical microbiology curricula.",
+    },
   },
   {
-    slide_id: "1b",
-    title: "Animal Virus Families by Baltimore Class",
-    card_type: "professor_slide",
-    image_ref: "screenshots/screenshot_009.jpg",
-    bullet_points: [],
-    exam_tip:
-      "DNA viruses generally replicate in the host nucleus using host enzymes, while RNA viruses generally replicate in the host cytoplasm using virally encoded RNA-dependent RNA polymerases.",
-    ei_percent: 90,
-  },
-];
+    slides: [
+      {
+        slide_id: "4a",
+        title: "Bacteriophage Anatomy",
+        card_type: "professor_slide",
+        image_ref: "/screenshots/screenshot_006.jpg",
+        bullet_points: [],
+        exam_tip:
+          "The protein capsid never enters the bacterial cell. It remains outside as an empty \u201Cghost\u201D once the DNA is injected through the contractile sheath.",
+        ei_percent: 70,
+      },
+      {
+        slide_id: "4b",
+        title: "Receptor Specificity and Genome Entry",
+        card_type: "professor_slide",
+        image_ref: "/screenshots/screenshot_007.jpg",
+        bullet_points: [],
+        exam_tip:
+          "Different phages bind different bacterial surface structures (flagellum, pilus, outer membrane proteins). Receptor specificity determines host range.",
+        ei_percent: 70,
+      },
+    ],
+    transcript: {
+      slide_number: 4,
+      title: "Bacteriophage Anatomy and Infection",
+      narrative: `We\u2019ve previously discussed how viruses are classified by their genomes, but how do they actually get that genetic material inside a host? To understand this, we look at **Bacteriophages**\u2014viruses that specifically infect **Prokaryotes**.
 
-const TEST_TRANSCRIPT: TranscriptSection[] = [
-  {
-    slide_number: 1,
-    title: "Baltimore Classification System",
-    narrative: `Remember back in Module 1, we established that cellular DNA replicates via semi-conservative replication. The two double-helix strands separate, and each acts as a physical template to synthesize a new complementary strand. Every living cell uses this exact same starting material\u2014double-stranded DNA\u2014to store information, which it then transcribes into messenger RNA to build proteins.
+Looking at Slide 4a, notice the complex, almost robotic structure of the T4 phage. It consists of an icosahedral **capsid** (head) containing the DNA, attached to a contractile **sheath**. At the base, you\u2019ll see the **tail fibers**. Think of these fibers as landing gear; they recognize and bind to specific receptors on the bacterial surface.
 
-Viruses, however, are essentially genetic hijackers. Every virus has one ultimate goal when it enters a host cell: to synthesize viral proteins. But to make proteins, you need messenger RNA. Where does a virus get it?
+Once anchored, the real magic happens. The helical sheath contracts\u2014powered by ATP\u2014driving the internal hollow core through the bacterial cell wall like a hypodermic needle. This process, known as **Genome Entry**, is purely mechanical.
 
-Look at the diagram on the slide. Right in the middle, you see mRNA highlighted in yellow. Notice how every single grey arrow points directly to it. This is the **Baltimore classification system**. It categorizes all viruses based on two physical traits: the structure of their genome, and the specific enzymatic pathway they use to reach that central mRNA step.
+On Slide 4b, you can see this receptor specificity in action. Different phages bind to completely different bacterial surface structures\u2014the flagellum, the pilus, outer membrane proteins, even the LPS layer.
 
-Before we trace those arrows, we need to establish the physical orientation of the genetic material. Look at the text at the top of the slide. A nucleic acid strand has a direction, read from the 5-prime carbon of the ribose sugar to the 3-prime carbon. We call this 5-prime to 3-prime orientation the **positive sense**.
-
-Messenger RNA is always positive sense. It arrives at the host ribosome perfectly formatted and ready to be read. The complementary strand runs in the opposite direction, from 3-prime to 5-prime. We call this the **negative sense**. A negative sense strand cannot be translated by a ribosome; it is a mirror image that must first be transcribed into a positive sense strand.
-
-Your professor glossed over the individual viral classes, but you will consistently see them on board exams. Let\u2019s walk through the main pathways these viruses use to generate mRNA.
-
-Classes I and II start with DNA. Class I viruses possess double-stranded DNA, so they simply enter the host nucleus and use the host\u2019s own DNA-dependent RNA polymerase to transcribe mRNA, exactly like a normal cell. Class II viruses possess single-stranded DNA, so they must first synthesize a complementary DNA strand to form a double-stranded intermediate before transcription can occur.
-
-Classes III, IV, and V start with RNA. This presents a unique mechanical problem: host cells do not possess enzymes that can read an RNA template to build a new RNA strand. Therefore, these viruses must utilize a viral-encoded enzyme called **RNA-dependent RNA polymerase**.
-
-Class IV viruses possess positive-sense single-stranded RNA. Because it is already in the 5-prime to 3-prime orientation, the viral genome acts directly as mRNA the moment it enters the cell. The host ribosomes immediately translate it. Class V viruses possess negative-sense single-stranded RNA. They must physically carry RNA-dependent RNA polymerase inside their viral capsule. Upon entry, this enzyme reads the negative-sense genome and transcribes a positive-sense mRNA strand.
-
-Class VI and VII viruses utilize a completely different mechanism involving **reverse transcriptase**, an enzyme that reads an RNA template to synthesize DNA. Class VI viruses, the retroviruses, enter with a positive-sense RNA genome. Instead of translating it directly, reverse transcriptase converts this RNA into double-stranded DNA, which then physically integrates into the host cell\u2019s own genome. The host\u2019s cellular machinery then unknowingly transcribes viral mRNA for the rest of its life.
-
-When we apply this classification system to animal viruses, we can organize the major viral families by their genome architecture.
-
-Looking at the top half of the diagram, you can see the DNA viruses. Notice that almost all of them, from the adenoviruses to the herpesviruses, group into Baltimore Class I with double-stranded genomes. They rely heavily on the host nucleus for their replication machinery.
-
-Now look at the bottom half of the diagram showing the RNA viruses. The structural diversity here is much wider. You can see the positive-sense single-stranded viruses grouped on the left, including the picornaviruses and coronaviruses. Because their genome functions immediately as mRNA, their replication cycle can occur entirely within the host cytoplasm without ever needing to enter the nucleus.
-
-On the right side of the RNA section, we find the negative-sense single-stranded viruses, including the orthomyxoviruses like influenza. Because they must first transcribe their genome into a positive-sense format, their physical virion structure must be large enough to package and deliver those essential viral polymerases directly into the host cell upon infection.`,
-    ei_percent: 90,
-    ei_reasoning:
-      "Understanding the basis of the Baltimore classification and the replication logic of all seven classes is highly testable across global medical curricula.",
+A critical distinction for your exams: the protein capsid never enters the cell. It remains outside as an empty \u201Cghost\u201D once the DNA is injected. The virus has now successfully hijacked the host\u2019s machinery, leading us directly into the two pathways it can take: the lytic or lysogenic cycles.`,
+      ei_percent: 70,
+      ei_reasoning: "Bacteriophage structure and the unique injection mechanism are high-yield topics in microbiology.",
+    },
   },
 ];
 
@@ -71,6 +104,8 @@ On the right side of the RNA section, we find the negative-sense single-stranded
 export default function PreviewPage() {
   const [isMobile, setIsMobile] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const [activeIdx, setActiveIdx] = useState(0);
+  const section = SECTIONS[activeIdx];
 
   return (
     <div
@@ -91,11 +126,23 @@ export default function PreviewPage() {
       >
         <div className="flex items-center gap-3">
           <span className="text-sm font-bold" style={{ color: "var(--accent)" }}>
-            V2 Preview
+            V3.1 Preview
           </span>
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-            Baltimore Classification System
-          </span>
+          <div className="flex gap-1.5">
+            {SECTIONS.map((s, i) => (
+              <button
+                key={s.transcript.title}
+                onClick={() => setActiveIdx(i)}
+                className="text-xs px-2.5 py-1 rounded-md transition-all"
+                style={{
+                  background: i === activeIdx ? "var(--accent-dim)" : "transparent",
+                  color: i === activeIdx ? "var(--accent)" : "var(--text-muted)",
+                }}
+              >
+                {s.transcript.title}
+              </button>
+            ))}
+          </div>
         </div>
         <button
           onClick={() => setIsMobile(!isMobile)}
@@ -113,16 +160,16 @@ export default function PreviewPage() {
       >
         {isMobile ? (
           <div className="space-y-8">
-            <SlideCardGroup cards={TEST_SLIDES} onImageClick={setLightboxSrc} />
-            <NarrativeSection section={TEST_TRANSCRIPT[0]} />
+            <SlideCardGroup cards={section.slides} onImageClick={setLightboxSrc} />
+            <NarrativeSection section={section.transcript} />
           </div>
         ) : (
           <div className="grid gap-8" style={{ gridTemplateColumns: "1fr 1fr" }}>
             <div className="space-y-4 sticky top-16 self-start">
-              <SlideCardGroup cards={TEST_SLIDES} onImageClick={setLightboxSrc} />
+              <SlideCardGroup cards={section.slides} onImageClick={setLightboxSrc} />
             </div>
             <div className="pl-8 border-l" style={{ borderColor: "var(--border)" }}>
-              <NarrativeSection section={TEST_TRANSCRIPT[0]} />
+              <NarrativeSection section={section.transcript} />
             </div>
           </div>
         )}
