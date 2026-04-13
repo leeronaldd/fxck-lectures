@@ -14,8 +14,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the pipeline source code (src/) and backend app
 COPY src/ ./src/
 COPY backend/app/ ./app/
-COPY data/ ./data/
 COPY docs/reference/ ./docs/reference/
+
+# Create data directories (actual data is runtime, not baked in)
+RUN mkdir -p data/output/screenshots data/textbook_cache
 
 # Set env vars
 ENV PYTHONUNBUFFERED=1

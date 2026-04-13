@@ -6,8 +6,8 @@ SET SERVICE_NAME=fxck-lectures-api
 SET REGION=australia-southeast1
 SET IMAGE=%REGION%-docker.pkg.dev/%PROJECT_ID%/fxck-lectures-api/backend
 
-echo Building and pushing image...
-call gcloud builds submit --project=%PROJECT_ID% --tag=%IMAGE% --timeout=600s
+echo Building and pushing image (with layer caching)...
+call gcloud builds submit --project=%PROJECT_ID% --tag=%IMAGE% --timeout=600s --gcs-log-dir=gs://fxck-lectures-screenshots/build-logs
 if %ERRORLEVEL% NEQ 0 (
     echo BUILD FAILED
     pause
