@@ -201,8 +201,7 @@ def run_pipeline(
             except Exception as e:
                 print(f"  PDF slide extraction failed (non-fatal): {e}")
 
-        # ── Stage 3: Generation ──
-        # V3.1 (slide-driven) when screenshots available, V2 (transcript-driven) as fallback
+        # ── Stage 3: V3.1 Generation (all formats) ──
         _check_cancelled(cancel_event)
 
         # Derive subject hint from user profile if available
@@ -212,48 +211,26 @@ def run_pipeline(
             if program:
                 subject = program
 
-        textbook_images = {}  # Only used by V2 fallback
+        yield {"status": "running", "stage": "Planning lecture structure", "progress": 24}
 
-        if screenshots_json:
-            # ── V3.1: Slide-driven multi-agent pipeline ──
-            yield {"status": "running", "stage": "Planning lecture structure", "progress": 20}
+        from src.generator_v3 import generate_lecture_v3
+        from src.generator_v2 import assemble_api_response
 
-            from src.generator_v3 import generate_lecture_v3
-            from src.generator_v2 import assemble_api_response
+        # Save transcript to temp file for V3 (it takes a path, not text)
+        transcript_path = output_dir / f"{job_id}_transcript.txt"
+        if not transcript_path.exists():
+            transcript_path.write_text(text, encoding="utf-8")
 
-            # Save transcript to temp file for V3 (it takes a path, not text)
-            transcript_path = output_dir / f"{job_id}_transcript.txt"
-            if not transcript_path.exists():
-                transcript_path.write_text(text, encoding="utf-8")
+        _check_cancelled(cancel_event)
+        yield {"status": "running", "stage": "Generating lecture", "progress": 30}
 
-            _check_cancelled(cancel_event)
-            yield {"status": "running", "stage": "Generating lecture", "progress": 30}
-
-            sections, groups = generate_lecture_v3(
-                screenshots_json=screenshots_json,
-                transcript_path=str(transcript_path),
-                subject=subject,
-                parallel=True,
-                job_id=job_id,
-            )
-        else:
-            # ── V2 fallback: transcript-driven (no screenshots) ──
-            yield {"status": "running", "stage": "Preparing teaching context", "progress": 20}
-
-            from src.generator_v2 import generate_lecture, assemble_api_response
-
-            _check_cancelled(cancel_event)
-            yield {"status": "running", "stage": "Generating lecture", "progress": 30}
-
-            result = generate_lecture(
-                chunks=chunks_dicts,
-                lecture_slides_path=slides_path,
-                screenshots_json=screenshots_json,
-                subject=subject,
-                parallel=True,
-                job_id=job_id,
-            )
-            sections, textbook_images = result
+        sections, groups = generate_lecture_v3(
+            screenshots_json=screenshots_json,  # None for transcript-only
+            transcript_path=str(transcript_path),
+            subject=subject,
+            parallel=True,
+            job_id=job_id,
+        )
 
         if not sections:
             yield {"status": "error", "stage": "Generating lecture", "progress": 30,
@@ -295,33 +272,6 @@ def run_pipeline(
                     print(f"  Replaced {replaced} screenshot refs with GCS URLs")
             except Exception as e:
                 print(f"  Warning: GCS URL replacement failed: {e}")
-
-        # Auto-fill diagram cards that have no image with the first available OpenStax figure
-        if textbook_images:
-            filled = 0
-            for slide in api_response.get("slides", []):
-                if slide.get("card_type") == "diagram" and not slide.get("image_ref"):
-                    # Find which chunk this slide belongs to (by slide_id number)
-                    try:
-                        slide_num = int(slide["slide_id"].rstrip("abcdefgh")) - 1
-                    except (ValueError, KeyError):
-                        continue
-                    # Get the chunk index from teaching order
-                    chunk_idx = slide_num  # slide_number is 1-based, maps to teaching_chunks order
-                    images = textbook_images.get(chunk_idx, [])
-                    if not images:
-                        # Try all chunk indices (textbook_images keyed by original chunk index)
-                        for idx, imgs in textbook_images.items():
-                            if imgs:
-                                images = imgs
-                                break
-                    if images:
-                        best = images[0]  # First figure is usually the most relevant
-                        if best.get("gcs_url"):
-                            slide["image_ref"] = best["gcs_url"]
-                            filled += 1
-            if filled:
-                print(f"  Auto-filled {filled} diagram cards with OpenStax figures")
 
         # Serialize as JSON string into the markdown field (no schema migration needed)
         # Frontend detects JSON vs plain markdown and renders accordingly

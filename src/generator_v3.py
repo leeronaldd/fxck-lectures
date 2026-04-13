@@ -126,10 +126,14 @@ def plan_lecture(
     # ═══════════════════════════════════════════════════
     # Agent 1: Slide Grouper (Flash, text-only)
     # ═══════════════════════════════════════════════════
-    print(f"  Agent 1: Grouping {len(non_blank)} slides...")
     t0 = time.time()
 
-    slide_groups_raw = _agent1_group_slides(client, screenshots, non_blank)
+    if non_blank:
+        print(f"  Agent 1: Grouping {len(non_blank)} slides...")
+        slide_groups_raw = _agent1_group_slides(client, screenshots, non_blank)
+    else:
+        print(f"  Agent 1: No slides — skipping (all groups will be transcript-only)")
+        slide_groups_raw = []
 
     # Validate: every non-blank slide appears exactly once
     covered = set()
@@ -455,7 +459,44 @@ def _agent2_scan_transcript(
     # Transcript — send full text (Flash handles 1M tokens)
     transcript_text = transcript[:80000]
 
-    prompt = f"""\
+    no_slides = len(slide_groups) == 0
+
+    if no_slides:
+        prompt = f"""\
+You're the second agent in a 4-agent lecture-planning pipeline. There are \
+NO lecture slides for this lecture — only a transcript. Your job is to \
+identify EVERY distinct topic the professor covers and create a group for it.
+
+Think of it like chunking the lecture into teachable units. Each topic should \
+be one concept a tutor would cover before moving to the next. Aim for 8-15 \
+groups depending on how many distinct topics exist in the transcript.
+
+A Pro coordinator reads your output next. They need to know every topic so \
+they can decide depth and sequencing. If you miss a topic, the student never \
+learns it. If you merge two different concepts, the writer gets confused.
+
+The transcript is auto-captioned and messy — extract the real scientific \
+vocabulary, not filler. For each topic, list sub-concepts: the distinct \
+mechanisms, classes, steps, or types a student needs to understand individually.
+
+FULL TRANSCRIPT:
+{transcript_text}
+
+Output ONLY valid JSON:
+{{
+  "slide_groups": [],
+  "transcript_only": [
+    {{
+      "title": "Topic Name",
+      "key_terms": ["term1", "term2"],
+      "sub_concepts": ["mechanism A does X", "mechanism B does Y"],
+      "transcript_words": 800,
+      "rationale": "Professor spent ~800 words explaining this concept"
+    }}
+  ]
+}}"""
+    else:
+        prompt = f"""\
 You're the second agent in a 4-agent lecture-planning pipeline. Agent 1 has \
 already grouped the lecture slides by topic (those groups are frozen — you \
 can't change them). Your job is two things:
@@ -1715,11 +1756,16 @@ def generate_lecture_v3(
     model = model or GENERATOR_MODEL
 
     # ── Load inputs ──
-    screenshots_path = Path(screenshots_json)
-    with open(screenshots_path, "r", encoding="utf-8") as f:
-        screenshots = json.load(f)
-    screenshots_dir = screenshots_path.parent / "screenshots"
-    print(f"  [load] {len(screenshots)} slides from {screenshots_path.name}")
+    if screenshots_json:
+        screenshots_path = Path(screenshots_json)
+        with open(screenshots_path, "r", encoding="utf-8") as f:
+            screenshots = json.load(f)
+        screenshots_dir = screenshots_path.parent / "screenshots"
+        print(f"  [load] {len(screenshots)} slides from {screenshots_path.name}")
+    else:
+        screenshots = []
+        screenshots_dir = Path("data/output/screenshots")
+        print(f"  [load] No slides — transcript-only mode")
 
     transcript_path = Path(transcript_path)
     with open(transcript_path, "r", encoding="utf-8") as f:
