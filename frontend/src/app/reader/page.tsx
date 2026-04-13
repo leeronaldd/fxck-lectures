@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
 import { SlideCardGroup } from "@/components/SlideCard";
@@ -27,11 +27,20 @@ export default function ReaderPage() {
   }, []);
 
   // Auto-poll when session exists but content isn't ready yet (e.g. after page reload mid-processing)
+  // useRef guards against stale closure: if user navigates to a different session, the old interval
+  // won't call loadSession with a stale id and overwrite the new session's content
+  const pollingSessionId = useRef<string | null>(null);
   useEffect(() => {
     if (store.markdown || !store.activeSessionId) return;
     const id = store.activeSessionId;
-    const interval = setInterval(() => store.loadSession(id), 15000);
-    return () => clearInterval(interval);
+    pollingSessionId.current = id;
+    const interval = setInterval(() => {
+      if (pollingSessionId.current === id) store.loadSession(id);
+    }, 15000);
+    return () => {
+      clearInterval(interval);
+      pollingSessionId.current = null;
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store.markdown, store.activeSessionId]);
 

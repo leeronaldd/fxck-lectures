@@ -75,9 +75,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <button
             onClick={async () => {
               if (user.isLoggedIn) {
-                useAppStore.getState().reset();
-                const { createNewSession } = useAppStore.getState();
-                await createNewSession();
+                // Don't reset if a pipeline is actively running — just navigate to upload
+                const { pipelineRuns, activePipelineId } = useAppStore.getState();
+                const isRunning = activePipelineId
+                  ? pipelineRuns[activePipelineId]?.isProcessing
+                  : Object.values(pipelineRuns).some((r) => r.isProcessing);
+                if (!isRunning) {
+                  useAppStore.getState().reset();
+                  await useAppStore.getState().createNewSession();
+                }
                 router.push("/upload");
               } else {
                 router.push("/");

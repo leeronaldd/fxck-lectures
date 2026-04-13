@@ -11,13 +11,17 @@ async function getToken(): Promise<string> {
     const { data: { session }, error } = await supabase.auth.getSession();
     if (error) {
       console.error("[Auth] getSession error:", error.message);
-      return "";
+      throw new Error("Your session expired. Please sign in again.");
     }
-    console.log("[Auth] Got token, length:", session?.access_token?.length || 0);
-    return session?.access_token || "";
+    if (!session?.access_token) {
+      throw new Error("Not signed in. Please sign in to continue.");
+    }
+    console.log("[Auth] Got token, length:", session.access_token.length);
+    return session.access_token;
   } catch (e) {
+    if (e instanceof Error && (e.message.includes("sign in") || e.message.includes("session"))) throw e;
     console.error("[Auth] getToken crashed:", e);
-    return "";
+    throw new Error("Authentication error. Please refresh and sign in again.");
   }
 }
 
@@ -38,6 +42,7 @@ export async function uploadFile(
   let lastError: Error | null = null;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
+      if (attempt > 0 && onProgress) onProgress(10); // reset bar on retry
       const token = await getToken();
       console.log(`[Upload] Attempt ${attempt + 1}, file: ${file.name} (${file.size} bytes)`);
 
@@ -212,6 +217,8 @@ export async function deleteSession(sessionId: string): Promise<boolean> {
   return res.ok;
 }
 
+const PIPELINE_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes — pipeline never takes longer
+
 export function runPipeline(
   fileId: string,
   onUpdate: (event: PipelineEvent) => void,
@@ -221,6 +228,16 @@ export function runPipeline(
 ): () => void {
   let cancelled = false;
   const controller = new AbortController();
+  let streamReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+
+  // Hard timeout — if server hangs, don't leave user stuck forever
+  const timeoutId = setTimeout(() => {
+    if (!cancelled) {
+      cancelled = true;
+      controller.abort();
+      onError("Processing timed out after 15 minutes. Please try again.");
+    }
+  }, PIPELINE_TIMEOUT_MS);
 
   (async () => {
     try {
@@ -243,8 +260,8 @@ export function runPipeline(
         return;
       }
 
-      const reader = res.body?.getReader();
-      if (!reader) {
+      streamReader = res.body?.getReader() || null;
+      if (!streamReader) {
         onError("No response body");
         return;
       }
@@ -253,7 +270,7 @@ export function runPipeline(
       let buffer = "";
 
       while (!cancelled) {
-        const { done, value } = await reader.read();
+        const { done, value } = await streamReader.read();
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
@@ -263,14 +280,14 @@ export function runPipeline(
         for (const part of parts) {
           if (part.startsWith("data: ")) {
             const data = JSON.parse(part.slice(6)) as PipelineEvent;
-            onUpdate(data);
+            if (!cancelled) onUpdate(data);
 
             if (data.status === "done") {
-              onDone(data.output);
+              if (!cancelled) onDone(data.output);
               return;
             }
             if (data.status === "error") {
-              onError(data.error || "Pipeline failed");
+              if (!cancelled) onError(data.error || "Pipeline failed");
               return;
             }
           }
@@ -280,11 +297,15 @@ export function runPipeline(
       if (!cancelled && !(e instanceof DOMException && e.name === "AbortError")) {
         onError(e instanceof Error ? e.message : "Connection lost");
       }
+    } finally {
+      clearTimeout(timeoutId);
     }
   })();
 
   return () => {
     cancelled = true;
+    clearTimeout(timeoutId);
+    streamReader?.cancel().catch(() => {});
     controller.abort();
   };
 }

@@ -328,11 +328,15 @@ export const useAppStore = create<AppState>((set, get) => {
           });
         });
 
-        // Upload slides PDF if provided
+        // Upload slides PDF if provided (non-fatal — pipeline runs without slides)
         const slidesFile = get().slidesFile;
         if (slidesFile) {
-          toast.loading("Uploading slides...", { id: `upload-${tempId}` });
-          await uploadSlides(file_id, slidesFile);
+          try {
+            toast.loading("Uploading slides...", { id: `upload-${tempId}` });
+            await uploadSlides(file_id, slidesFile);
+          } catch (err) {
+            console.warn("[Pipeline] Slides upload failed, continuing without slides:", err);
+          }
         }
 
         // Migrate from tempId to real fileId

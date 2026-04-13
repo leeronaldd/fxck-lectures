@@ -118,18 +118,18 @@ export default function PipelineStepper({
               </p>
 
               {/* Sub-progress bar for generation stage */}
-              {stage.status === "running" && stage.hasSubProgress && (
+              {stage.status === "running" && stage.hasSubProgress && subProgress > 0 && (
                 <div className="mt-2">
                   <Progress.Root
                     className="relative overflow-hidden rounded-full w-full h-1.5"
                     style={{ background: "var(--bg-elevated)" }}
-                    value={overallPercent}
+                    value={subProgress}
                   >
                     <Progress.Indicator
                       className="w-full h-full rounded-full transition-transform duration-300 ease-out"
                       style={{
                         background: "var(--accent)",
-                        transform: `translateX(-${100 - overallPercent}%)`,
+                        transform: `translateX(-${100 - subProgress}%)`,
                       }}
                     />
                   </Progress.Root>

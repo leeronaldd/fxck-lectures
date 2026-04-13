@@ -15,6 +15,11 @@ export default function AppSidebar() {
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);
 
+  // Clear delete confirmation when user logs out/in — prevents armed delete carrying over
+  useEffect(() => {
+    setDeleteConfirm(null);
+  }, [user.isLoggedIn]);
+
   // Close account menu on click outside
   useEffect(() => {
     if (!accountMenuOpen) return;
