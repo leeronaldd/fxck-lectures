@@ -1866,11 +1866,6 @@ def generate_lecture_v3(
 
     tb_groups = teaching_groups  # All groups get textbook (merged groups already excluded)
 
-    # Groups with no professor slides need a textbook/diagram image for the visual
-    # Only fetch images for these — skipping the GCS upload chain for the majority
-    # that already have professor slides saves 60-120s on Cloud Run
-    img_groups = [g for g in tb_groups if g.visual_strategy == "openstax_figure"]
-
     def _fetch_tb(g: SlideGroup):
         return g.group_index, fetch_textbook_section(
             topic_name=g.title,
@@ -1887,7 +1882,7 @@ def generate_lecture_v3(
 
     with ThreadPoolExecutor(max_workers=8) as executor:
         tb_futures = {executor.submit(_fetch_tb, g): g.group_index for g in tb_groups}
-        img_futures = {executor.submit(_fetch_imgs, g): g.group_index for g in img_groups}
+        img_futures = {executor.submit(_fetch_imgs, g): g.group_index for g in tb_groups}
 
         for future in as_completed(tb_futures):
             idx, text = future.result()
@@ -1898,9 +1893,8 @@ def generate_lecture_v3(
             textbook_imgs[idx] = imgs
 
     t_tb = time.time() - t0_tb
-    n_imgs = sum(len(v) for v in textbook_imgs.values())
-    print(f"  → {len(textbook_sections)} textbook sections + {n_imgs} images "
-          f"({len(img_groups)} openstax_figure groups) in {t_tb:.1f}s")
+    print(f"  → {len(textbook_sections)} textbooks + "
+          f"{sum(len(v) for v in textbook_imgs.values())} images in {t_tb:.1f}s")
 
     # ══════════════════════════════════════════════════════════════
     # Stage 3: Two-tier generation (no bridges — merged by coordinator)
