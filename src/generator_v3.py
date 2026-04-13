@@ -749,7 +749,7 @@ Every group from the notebook must appear. Start output now:"""
                 # This fixes the depth-flattening issue (e.g. Baltimore at 70%
                 # instead of 95%) observed without thinking.
                 "thinking_config": genai_types.ThinkingConfig(
-                    thinking_level="LOW",
+                    thinking_level="MEDIUM",
                 ),
             },
         )
@@ -1862,9 +1862,14 @@ def generate_lecture_v3(
     t0_tb = time.time()
 
     textbook_sections: dict[int, str] = {}
-    textbook_imgs: dict[int, list[dict]] = {}  # skipped — GCS uploads too slow on Cloud Run
+    textbook_imgs: dict[int, list[dict]] = {}
 
     tb_groups = teaching_groups  # All groups get textbook (merged groups already excluded)
+
+    # Groups with no professor slides need a textbook/diagram image for the visual
+    # Only fetch images for these — skipping the GCS upload chain for the majority
+    # that already have professor slides saves 60-120s on Cloud Run
+    img_groups = [g for g in tb_groups if g.visual_strategy == "openstax_figure"]
 
     def _fetch_tb(g: SlideGroup):
         return g.group_index, fetch_textbook_section(
@@ -1873,14 +1878,29 @@ def generate_lecture_v3(
             subject=subject,
         )
 
+    def _fetch_imgs(g: SlideGroup):
+        return g.group_index, fetch_textbook_images(
+            topic_name=g.title,
+            key_terms=g.key_terms,
+            job_id=job_id,
+        )
+
     with ThreadPoolExecutor(max_workers=8) as executor:
         tb_futures = {executor.submit(_fetch_tb, g): g.group_index for g in tb_groups}
+        img_futures = {executor.submit(_fetch_imgs, g): g.group_index for g in img_groups}
+
         for future in as_completed(tb_futures):
             idx, text = future.result()
             textbook_sections[idx] = text
 
+        for future in as_completed(img_futures):
+            idx, imgs = future.result()
+            textbook_imgs[idx] = imgs
+
     t_tb = time.time() - t0_tb
-    print(f"  → {len(textbook_sections)} textbook sections in {t_tb:.1f}s")
+    n_imgs = sum(len(v) for v in textbook_imgs.values())
+    print(f"  → {len(textbook_sections)} textbook sections + {n_imgs} images "
+          f"({len(img_groups)} openstax_figure groups) in {t_tb:.1f}s")
 
     # ══════════════════════════════════════════════════════════════
     # Stage 3: Two-tier generation (no bridges — merged by coordinator)
