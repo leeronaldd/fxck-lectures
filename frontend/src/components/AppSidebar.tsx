@@ -12,8 +12,6 @@ export default function AppSidebar() {
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-  const [renaming, setRenaming] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState("");
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);
 
@@ -186,67 +184,10 @@ export default function AppSidebar() {
                   if (!isActive) e.currentTarget.style.background = "transparent";
                 }}
               >
-                {renaming === session.id ? (
-                  <div className="flex-1 px-3 py-2 min-w-0">
-                    <p
-                      ref={(el) => {
-                        if (el && !el.dataset.focused) {
-                          el.dataset.focused = "1";
-                          // Select all text on first focus
-                          requestAnimationFrame(() => {
-                            el.focus();
-                            const range = document.createRange();
-                            range.selectNodeContents(el);
-                            const sel = window.getSelection();
-                            sel?.removeAllRanges();
-                            sel?.addRange(range);
-                          });
-                        }
-                      }}
-                      contentEditable
-                      suppressContentEditableWarning
-                      onBlur={async (e) => {
-                        const val = e.currentTarget.textContent?.trim() || "";
-                        console.log("[rename] blur fired, val:", JSON.stringify(val), "old:", JSON.stringify(session.name), "different:", val !== session.name);
-                        if (val && val !== session.name) {
-                          const { renameSession: apiRename } = await import("@/lib/api");
-                          const ok = await apiRename(session.id, val);
-                          console.log("[rename] API response:", ok);
-                          useAppStore.getState().loadSessions();
-                        }
-                        setRenaming(null);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          e.currentTarget.blur(); // triggers onBlur → save
-                        } else if (e.key === "Escape") {
-                          e.currentTarget.textContent = session.name;
-                          setRenaming(null);
-                        }
-                      }}
-                      className="text-sm truncate outline-none px-2 py-1 rounded-lg"
-                      style={{
-                        background: "var(--bg-base)",
-                        border: "1px solid var(--accent)",
-                        color: "var(--text-primary)",
-                        cursor: "text",
-                        minHeight: "1.5em",
-                      }}
-                    >
-                      {session.name}
-                    </p>
-                  </div>
-                ) : (
-                  <button
+                <button
                     onClick={async () => {
                       await loadSession(session.id);
                       router.push("/reader");
-                    }}
-                    onDoubleClick={(e) => {
-                      e.preventDefault();
-                      setRenaming(session.id);
-                      setRenameValue(session.name);
                     }}
                     className="flex-1 text-left px-3 py-2.5 min-w-0"
                   >
@@ -257,7 +198,6 @@ export default function AppSidebar() {
                       {session.date}
                     </p>
                   </button>
-                )}
                 {deleteConfirm === session.id ? (
                   <div className="flex items-center gap-1 mr-1" onClick={(e) => e.stopPropagation()}>
                     <button
@@ -280,23 +220,6 @@ export default function AppSidebar() {
                   </div>
                 ) : (
                   <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    {/* Rename */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setRenaming(session.id);
-                        setRenameValue(session.name);
-                      }}
-                      className="p-1.5 rounded-lg"
-                      style={{ color: "var(--text-muted)" }}
-                      onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent)")}
-                      onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
-                      title="Rename"
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
-                      </svg>
-                    </button>
                     {/* Delete */}
                     <button
                       onClick={(e) => {

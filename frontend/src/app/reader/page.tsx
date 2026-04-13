@@ -159,6 +159,10 @@ export default function ReaderPage() {
     slideGroups[num].push(card);
   }
 
+  // Get current session name for the editable title
+  const activeSession = store.sessions.find((s) => s.id === store.activeSessionId);
+  const sessionName = activeSession?.name || "Untitled Lecture";
+
   return (
     <div className="flex flex-1 overflow-x-hidden">
       {/* Lightbox */}
@@ -168,6 +172,32 @@ export default function ReaderPage() {
 
       <div className="flex-1 min-w-0 overflow-y-auto">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-8 pb-16">
+          {/* Editable session title */}
+          <h1
+            contentEditable
+            suppressContentEditableWarning
+            onBlur={async (e) => {
+              const val = e.currentTarget.textContent?.trim() || "";
+              if (val && val !== sessionName && store.activeSessionId) {
+                const { renameSession } = await import("@/lib/api");
+                await renameSession(store.activeSessionId, val);
+                store.loadSessions();
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); }
+            }}
+            className="text-lg font-semibold mb-8 outline-none rounded-lg px-2 py-1 -ml-2 transition-colors"
+            style={{
+              color: "var(--text-secondary)",
+              cursor: "text",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-elevated)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+            onFocus={(e) => { e.currentTarget.style.background = "var(--bg-elevated)"; e.currentTarget.style.color = "var(--text-primary)"; }}
+          >
+            {sessionName}
+          </h1>
           {transcript.map((section, i) => {
             const sectionSlides = slideGroups[section.slide_number] || [];
 
