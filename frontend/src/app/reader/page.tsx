@@ -26,6 +26,15 @@ export default function ReaderPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Auto-poll when session exists but content isn't ready yet (e.g. after page reload mid-processing)
+  useEffect(() => {
+    if (store.markdown || !store.activeSessionId) return;
+    const id = store.activeSessionId;
+    const interval = setInterval(() => store.loadSession(id), 15000);
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store.markdown, store.activeSessionId]);
+
   // Load data — detect V2 JSON vs legacy markdown
   useEffect(() => {
     if (store.markdown) {
@@ -128,7 +137,7 @@ export default function ReaderPage() {
           </h2>
           <p className="text-sm mb-6" style={{ color: "var(--text-secondary)" }}>
             {hasActiveSession
-              ? "This lecture is still being generated. It will appear here when ready — try refreshing in a minute."
+              ? "This lecture is still being generated. It'll appear here automatically when ready."
               : "Upload a lecture recording or transcript to get started."}
           </p>
           <button
