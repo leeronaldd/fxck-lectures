@@ -192,14 +192,20 @@ export default function ReaderPage() {
                 const sessionId = store.activeSessionId;
                 // Optimistically update store synchronously so React re-renders
                 // with the NEW name — prevents the DOM from reverting before the API call completes
+                // Optimistically update store synchronously
                 useAppStore.setState((s) => ({
                   sessions: s.sessions.map((sess) =>
                     sess.id === sessionId ? { ...sess, name: val } : sess
                   ),
                 }));
+                // Call API in background without awaiting — it will sync on next session load
+                // Awaiting here and then calling loadSessions() can still race and revert the name
                 const { renameSession } = await import("@/lib/api");
-                await renameSession(sessionId, val);
-                store.loadSessions();
+                renameSession(sessionId, val).catch((err) => {
+                  console.error("Failed to rename session:", err);
+                  // Optionally reload on error to restore server state
+                  store.loadSessions();
+                });
               }
             }}
             onKeyDown={(e) => {
