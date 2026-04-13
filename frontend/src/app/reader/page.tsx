@@ -101,8 +101,9 @@ export default function ReaderPage() {
     );
   }
 
-  // Empty state
+  // Empty state — check if there's an active session (might still be processing)
   if (!store.markdown) {
+    const hasActiveSession = !!store.activeSessionId;
     return (
       <div className="flex-1 flex items-center justify-center px-4 py-24">
         <div className="text-center max-w-md">
@@ -110,19 +111,28 @@ export default function ReaderPage() {
             className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6"
             style={{ background: "var(--accent-dim)", color: "var(--accent)" }}
           >
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-              <polyline points="14,2 14,8 20,8" />
-            </svg>
+            {hasActiveSession ? (
+              <div
+                className="w-7 h-7 rounded-full border-2 border-t-transparent animate-spin"
+                style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }}
+              />
+            ) : (
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                <polyline points="14,2 14,8 20,8" />
+              </svg>
+            )}
           </div>
           <h2 className="text-xl font-bold mb-2" style={{ color: "var(--text-primary)" }}>
-            No lecture loaded
+            {hasActiveSession ? "Still processing..." : "No lecture loaded"}
           </h2>
           <p className="text-sm mb-6" style={{ color: "var(--text-secondary)" }}>
-            Upload a lecture recording or transcript to get started.
+            {hasActiveSession
+              ? "This lecture is still being generated. It will appear here when ready — try refreshing in a minute."
+              : "Upload a lecture recording or transcript to get started."}
           </p>
           <button
-            onClick={() => router.push("/upload")}
+            onClick={() => hasActiveSession ? window.location.reload() : router.push("/upload")}
             className="btn-glow px-6 py-3 rounded-xl text-sm font-semibold"
             style={{
               background: "linear-gradient(135deg, var(--accent), #FF8555)",
@@ -130,7 +140,7 @@ export default function ReaderPage() {
               boxShadow: "0 8px 32px var(--accent-glow)",
             }}
           >
-            Upload a Lecture
+            {hasActiveSession ? "Refresh" : "Upload a Lecture"}
           </button>
         </div>
       </div>
