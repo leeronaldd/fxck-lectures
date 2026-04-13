@@ -67,10 +67,12 @@ def run_pipeline(
         input_file = Path(input_path)
         job_id = input_file.stem
         video_extensions = {".mp4", ".mkv", ".avi", ".mov", ".webm"}
+        audio_extensions = {".mp3", ".m4a", ".wav", ".ogg", ".flac", ".aac"}
         is_video = input_file.suffix in video_extensions
+        is_audio = input_file.suffix in audio_extensions
 
-        # ── Stage 0 (conditional): Transcribe video ──
-        if is_video:
+        # ── Stage 0 (conditional): Transcribe video/audio ──
+        if is_video or is_audio:
             yield {"status": "running", "stage": "Transcribing lecture", "progress": 2}
             from src.transcriber import transcribe
             result = transcribe(input_path)
@@ -87,7 +89,7 @@ def run_pipeline(
             text = input_file.read_text(encoding="utf-8")
         else:
             yield {"status": "error", "stage": "Reading file", "progress": 5,
-                   "error": f"Unsupported file type: {input_file.suffix}. Use .txt, .mp4, .mkv, .avi, .mov, or .webm"}
+                   "error": f"Unsupported file type: {input_file.suffix}. Use .txt, .mp4, .mp3, .mkv, .avi, .mov, or .webm"}
             return
 
         # Guard: reject too-short transcripts
@@ -110,7 +112,7 @@ def run_pipeline(
 
         # ── Stage 1.5: Extract screenshots from video (if no slides PDF uploaded) ──
         screenshots_json = None
-        if not slides_path and is_video:
+        if not slides_path and is_video and not is_audio:
             yield {"status": "running", "stage": "Extracting lecture slides", "progress": 16}
             try:
                 from src.screenshot_extractor import extract_all
