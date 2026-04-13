@@ -56,42 +56,66 @@ Regex chunking is free. Use cheap models (Gemini Flash) for simple tasks like CI
 
 ## Architecture
 
-V2 pipeline (3-stage parallel architecture, replaced V1's 8 stages):
+### V3.1 pipeline (slide-driven, multi-agent planning, current)
+
+Slides drive the structure, transcript fills the gaps. 4-agent planning pipeline
+replaces V3's single overloaded Flash call. Pro coordinator makes strategic
+decisions. No bridge sections — every section either teaches or gets merged.
 
 ```
 Stage 0: Transcription (src/transcriber.py) — optional, if input is video/audio
-    → Self-hosted faster-whisper on Cloud Run GPU (L4, asia-southeast1)
-    → Model: small, int8 quantized, batch_size=64 (~70s for 2hr lecture, $0.016)
-    → Fallback: Gemini Flash multimodal (for local dev without Whisper service)
+    → Gemini Flash multimodal audio (no rate limits)
     → auto audio extraction via ffmpeg
     ↓
 Stage 0.5: Screenshot Extraction (src/screenshot_extractor.py) — if video input
     → OpenCV frame detection + Gemini Flash descriptions
-    → matched to chunks by timestamp
+    → produces screenshots.json with slide metadata
     ↓
-Stage 1: Chunking (src/chunker.py)
-    → regex splitting with Gemini Flash fallback
+Stage 1: Multi-agent planning (src/generator_v3.py — plan_lecture)
+    Agent 1 (Flash): group slides by topic from descriptions
+      → validated: every non-blank slide in exactly one group
+      → groups FROZEN after this step
+    Agent 2 (Flash): match transcript to groups + find transcript-only topics
+      → extracts sub-concepts per group (structural depth signal)
+      → each transcript section → at most one group
+    Coordinator (Pro + thinking MEDIUM): read full notebook → master plan
+      → depth (deep/standard/merge_into), ownership, sequence, word budget
+      → plan is IMMUTABLE — downstream can't override
+      → total word budget: 5,500-6,500w
+    Agent 3 (Flash + images, parallel): teaching notes + visual strategy per group
+      → notes are SUGGESTIONS, master plan is LAW
+      → visual_strategy: professor_slide | openstax_figure | structured_card
+      → visual_data: slide index, search terms, or card content
     ↓
-Stage 2: V2 Generation (src/generator_v2.py) — all parallel
+Stage 2: Textbook fetch (parallel, same as V2)
+    → OpenStax + NCBI per group via textbook_search.py
+    → OpenStax figure images uploaded to GCS
     ↓
-    ├── Flash prefetch + textbook fetch (parallel together, ~30s)
-    │   ├── teaching summaries + term tracking for all chunks
-    │   ├── term ownership assigned by Python set arithmetic
-    │   └── OpenStax content via Google Search grounding per chunk
-    │
-    └── Pro generation (parallel, 8 workers, ~45-60s)
-        → creative brief with anatomy professor style transfer
-        → context caching (system instruction cached once)
-        → per-chunk: prior previews + textbook + transcript + slides
-        → output: slide doc + transcript + EI% per section
+Stage 3: Two-tier generation (src/generator_v3.py — parallel, 8 workers)
+    → Pro for deep groups (complex mechanisms, 400-600w)
+    → Flash + thinking LOW for standard groups (150-300w)
+    → Same creative brief for both tiers
+    → Visual strategy injected into writer prompt per group
+    → Post-processing strips "your professor" meta-commentary
+    → Context caching for Pro only
+    → Output: slide doc + transcript + EI% per section
     ↓
-Assembly (Python parser, no LLM)
-    → splits delimited output into slides.json + transcript.json
-    → frontend renders two-panel layout
+Assembly (Python parser, no LLM — same as V2)
+    → slides.json + transcript.json for frontend
+```
+
+**Not yet implemented:** Backend API integration, frontend structured card
+rendering component, targeted OpenStax figure selection from Agent 3 search terms.
+
+### V2 pipeline (transcript-driven, kept as fallback)
+
+```
+Stage 1: Chunking (src/chunker.py) → regex splitting with Flash fallback
+Stage 2: V2 Generation (src/generator_v2.py) → Flash prefetch + coordinator + Pro
 ```
 
 Old V1 files (src/generator.py, ci_scorer.py, concept_grouper.py, fact_checker.py, 
-completeness_checker.py, slide_inserter.py) kept as fallback but not used by V2.
+completeness_checker.py, slide_inserter.py) kept as fallback but not used by V2/V3.
 
 Not yet implemented (Stage 3-5 — Teacher-Student Agent Loop):
 
@@ -163,20 +187,20 @@ python run_transcribe.py "Bad Professor Lecture.mp4" --timestamps --json
 # Stage 1.5a: CI% Scoring
 python run_ci_scorer.py data/output/final_chunks_v5.json -o data/output/v4_ci_scores.json --preview
 
-# Full V4 Pipeline (recommended)
+# V3 Pipeline (slide-driven, recommended)
+python run_v3.py data/output/screenshots.json data/transcripts/lecture2_transcript.txt --subject microbiology --preview
+
+# V3 dry-run (see teaching plan without generation)
+python run_v3.py data/output/screenshots.json data/transcripts/lecture2_transcript.txt --dry-run
+
+# V3 sequential mode (for debugging)
+python run_v3.py data/output/screenshots.json data/transcripts/lecture2_transcript.txt --sequential
+
+# V2 Pipeline (transcript-driven fallback)
 python run_stage2.py data/output/final_chunks_v5.json --v4 \
   --ci data/output/v4_ci_scores.json \
   --screenshots data/output/screenshots.json \
   --preview
-
-# V4 with deterministic grouping (no LLM for grouping step)
-python run_stage2.py data/output/final_chunks_v5.json --v4 --no-llm-group \
-  --ci data/output/v4_ci_scores.json \
-  --screenshots data/output/screenshots.json \
-  --preview
-
-# Dry-run (print prompts, no generation)
-python run_stage2.py data/output/final_chunks_v5.json --v4 --dry-run --no-llm-group --skip-ci
 ```
 
 ## Tech Stack
@@ -202,26 +226,26 @@ python run_stage2.py data/output/final_chunks_v5.json --v4 --dry-run --no-llm-gr
 
 ```
 src/
-  transcriber.py           # Stage 0: Groq Whisper STT with auto chunking
-  chunker.py               # Stage 1: regex splitting, emphasis, prerequisites
-  ci_scorer.py             # Stage 1.5a: CI% exam importance scoring
-  screenshot_extractor.py  # Stage 1.5b: OpenCV slide extraction + Flash descriptions
-  slide_chunker.py         # Slide-based chunking (legacy, superseded by concept grouper)
-  concept_grouper.py       # Merge/reorder/skip pass on Stage 1 chunks
-  generator.py             # Stage 2: system prompt + Gemini Pro generation
-  textbook_search.py         # Dynamic OpenStax + NCBI textbook retrieval (89 keyword entries, 12 books)
-  fact_checker.py            # Textbook RAG + Google Search verification + Pro correction loop
-  completeness_checker.py  # Grep + slide-term coverage check + auto-fix
-  slide_inserter.py        # Post-processing slide references (companion doc only, inline done in assembly)
+  generator_v3.py          # V3: slide-driven pipeline (Flash planner + Pro generation)
+  generator_v2.py          # V2: transcript-driven pipeline (creative brief, textbook, caching)
+  transcriber.py           # Stage 0: Gemini Flash multimodal audio transcription
+  screenshot_extractor.py  # Stage 0.5: OpenCV slide extraction + Flash descriptions
+  chunker.py               # V2 Stage 1: regex splitting (used by V2 only)
+  textbook_search.py       # Dynamic OpenStax + NCBI textbook retrieval (89 keyword entries, 12 books)
+  generator.py             # V1 generator (legacy fallback)
+  ci_scorer.py             # EI% scoring (used by V2 only, V3 does inline)
+  concept_grouper.py       # Concept grouping (used by V2 only, V3 does inline)
+  fact_checker.py           # Textbook RAG + Google Search verification
+  completeness_checker.py  # Slide-term coverage check
+  slide_inserter.py        # Post-processing slide references
   json_repair.py           # Robust JSON extraction from truncated Flash responses
   models.py                # Pydantic models
   config.py                # Vertex AI + Groq config (env-var switchable models)
-run_stage1.py              # CLI: Stage 0+1 (accepts video/audio OR transcript)
+run_v3.py                  # CLI: V3 slide-driven pipeline (recommended)
+run_stage1.py              # CLI: Stage 0+1 (transcription + chunking)
+run_stage2.py              # CLI: V2 transcript-driven pipeline
 run_transcribe.py          # CLI: standalone transcription
-run_ci_scorer.py           # CLI: CI% scoring
 run_screenshots.py         # CLI: screenshot extraction
-run_slide_chunker.py       # CLI: slide-based chunking
-run_stage2.py              # CLI: full V4 pipeline
 data/
   input/                   # Raw lecture files (video, audio)
   transcripts/             # Transcribed .txt files (from Stage 0 or manual)

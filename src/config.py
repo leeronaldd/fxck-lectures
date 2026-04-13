@@ -25,3 +25,6 @@ DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 TRANSCRIPTS_DIR = os.path.join(DATA_DIR, "transcripts")
 OUTPUT_DIR = os.path.join(DATA_DIR, "output")
 SCREENSHOTS_DIR = os.path.join(DATA_DIR, "output", "screenshots")
+
+# Google Cloud Storage — screenshot persistence
+GCS_SCREENSHOTS_BUCKET = os.environ.get("GCS_SCREENSHOTS_BUCKET", "fxck-lectures-screenshots")

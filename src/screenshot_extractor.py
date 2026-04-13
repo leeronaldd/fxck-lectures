@@ -19,9 +19,34 @@ from src.config import (
     CHUNKER_FALLBACK_MODEL,
     GCP_LOCATION,
     GCP_PROJECT_ID,
+    GCS_SCREENSHOTS_BUCKET,
     SCREENSHOTS_DIR,
 )
 from src.models import Chunk, Screenshot
+
+
+# ---------------------------------------------------------------------------
+# GCS upload
+# ---------------------------------------------------------------------------
+
+def _upload_to_gcs(local_path: str, job_id: str) -> str:
+    """Upload a screenshot to GCS and return its public URL.
+
+    Uses the default Cloud Run service account credentials.
+    Falls back gracefully — returns empty string if upload fails.
+    """
+    try:
+        from google.cloud import storage
+        client = storage.Client()
+        bucket = client.bucket(GCS_SCREENSHOTS_BUCKET)
+        blob_name = f"{job_id}/{os.path.basename(local_path)}"
+        blob = bucket.blob(blob_name)
+        mime = "image/png" if local_path.endswith(".png") else "image/jpeg"
+        blob.upload_from_filename(local_path, content_type=mime)
+        return f"https://storage.googleapis.com/{GCS_SCREENSHOTS_BUCKET}/{blob_name}"
+    except Exception as e:
+        print(f"  Warning: GCS upload failed for {local_path}: {e}")
+        return ""
 
 
 # ---------------------------------------------------------------------------
@@ -174,25 +199,33 @@ def describe_screenshots(
     screenshots: list[dict],
     batch_size: int = 5,
     delay: float = 0.5,
+    max_workers: int = 6,
 ) -> list[dict]:
     """
     Use Gemini Flash multimodal to describe each screenshot in 1-2 sentences.
 
+    Runs descriptions in parallel (6 workers) instead of sequentially.
+    For 20 screenshots this cuts ~25s sequential down to ~5s parallel.
+
     Args:
         screenshots: List of dicts with 'image_path' key.
         batch_size: Log progress every N screenshots.
-        delay: Seconds to wait between API calls (rate limiting).
+        delay: Unused (kept for API compatibility). Parallel calls handle rate limiting.
+        max_workers: Number of parallel description workers.
 
     Returns:
         The same list with 'description' key added to each dict.
     """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
     from google import genai
     from google.genai import types
 
     client = genai.Client(vertexai=True, project=GCP_PROJECT_ID, location=GCP_LOCATION)
 
     total = len(screenshots)
-    for i, ss in enumerate(screenshots):
+
+    def _describe_one(idx: int, ss: dict) -> tuple[int, str]:
         try:
             with open(ss["image_path"], "rb") as f:
                 image_bytes = f.read()
@@ -204,16 +237,23 @@ def describe_screenshots(
                     "Describe this lecture slide in 1-2 sentences. What topic/concept does it show?",
                 ],
             )
-            ss["description"] = response.text.strip()
+            return idx, response.text.strip()
         except Exception as e:
-            print(f"  Warning: description failed for screenshot {i + 1}: {e}")
-            ss["description"] = "[Description unavailable]"
+            print(f"  Warning: description failed for screenshot {idx + 1}: {e}")
+            return idx, "[Description unavailable]"
 
-        if (i + 1) % batch_size == 0 or (i + 1) == total:
-            print(f"  Described {i + 1}/{total} screenshots")
-
-        if delay > 0 and (i + 1) < total:
-            time.sleep(delay)
+    completed = 0
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {
+            executor.submit(_describe_one, i, ss): i
+            for i, ss in enumerate(screenshots)
+        }
+        for future in as_completed(futures):
+            idx, description = future.result()
+            screenshots[idx]["description"] = description
+            completed += 1
+            if completed % batch_size == 0 or completed == total:
+                print(f"  Described {completed}/{total} screenshots")
 
     return screenshots
 
@@ -300,7 +340,106 @@ def match_to_chunks(
             description=ss.get("description", "[No description]"),
             matched_chunk_index=matched_chunk.chunk_index,
             matched_chunk_topic=matched_chunk.topic_name,
+            gcs_url=ss.get("gcs_url", ""),
         ))
+
+    return results
+
+
+# ---------------------------------------------------------------------------
+# PDF slide extraction
+# ---------------------------------------------------------------------------
+
+def extract_pdf_slides(
+    pdf_path: str,
+    output_dir: str | None = None,
+    output_json: str | None = None,
+    job_id: str = "",
+) -> list[dict]:
+    """
+    Extract each page of a PDF as a high-res PNG image.
+
+    Renders every page at 300 DPI using PyMuPDF, saves locally, and optionally
+    uploads to GCS. Returns metadata compatible with the video screenshot
+    pipeline so downstream stages (Flash description, generation) can use
+    PDF slides as a drop-in replacement for video screenshots.
+
+    Args:
+        pdf_path: Path to the lecture slides PDF.
+        output_dir: Directory to save PNG images (default: SCREENSHOTS_DIR).
+        output_json: Path to save metadata JSON (like extract_all does).
+        job_id: GCS folder prefix. If provided, images are uploaded to GCS.
+
+    Returns:
+        List of dicts with keys: page_number, image_path, image_filename,
+        gcs_url, description.
+    """
+    import fitz  # PyMuPDF
+
+    if output_dir is None:
+        output_dir = SCREENSHOTS_DIR
+    os.makedirs(output_dir, exist_ok=True)
+
+    doc = fitz.open(pdf_path)
+    total_pages = len(doc)
+    print(f"PDF: {total_pages} pages — {pdf_path}")
+
+    # 300 DPI: scale factor relative to 72 DPI default
+    zoom = 300 / 72
+    matrix = fitz.Matrix(zoom, zoom)
+
+    results: list[dict] = []
+
+    for page_num in range(total_pages):
+        page = doc[page_num]
+        pix = page.get_pixmap(matrix=matrix)
+
+        filename = f"slide_{page_num + 1:03d}.png"
+        save_path = os.path.join(output_dir, filename)
+        pix.save(save_path)
+
+        entry = {
+            "page_number": page_num + 1,
+            "image_path": save_path,
+            "image_filename": filename,
+            "gcs_url": "",
+            "description": "",
+        }
+        results.append(entry)
+
+        if (page_num + 1) % 10 == 0 or (page_num + 1) == total_pages:
+            print(f"  Rendered {page_num + 1}/{total_pages} pages")
+
+    doc.close()
+
+    # Upload to GCS if job_id provided (parallel)
+    if job_id:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        print(f"\nUploading {len(results)} slides to GCS...")
+
+        def _upload_one(idx_entry):
+            idx, entry = idx_entry
+            return idx, _upload_to_gcs(entry["image_path"], job_id)
+
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            futures = {
+                executor.submit(_upload_one, (i, e)): i
+                for i, e in enumerate(results)
+            }
+            uploaded = 0
+            for future in as_completed(futures):
+                idx, gcs_url = future.result()
+                results[idx]["gcs_url"] = gcs_url
+                if gcs_url:
+                    uploaded += 1
+        print(f"  Uploaded {uploaded}/{len(results)} slides to GCS")
+
+    # Save metadata JSON
+    if output_json:
+        os.makedirs(os.path.dirname(output_json) or ".", exist_ok=True)
+        with open(output_json, "w", encoding="utf-8") as f:
+            json.dump(results, f, indent=2, ensure_ascii=False)
+        print(f"\nSaved PDF slide metadata to: {output_json}")
 
     return results
 
@@ -316,6 +455,7 @@ def extract_all(
     output_json: str | None = None,
     threshold: float = 30.0,
     skip_describe: bool = False,
+    job_id: str = "",
 ) -> list[Screenshot]:
     """
     Full pipeline: extract frames, describe them, match to chunks.
@@ -363,6 +503,31 @@ def extract_all(
         print("\n--- Step 2: Skipped (--skip-describe) ---")
         for ss in screenshots:
             ss["description"] = "[Description skipped]"
+
+    # Step 2.5: Upload to GCS for persistent access (parallel)
+    if job_id:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        print("\n--- Step 2.5: Uploading screenshots to GCS ---")
+
+        def _upload_one(idx_ss):
+            idx, ss = idx_ss
+            return idx, _upload_to_gcs(ss["image_path"], job_id)
+
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            futures = {
+                executor.submit(_upload_one, (i, ss)): i
+                for i, ss in enumerate(screenshots)
+            }
+            uploaded = 0
+            for future in as_completed(futures):
+                idx, gcs_url = future.result()
+                screenshots[idx]["gcs_url"] = gcs_url
+                if gcs_url:
+                    uploaded += 1
+        print(f"  Uploaded {uploaded}/{len(screenshots)} screenshots to GCS")
+    else:
+        for ss in screenshots:
+            ss["gcs_url"] = ""
 
     # Step 3: Match to chunks
     print("\n--- Step 3: Matching screenshots to chunks ---")

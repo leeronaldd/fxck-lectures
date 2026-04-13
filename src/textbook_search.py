@@ -289,8 +289,75 @@ def store_cache(url: str, text: str, source_type: str):
 # URL fetching + text extraction
 # ---------------------------------------------------------------------------
 
-def _fetch_and_extract(url: str, max_chars: int = 5000) -> str | None:
-    """Fetch a URL and extract readable text content."""
+def _extract_images_from_html(html: str, page_url: str) -> list[dict]:
+    """Extract figure images and captions from OpenStax HTML.
+
+    Returns list of dicts with keys: src, caption, figure_id.
+    OpenStax images are CC-BY 4.0 licensed.
+    """
+    images = []
+
+    # Extract <figure> blocks with their <img> and <figcaption>
+    figures = re.findall(
+        r"<figure[^>]*>(.*?)</figure>",
+        html,
+        re.DOTALL | re.IGNORECASE,
+    )
+
+    for fig_html in figures:
+        # Get img src
+        img_match = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', fig_html)
+        if not img_match:
+            continue
+        src = img_match.group(1)
+
+        # Skip tiny icons, decorative images
+        if any(skip in src.lower() for skip in ["icon", "logo", "avatar", "button"]):
+            continue
+
+        # Get alt text
+        alt_match = re.search(r'<img[^>]+alt=["\']([^"\']*)["\']', fig_html)
+        alt = alt_match.group(1) if alt_match else ""
+
+        # Get figcaption text
+        caption_match = re.search(
+            r"<figcaption[^>]*>(.*?)</figcaption>",
+            fig_html,
+            re.DOTALL | re.IGNORECASE,
+        )
+        caption = ""
+        if caption_match:
+            caption = re.sub(r"<[^>]+>", " ", caption_match.group(1))
+            caption = re.sub(r"\s+", " ", caption).strip()
+
+        # Resolve relative URLs
+        if src.startswith("//"):
+            src = "https:" + src
+        elif src.startswith("/"):
+            # OpenStax content API images are relative to openstax.org
+            src = "https://openstax.org" + src
+
+        # Extract figure number from caption (e.g. "Figure 6.8")
+        fig_id = ""
+        fig_num_match = re.search(r"(Figure\s+\d+[\.\d]*)", caption or alt)
+        if fig_num_match:
+            fig_id = fig_num_match.group(1)
+
+        images.append({
+            "src": src,
+            "caption": (caption or alt)[:200],
+            "figure_id": fig_id,
+        })
+
+    return images
+
+
+def _fetch_and_extract(url: str, max_chars: int = 5000) -> dict | None:
+    """Fetch a URL and extract readable text content + images.
+
+    Returns dict with keys: text, images (list of image dicts).
+    Returns None if fetch fails.
+    """
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         resp = urllib.request.urlopen(req, timeout=15)
@@ -316,6 +383,9 @@ def _fetch_and_extract(url: str, max_chars: int = 5000) -> str | None:
             except Exception:
                 return None
 
+    # Extract images BEFORE stripping HTML tags
+    images = _extract_images_from_html(html, url)
+
     # Strip scripts and styles
     text = re.sub(r"<script[^>]*>.*?</script>", "", html, flags=re.DOTALL)
     text = re.sub(r"<style[^>]*>.*?</style>", "", text, flags=re.DOTALL)
@@ -332,7 +402,7 @@ def _fetch_and_extract(url: str, max_chars: int = 5000) -> str | None:
     chapter_text = text[:max_chars].strip()
     if not chapter_text or len(chapter_text) < 200:
         return None
-    return chapter_text
+    return {"text": chapter_text, "images": images}
 
 
 # ---------------------------------------------------------------------------
@@ -445,8 +515,9 @@ def search_textbook(topic_name: str) -> dict:
         - text: str | None — chapter text (up to 5000 chars)
         - url: str | None — source URL
         - source_type: "openstax" | "ncbi_bookshelf" | "none"
+        - images: list[dict] — figures from the page (src, caption, figure_id)
     """
-    result = {"text": None, "url": None, "source_type": "none"}
+    result = {"text": None, "url": None, "source_type": "none", "images": []}
 
     print(f"    Searching textbook for '{topic_name}'...")
 
@@ -462,13 +533,17 @@ def search_textbook(topic_name: str) -> dict:
         cached = get_cached(url)
         if cached:
             print(f"    Textbook (cached): {url[:60]}...")
-            return {"text": cached, "url": url, "source_type": "openstax"}
+            # Cached text doesn't have images — check for cached images separately
+            images = _get_cached_images(url)
+            return {"text": cached, "url": url, "source_type": "openstax", "images": images}
 
-        text = _fetch_and_extract(url)
-        if text:
-            store_cache(url, text, "openstax")
-            print(f"    Textbook (fetched): {url[:60]}... ({len(text)} chars)")
-            return {"text": text, "url": url, "source_type": "openstax"}
+        fetched = _fetch_and_extract(url)
+        if fetched:
+            store_cache(url, fetched["text"], "openstax")
+            if fetched["images"]:
+                _store_cached_images(url, fetched["images"])
+            print(f"    Textbook (fetched): {url[:60]}... ({len(fetched['text'])} chars, {len(fetched['images'])} images)")
+            return {"text": fetched["text"], "url": url, "source_type": "openstax", "images": fetched["images"]}
 
     # Tier 3: NCBI Bookshelf
     time.sleep(0.5)
@@ -478,13 +553,174 @@ def search_textbook(topic_name: str) -> dict:
         cached = get_cached(ncbi_url)
         if cached:
             print(f"    Textbook (cached, NCBI): {ncbi_url[:60]}...")
-            return {"text": cached, "url": ncbi_url, "source_type": "ncbi_bookshelf"}
+            return {"text": cached, "url": ncbi_url, "source_type": "ncbi_bookshelf", "images": []}
 
-        text = _fetch_and_extract(ncbi_url)
-        if text:
-            store_cache(ncbi_url, text, "ncbi_bookshelf")
-            print(f"    Textbook (fetched, NCBI): {ncbi_url[:60]}... ({len(text)} chars)")
-            return {"text": text, "url": ncbi_url, "source_type": "ncbi_bookshelf"}
+        fetched = _fetch_and_extract(ncbi_url)
+        if fetched:
+            store_cache(ncbi_url, fetched["text"], "ncbi_bookshelf")
+            print(f"    Textbook (fetched, NCBI): {ncbi_url[:60]}... ({len(fetched['text'])} chars)")
+            return {"text": fetched["text"], "url": ncbi_url, "source_type": "ncbi_bookshelf", "images": fetched.get("images", [])}
 
     print(f"    No textbook found for '{topic_name}'")
     return result
+
+
+def _get_cached_images(url: str) -> list[dict]:
+    """Load cached image metadata for a URL."""
+    h = _url_hash(url)
+    cache_file = _CACHE_DIR / f"{h}_images.json"
+    if cache_file.exists():
+        try:
+            return json.loads(cache_file.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return []
+
+
+def _store_cached_images(url: str, images: list[dict]):
+    """Cache image metadata for a URL."""
+    _ensure_cache_dir()
+    h = _url_hash(url)
+    cache_file = _CACHE_DIR / f"{h}_images.json"
+    cache_file.write_text(json.dumps(images, indent=2), encoding="utf-8")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Wikimedia Commons fallback — CC-licensed diagrams for topics OpenStax misses
+# ═══════════════════════════════════════════════════════════════════════════
+
+_WIKIMEDIA_API = "https://commons.wikimedia.org/w/api.php"
+_ALLOWED_LICENSES = {
+    "public domain", "pd", "cc0",
+    "cc by 4.0", "cc by 3.0", "cc by 2.5", "cc by 2.0",
+    "cc by-sa 4.0", "cc by-sa 3.0", "cc by-sa 2.5", "cc by-sa 2.0",
+}
+
+
+def fetch_wikimedia_image(
+    topic_name: str,
+    key_terms: list[str] | None = None,
+) -> list[dict]:
+    """Search Wikimedia Commons for a CC-licensed diagram matching a topic.
+
+    Falls back here when OpenStax has no relevant figure. Returns up to 3
+    images as dicts: {src_url, caption, license, attribution, figure_id}.
+
+    Returns empty list on failure — generation continues without images.
+    """
+    # Check cache first (file-based, _get_cached_images returns [] on miss)
+    cache_key = f"wikimedia:{topic_name}"
+    h = _url_hash(cache_key)
+    cache_file = _CACHE_DIR / f"{h}_images.json"
+    if cache_file.exists():
+        try:
+            return json.loads(cache_file.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    # Build multiple search queries — Wikimedia's search is finicky.
+    # Key terms work best (they're actual scientific vocabulary that matches
+    # Wikimedia filenames). Topic names are often too wordy/abstract.
+    _FILLER = {"and", "or", "the", "of", "in", "for", "vs", "vs.", "a", "an",
+               "mechanisms", "classification", "characteristics", "comparison",
+               "comparative", "methods", "analysis", "techniques", "overview"}
+    content_words = [w for w in topic_name.split() if w.lower() not in _FILLER][:4]
+
+    queries_to_try = []
+    # Priority 1: key terms (most search-friendly)
+    if key_terms and len(key_terms) >= 2:
+        queries_to_try.append(" ".join(key_terms[:3]) + " diagram")
+    # Priority 2: simplified topic name
+    queries_to_try.append(" ".join(content_words) + " diagram")
+    # Priority 3: even simpler 2-word query
+    if len(content_words) >= 2:
+        queries_to_try.append(f"{content_words[0]} {content_words[1]} biology diagram")
+
+    # Try each query until we find usable results
+    results = []
+    for search_query in queries_to_try:
+        params = {
+            "action": "query",
+            "generator": "search",
+            "gsrnamespace": "6",  # File namespace
+            "gsrsearch": search_query,
+            "gsrlimit": "8",
+            "prop": "imageinfo",
+            "iiprop": "url|extmetadata|size|mime",
+            "iiurlwidth": "800",  # Get thumbnail at 800px
+            "format": "json",
+        }
+
+        query_string = urllib.parse.urlencode(params)
+        url = f"{_WIKIMEDIA_API}?{query_string}"
+
+        try:
+            req = urllib.request.Request(url, headers={
+                "User-Agent": "FxckLectures/1.0 (educational tool; contact: github.com/leeronaldd/fxck-lectures)"
+            })
+            resp = urllib.request.urlopen(req, timeout=15)
+            data = json.loads(resp.read().decode())
+        except Exception as e:
+            continue  # Try next query
+
+        pages = data.get("query", {}).get("pages", {})
+        if not pages:
+            continue  # Try next query
+
+        for pid, page in sorted(pages.items()):
+            title = page.get("title", "")
+            for ii in page.get("imageinfo", []):
+                mime = ii.get("mime", "")
+                width = ii.get("width", 0)
+                thumb_url = ii.get("thumburl", "")
+                full_url = ii.get("url", "")
+
+                # Skip PDFs (not renderable as images)
+                if "pdf" in mime.lower():
+                    continue
+                if "image/" not in mime.lower():
+                    continue
+
+                # Skip tiny images (icons, thumbnails)
+                if width < 300:
+                    continue
+
+                meta = ii.get("extmetadata", {})
+                license_raw = meta.get("LicenseShortName", {}).get("value", "")
+                license_lower = license_raw.lower().strip()
+
+                # Check license is acceptable
+                if not any(allowed in license_lower for allowed in _ALLOWED_LICENSES):
+                    continue
+
+                # Extract attribution
+                author_html = meta.get("Artist", {}).get("value", "")
+                author = re.sub(r"<[^>]+>", "", author_html).strip()[:100]
+                description = meta.get("ImageDescription", {}).get("value", "")
+                caption = re.sub(r"<[^>]+>", "", description).strip()[:200]
+
+                figure_id = title.replace("File:", "").rsplit(".", 1)[0]
+
+                results.append({
+                    "src_url": thumb_url or full_url,
+                    "caption": caption or figure_id,
+                    "license": license_raw,
+                    "attribution": author,
+                    "figure_id": figure_id,
+                    "source": "wikimedia",
+                })
+
+                if len(results) >= 3:
+                    break
+            if len(results) >= 3:
+                break
+
+        # If this query found results, stop trying more queries
+        if results:
+            break
+
+    if not results:
+        print(f"    [wikimedia] No usable images for '{topic_name[:40]}'")
+
+    _store_cached_images(cache_key, results)
+    return results

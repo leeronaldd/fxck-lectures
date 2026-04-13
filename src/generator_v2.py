@@ -85,7 +85,7 @@ When writing the exam tip line in the slide section, just write the tip directly
 
 The professor's opinions on what is and isn't tested are unreliable. He may tell students to skip content that is commonly examined at other institutions. When scoring exam importance, base it on what medical school curricula globally assess, not on the professor's claims about his own exam. If the professor says 'you don't need to know this' but it's a standard exam topic worldwide, keep it and score it accordingly.
 
-If the textbook covers a topic in depth but the professor skimmed or skipped it, check global exam relevance. If it's commonly tested in medical curricula worldwide, teach it using the textbook as your source \u2014 don't mirror the professor's decision to skip. Flag it naturally: 'Your professor glossed over this, but you'll likely see it on board exams. Here's what you need to know.'
+If the textbook covers a topic in depth but the professor skimmed or skipped it, check global exam relevance. If it's commonly tested in medical curricula worldwide, teach it using the textbook as your source \u2014 don't mirror the professor's decision to skip. Flag it naturally: 'This wasn't covered in much detail in the lecture, but it's commonly tested. Here's what you need to know.'
 
 Medical students have a rich tradition of mnemonics for complex lists and sequences. If a well-known, widely-used mnemonic exists for the content you're teaching (like 'SAME' for Sensory Afferent Motor Efferent, or cranial nerve mnemonics), include it naturally \u2014 the way you'd share it as a tutor: 'A trick that's saved a lot of exam marks is...' Don't force a mnemonic where one isn't needed. Don't invent new ones. Only use established ones that the medical community already relies on.
 
@@ -798,26 +798,28 @@ def fetch_textbook_images(
     url = _match_topic_to_index(topic_name)
     if not url:
         url = _flash_pick_chapter(topic_name)
-    if not url:
-        return []
 
-    # Check for cached images first
-    cached_images = _get_cached_images(url)
-    if cached_images:
-        # If cached images already have GCS URLs, return as-is
-        if cached_images and cached_images[0].get("gcs_url"):
-            return cached_images
+    openstax_result = []
+    if url:
+        # Check for cached images first
+        cached_images = _get_cached_images(url)
+        if cached_images:
+            if cached_images and cached_images[0].get("gcs_url"):
+                return cached_images
 
-    # Fetch the page and extract images
-    fetched = _fetch_and_extract(url)
-    if not fetched or not fetched.get("images"):
-        return []
+        # Fetch the page and extract images
+        fetched = _fetch_and_extract(url)
+        if not fetched or not fetched.get("images"):
+            fetched = None  # Fall through to Wikimedia
 
-    images = fetched["images"]
-    print(f"    [images] Found {len(images)} figures for '{topic_name}'")
-
-    # Upload to GCS and build result
+    # Upload OpenStax images to GCS (if any found)
     result = []
+    if url and fetched and fetched.get("images"):
+        images = fetched["images"]
+        print(f"    [images] Found {len(images)} figures for '{topic_name}'")
+    else:
+        images = []
+
     for img in images[:6]:  # Cap at 6 images per chunk
         src = img.get("src", "")
         if not src:
@@ -833,11 +835,81 @@ def fetch_textbook_images(
             }
             result.append(entry)
 
-    if result:
+    if result and url:
         _store_cached_images(url, result)
         print(f"    [images] Uploaded {len(result)} figures to GCS")
 
+    # ── Wikimedia Commons fallback ──
+    # If OpenStax returned no images, try Wikimedia for CC-licensed diagrams
+    if not result:
+        from src.textbook_search import fetch_wikimedia_image
+        print(f"    [images] OpenStax empty, trying Wikimedia for '{topic_name[:40]}'...")
+        wiki_images = fetch_wikimedia_image(topic_name, key_terms)
+        print(f"    [images] Wikimedia returned {len(wiki_images)} candidates")
+        if wiki_images:
+            for wimg in wiki_images[:3]:
+                src = wimg.get("src_url", "")
+                if not src:
+                    continue
+                gcs_url = _upload_wikimedia_image_to_gcs(
+                    src, job_id, wimg.get("figure_id", "")
+                )
+                if gcs_url:
+                    attribution = wimg.get("attribution", "Unknown")
+                    license_name = wimg.get("license", "CC")
+                    result.append({
+                        "gcs_url": gcs_url,
+                        "caption": wimg.get("caption", ""),
+                        "figure_id": wimg.get("figure_id", ""),
+                        "original_src": src,
+                        "source": "wikimedia",
+                        "attribution": f"Wikimedia Commons. {attribution}. {license_name}.",
+                    })
+            if result:
+                print(f"    [images] Wikimedia fallback: {len(result)} figures for '{topic_name}'")
+
     return result
+
+
+def _upload_wikimedia_image_to_gcs(src_url: str, job_id: str, figure_id: str) -> str:
+    """Download a Wikimedia Commons image and upload to GCS.
+
+    Same pattern as _upload_openstax_image_to_gcs but uses wikimedia/ prefix.
+    Returns the public GCS URL, or empty string on failure.
+    """
+    import urllib.request as urlreq
+
+    try:
+        req = urlreq.Request(src_url, headers={
+            "User-Agent": "FxckLectures/1.0 (educational tool)"
+        })
+        resp = urlreq.urlopen(req, timeout=15)
+        image_bytes = resp.read()
+
+        if len(image_bytes) < 500:
+            return ""
+
+        ext = ".jpg"
+        if ".png" in src_url.lower():
+            ext = ".png"
+
+        safe_id = re.sub(r"[^a-zA-Z0-9_.-]", "_", figure_id or "figure") or "figure"
+        # Truncate long filenames (Wikimedia titles can be very long)
+        safe_id = safe_id[:80]
+        blob_name = f"{job_id}/wikimedia_{safe_id}{ext}" if job_id else f"wikimedia/{safe_id}{ext}"
+
+        from google.cloud import storage
+        client = storage.Client()
+        bucket = client.bucket(GCS_SCREENSHOTS_BUCKET)
+        blob = bucket.blob(blob_name)
+
+        content_type = resp.headers.get("Content-Type", "image/jpeg")
+        blob.upload_from_string(image_bytes, content_type=content_type)
+
+        return f"https://storage.googleapis.com/{GCS_SCREENSHOTS_BUCKET}/{blob_name}"
+    except Exception as e:
+        print(f"    [images] Wikimedia upload failed {src_url[:60]}: {e}")
+        return ""
 
 
 def _upload_openstax_image_to_gcs(src_url: str, job_id: str, figure_id: str) -> str:

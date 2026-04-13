@@ -7,7 +7,7 @@ SET REGION=australia-southeast1
 SET IMAGE=%REGION%-docker.pkg.dev/%PROJECT_ID%/fxck-lectures-api/backend
 
 echo Building and pushing image...
-call gcloud builds submit --project %PROJECT_ID% --tag %IMAGE% --timeout=600s
+call gcloud builds submit --project=%PROJECT_ID% --tag=%IMAGE% --timeout=600s
 if %ERRORLEVEL% NEQ 0 (
     echo BUILD FAILED
     pause
@@ -34,7 +34,7 @@ IF DEFINED STRIPE_KEY SET ENV_VARS=%ENV_VARS%,STRIPE_SECRET_KEY=%STRIPE_KEY%
 IF DEFINED SUPA_JWT SET ENV_VARS=%ENV_VARS%,SUPABASE_JWT_SECRET=%SUPA_JWT%
 IF DEFINED GROQ_KEY SET ENV_VARS=%ENV_VARS%,GROQ_API_KEY=%GROQ_KEY%
 
-call gcloud run deploy %SERVICE_NAME% --project %PROJECT_ID% --image %IMAGE% --region %REGION% --platform managed --allow-unauthenticated --use-http2 --memory 2Gi --timeout 900 --concurrency 1 --min-instances 0 --max-instances 3 --set-env-vars "%ENV_VARS%"
+call gcloud run deploy %SERVICE_NAME% --project=%PROJECT_ID% --image=%IMAGE% --region=%REGION% --platform=managed --allow-unauthenticated --use-http2 --memory=2Gi --cpu=4 --timeout=900 --concurrency=1 --min-instances=0 --max-instances=3 --set-env-vars="%ENV_VARS%"
 
 echo.
 echo Done! Backend: https://%SERVICE_NAME%-211270844056.%REGION%.run.app

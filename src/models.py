@@ -52,6 +52,7 @@ class Screenshot(BaseModel):
     description: str                # from Gemini Flash multimodal
     matched_chunk_index: int        # which chunk this belongs to
     matched_chunk_topic: str
+    gcs_url: str = ""               # public GCS URL for persistent access
 
 
 class SlideChunk(BaseModel):

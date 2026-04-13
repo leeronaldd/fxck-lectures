@@ -1,9 +1,13 @@
-"""Pipeline runner — V2: 3-stage anatomy-professor pipeline.
+"""Pipeline runner — V3.1: slide-driven multi-agent pipeline.
 
 Stages:
-1. Transcribe (if video) + Chunk
-2. Flash prefetch (teaching summaries + term tracking) + Flash textbook fetch
-3. Pro generation (parallel, all chunks at once)
+0. Transcribe (if video)
+0.5. Extract screenshots (from video or PDF)
+1. Multi-agent planning (Flash grouper → Flash scanner → Pro coordinator → Flash planner)
+2. Textbook + image fetch (OpenStax + Wikimedia fallback)
+3. Two-tier generation (Pro deep + Flash standard, parallel)
+
+Falls back to V2 (transcript-driven) if no screenshots available.
 
 Yields progress dicts for the SSE stream.
 """
@@ -183,11 +187,9 @@ def run_pipeline(
             except Exception as e:
                 print(f"  PDF slide extraction failed (non-fatal): {e}")
 
-        # ── Stage 3: V2 Generation (prefetch + textbook + Pro, all inside) ──
+        # ── Stage 3: Generation ──
+        # V3.1 (slide-driven) when screenshots available, V2 (transcript-driven) as fallback
         _check_cancelled(cancel_event)
-        yield {"status": "running", "stage": "Preparing teaching context", "progress": 20}
-
-        from src.generator_v2 import generate_lecture, assemble_api_response
 
         # Derive subject hint from user profile if available
         subject = None
@@ -196,18 +198,48 @@ def run_pipeline(
             if program:
                 subject = program
 
-        _check_cancelled(cancel_event)
-        yield {"status": "running", "stage": "Generating lecture", "progress": 30}
+        textbook_images = {}  # Only used by V2 fallback
 
-        result = generate_lecture(
-            chunks=chunks_dicts,
-            lecture_slides_path=slides_path,
-            screenshots_json=screenshots_json,
-            subject=subject,
-            parallel=True,
-            job_id=job_id,
-        )
-        sections, textbook_images = result
+        if screenshots_json:
+            # ── V3.1: Slide-driven multi-agent pipeline ──
+            yield {"status": "running", "stage": "Planning lecture structure", "progress": 20}
+
+            from src.generator_v3 import generate_lecture_v3
+            from src.generator_v2 import assemble_api_response
+
+            # Save transcript to temp file for V3 (it takes a path, not text)
+            transcript_path = output_dir / f"{job_id}_transcript.txt"
+            if not transcript_path.exists():
+                transcript_path.write_text(text, encoding="utf-8")
+
+            _check_cancelled(cancel_event)
+            yield {"status": "running", "stage": "Generating lecture", "progress": 30}
+
+            sections, groups = generate_lecture_v3(
+                screenshots_json=screenshots_json,
+                transcript_path=str(transcript_path),
+                subject=subject,
+                parallel=True,
+                job_id=job_id,
+            )
+        else:
+            # ── V2 fallback: transcript-driven (no screenshots) ──
+            yield {"status": "running", "stage": "Preparing teaching context", "progress": 20}
+
+            from src.generator_v2 import generate_lecture, assemble_api_response
+
+            _check_cancelled(cancel_event)
+            yield {"status": "running", "stage": "Generating lecture", "progress": 30}
+
+            result = generate_lecture(
+                chunks=chunks_dicts,
+                lecture_slides_path=slides_path,
+                screenshots_json=screenshots_json,
+                subject=subject,
+                parallel=True,
+                job_id=job_id,
+            )
+            sections, textbook_images = result
 
         if not sections:
             yield {"status": "error", "stage": "Generating lecture", "progress": 30,
@@ -216,7 +248,7 @@ def run_pipeline(
 
         yield {"status": "running", "stage": "Assembling output", "progress": 90}
 
-        # Build V2 API response
+        # Build API response (same format for V2 and V3)
         api_response = assemble_api_response(sections)
 
         # Replace local screenshot refs with persistent GCS URLs

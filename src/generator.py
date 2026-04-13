@@ -405,11 +405,14 @@ def build_user_prompt(chunk: Chunk, prior_topics: list[str],
         for ss in screenshots:
             screenshot_lines.append(f"- [{ss.timestamp_display}] {ss.description} ({ss.image_filename})")
         sections.append(
-            "LECTURE SCREENSHOTS (from the video at these timestamps):\n"
+            "LECTURE SLIDES (the student sees these images alongside your text):\n"
             + "\n".join(screenshot_lines) + "\n"
-            "Reference these naturally in your explanation where relevant, e.g.: "
-            "\"As shown in the lecture slide at 12:34, the structure looks like...\" "
-            "These give the student visual anchors to the actual lecture materials."
+            "Write as if you and the student are both looking at these slides — like the anatomy professor does. "
+            "She never re-describes what's already visible on the slide. Instead she explains what it means, "
+            "why it matters, and what the student should take away for the exam. When a slide is a clear diagram "
+            "or table, she keeps her text short and lets the visual carry the teaching load. "
+            "Direct the student's eyes: 'Looking at the diagram, take note that...' or 'The slide shows three pathways — here's what matters.' "
+            "Don't narrate what they can already see. Explain the significance."
         )
 
     # Word count guidance — CI%-driven if available, fallback to emphasis-based
@@ -927,7 +930,8 @@ def _save_explanations(explanations: list[Explanation], path: str):
 # ---------------------------------------------------------------------------
 
 def build_group_prompt(group, prior_group_names: list[str],
-                       textbook_context: str | None = None) -> str:
+                       textbook_context: str | None = None,
+                       screenshots: list | None = None) -> str:
     """Build a prompt for a ConceptGroup (v4 pipeline).
 
     Args:
@@ -988,6 +992,24 @@ def build_group_prompt(group, prior_group_names: list[str],
     if quiz_text:
         sections.append("(Quiz review content was stripped from the transcript above.)")
 
+    # Lecture slides
+    if screenshots:
+        slide_lines = []
+        for ss in screenshots:
+            desc = ss.description if isinstance(ss, object) and hasattr(ss, 'description') else ss.get('description', '')
+            fname = ss.image_filename if isinstance(ss, object) and hasattr(ss, 'image_filename') else ss.get('image_filename', '')
+            slide_lines.append(f"- {desc} ({fname})")
+        sections.append(
+            "LECTURE SLIDES (the student sees these images alongside your text):\n"
+            + "\n".join(slide_lines) + "\n"
+            "Write as if you and the student are both looking at these slides — like the anatomy professor does. "
+            "She never re-describes what's already visible on the slide. Instead she explains what it means, "
+            "why it matters, and what the student should take away for the exam. When a slide is a clear diagram "
+            "or table, she keeps her text short and lets the visual carry the teaching load. "
+            "Direct the student's eyes: 'Looking at the diagram...' or 'The slide shows three pathways — here's what matters.' "
+            "Don't narrate what they can already see. Explain the significance."
+        )
+
     # Final instruction
     sections.append(
         "Generate a tutor-quality explanation for this concept group. "
@@ -1019,7 +1041,9 @@ def _generate_single_group(args: tuple) -> dict:
     except Exception as e:
         print(f"  (textbook fetch failed: {e})")
 
-    prompt = build_group_prompt(group, prior_names, textbook_context=textbook)
+    # Load screenshots if available (passed via group._screenshots)
+    screenshots = getattr(group, '_screenshots', None)
+    prompt = build_group_prompt(group, prior_names, textbook_context=textbook, screenshots=screenshots)
 
     try:
         text = call_llm_with_retry(prompt, system_prompt=get_full_system_prompt(), max_tokens=8192)
