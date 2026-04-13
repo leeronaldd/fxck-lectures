@@ -1454,42 +1454,67 @@ def build_user_prompt_v3(
             "Be concise. The anatomy professor covers a concept in 130 words per slide."
         )
 
-    # Slide type guidance based on visual strategy
-    if effective_strategy == "professor_slide":
-        slide_type_hint = (
+    # Build per-slide output blocks for professor_slide strategy
+    # Each professor slide in the group gets its own === SLIDE === card with its screenshot
+    slide_blocks = ""
+    if effective_strategy == "professor_slide" and slide_meta and len(slide_meta) > 1:
+        letters = "abcdefghijklmnopqrstuvwxyz"
+        slide_block_lines = []
+        for i, s in enumerate(slide_meta):
+            suffix = letters[i]
+            fname = s["image_filename"]
+            slide_block_lines.append(
+                f"=== SLIDE ===\n"
+                f"Slide {slide_number}{suffix}: [subtitle for this slide]\n"
+                f"type: professor_slide\n"
+                f"![{s.get('description', fname)[:60]}](screenshots/{fname})\n"
+                f"Exam tip: [one relevant takeaway]"
+            )
+        slide_blocks = (
+            f"This group has {len(slide_meta)} professor slides. "
+            f"Output one === SLIDE === block per slide, using these exact filenames:\n\n"
+            + "\n\n".join(slide_block_lines)
+            + "\n\nReplace the bracketed text with your actual titles and exam tips."
+        )
+    elif effective_strategy == "professor_slide":
+        fname = slide_meta[0]["image_filename"] if slide_meta else ""
+        img_line = f"![description](screenshots/{fname})" if fname else "![description](screenshots/slide.jpg)"
+        slide_blocks = (
+            "=== SLIDE ===\n"
+            f"Slide {slide_number}: [Your title]\n"
             "type: professor_slide\n"
-            "The professor's slide is clear — just reference it with an image "
-            "markdown and add one exam-relevant takeaway underneath. Don't duplicate "
-            "the slide's labels or bullet points."
+            f"{img_line}\n"
+            "Exam tip: [one relevant takeaway]"
         )
     elif effective_strategy == "openstax_figure":
-        slide_type_hint = (
+        slide_blocks = (
+            "=== SLIDE ===\n"
+            f"Slide {slide_number}: [Your title]\n"
             "type: diagram\n"
-            "Embed the best matching figure using markdown: ![caption](URL). "
-            "Add 2-3 dot points providing context around the figure."
+            "![caption](URL from TEXTBOOK FIGURES list above)\n"
+            "• [2-3 dot points providing context around the figure]"
         )
     elif effective_strategy == "structured_card":
-        slide_type_hint = (
+        slide_blocks = (
+            "=== SLIDE ===\n"
+            f"Slide {slide_number}: [Your title]\n"
             "type: diagram\n"
-            "[Write ONLY the card content below — title, bullet points, and exam tip. "
-            "Do NOT include any meta-instructions like 'no image available' or "
-            "'the frontend renders this'. Just write the actual content directly.]"
+            "[Write the card content: title, bullet points, exam tip. "
+            "No meta-instructions — just the content directly.]"
         )
     else:
-        slide_type_hint = (
+        slide_blocks = (
+            "=== SLIDE ===\n"
+            f"Slide {slide_number}: [Your title]\n"
             "type: professor_slide OR diagram\n"
-            "[If type is professor_slide: just the image reference and one exam tip.]\n"
-            "[If type is diagram: dot points + embed OpenStax figure if available.]"
+            "[image reference or bullet points]"
         )
 
     parts.append(types.Part.from_text(text=
         f"\nWrite this as Slide {slide_number}. "
+        "Fill in the bracketed placeholders. "
         "Output in this exact format:\n\n"
-        "=== SLIDE ===\n"
-        f"Slide {slide_number}: [Your title]\n"
-        f"{slide_type_hint}\n"
-        f"[If this section needs multiple visuals, split as Slide {slide_number}a, "
-        f"Slide {slide_number}b, etc.]\n\n"
+        f"{slide_blocks}\n\n"
         "=== TRANSCRIPT ===\n"
         f"Slide {slide_number}\n"
         "[Your transcript — written exactly how the anatomy professor writes]\n\n"
