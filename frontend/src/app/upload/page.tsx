@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
 import UploadZone from "@/components/UploadZone";
@@ -18,7 +19,18 @@ export default function UploadPage() {
     startPipeline,
     uploadProgress,
     isUploading,
+    pipelineRuns,
   } = useAppStore();
+
+  // If there's an active pipeline run (upload or processing), send the user back to it
+  // so navigating away doesn't make it look like the upload stopped
+  useEffect(() => {
+    const activeRun = Object.values(pipelineRuns).find((r) => r.isProcessing);
+    if (activeRun) {
+      router.replace(`/processing?id=${activeRun.fileId}`);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleGenerate = () => {
     startPipeline();

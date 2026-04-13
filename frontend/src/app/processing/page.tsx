@@ -41,12 +41,17 @@ export default function ProcessingPage() {
     }
   }, [isDone, router]);
 
-  // Redirect to home only if no active pipeline
+  // Redirect to upload only if there's genuinely no pipeline — not on first mount
+  // (first render can race before Zustand has hydrated the active run)
   useEffect(() => {
-    if (!run && !pipelineError) {
-      router.replace("/upload");
-    }
-  }, [run, pipelineError, router]);
+    if (run || pipelineError) return;
+    const timer = setTimeout(() => {
+      const stillNoRun = !useAppStore.getState().pipelineRuns[viewId || ""];
+      if (stillNoRun) router.replace("/upload");
+    }, 500);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run, pipelineError]);
 
   const handleCancel = () => {
     if (viewId) cancelPipeline(viewId);
