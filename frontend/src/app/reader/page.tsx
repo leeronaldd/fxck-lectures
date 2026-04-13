@@ -189,8 +189,16 @@ export default function ReaderPage() {
             onBlur={async (e) => {
               const val = e.currentTarget.textContent?.trim() || "";
               if (val && val !== sessionName && store.activeSessionId) {
+                const sessionId = store.activeSessionId;
+                // Optimistically update store synchronously so React re-renders
+                // with the NEW name — prevents the DOM from reverting before the API call completes
+                useAppStore.setState((s) => ({
+                  sessions: s.sessions.map((sess) =>
+                    sess.id === sessionId ? { ...sess, name: val } : sess
+                  ),
+                }));
                 const { renameSession } = await import("@/lib/api");
-                await renameSession(store.activeSessionId, val);
+                await renameSession(sessionId, val);
                 store.loadSessions();
               }
             }}
