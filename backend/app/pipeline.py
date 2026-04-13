@@ -173,19 +173,31 @@ def run_pipeline(
                 )
 
                 if pdf_slides:
-                    # Map pages to chunks round-robin
-                    num_chunks = len(chunks_dicts)
+                    # Add synthetic timestamps (V3 uses these for transcript matching)
+                    # Evenly space slides across an assumed 2-hour lecture
+                    assumed_duration = 7200  # 2 hours in seconds
                     for i, entry in enumerate(pdf_slides):
-                        entry["matched_chunk_index"] = i % num_chunks
+                        entry["matched_chunk_index"] = i % len(chunks_dicts)
                         entry["image_filename"] = entry.get("image_filename", f"slide_{i+1:03d}.png")
+                        entry["timestamp_seconds"] = int(i * assumed_duration / max(len(pdf_slides), 1))
+                        entry["timestamp_display"] = f"{entry['timestamp_seconds'] // 60}:{entry['timestamp_seconds'] % 60:02d}"
+
+                    yield {"status": "running", "stage": "Describing slides", "progress": 20,
+                           "result": f"{len(pdf_slides)} slides — generating descriptions..."}
+                    _check_cancelled(cancel_event)
+
+                    # Flash multimodal descriptions — V3 needs these to group slides
+                    from src.screenshot_extractor import describe_screenshots
+                    describe_screenshots(pdf_slides)
 
                     ss_json_path = str(output_dir / f"{job_id}_screenshots.json")
                     with open(ss_json_path, "w", encoding="utf-8") as f:
                         json.dump(pdf_slides, f, indent=2, ensure_ascii=False)
                     screenshots_json = ss_json_path
 
-                    yield {"status": "running", "stage": "Extracting slides from PDF", "progress": 20,
-                           "result": f"{len(pdf_slides)} slide pages extracted"}
+                    described = sum(1 for s in pdf_slides if s.get("description"))
+                    yield {"status": "running", "stage": "Describing slides", "progress": 22,
+                           "result": f"{described}/{len(pdf_slides)} slides described"}
             except Exception as e:
                 print(f"  PDF slide extraction failed (non-fatal): {e}")
 

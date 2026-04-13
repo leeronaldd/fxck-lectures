@@ -227,13 +227,15 @@ def describe_screenshots(
 
     def _describe_one(idx: int, ss: dict) -> tuple[int, str]:
         try:
-            with open(ss["image_path"], "rb") as f:
+            img_path = ss["image_path"]
+            with open(img_path, "rb") as f:
                 image_bytes = f.read()
 
+            mime = "image/png" if img_path.lower().endswith(".png") else "image/jpeg"
             response = client.models.generate_content(
                 model=CHUNKER_FALLBACK_MODEL,
                 contents=[
-                    types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
+                    types.Part.from_bytes(data=image_bytes, mime_type=mime),
                     "Describe this lecture slide in 1-2 sentences. What topic/concept does it show?",
                 ],
             )
