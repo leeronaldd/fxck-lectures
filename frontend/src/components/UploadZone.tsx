@@ -166,15 +166,30 @@ export default function UploadZone({
         </div>
       )}
 
-      {/* Primary: Lecture video */}
+      {/* Upload slots */}
       {!isUploading && (
         <>
+          {/* Primary: Lecture recording or transcript */}
           <UploadSlot
-            label="Drop your lecture recording"
-            accept=".mp4"
-            file={videoFile}
-            onFileChange={onVideoChange}
-            hint="MP4 video file"
+            label="Drop your lecture recording or transcript"
+            accept=".mp4,.mp3,.txt"
+            file={videoFile || transcriptFile}
+            onFileChange={(f) => {
+              if (!f) {
+                onVideoChange(null);
+                onTranscriptChange(null);
+                return;
+              }
+              const ext = f.name.split(".").pop()?.toLowerCase();
+              if (ext === "txt") {
+                onTranscriptChange(f);
+                onVideoChange(null);
+              } else {
+                onVideoChange(f);
+                onTranscriptChange(null);
+              }
+            }}
+            hint="MP4 video, MP3 audio, or plain text file"
             icon={
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="23,7 16,12 23,17" />
@@ -183,51 +198,25 @@ export default function UploadZone({
             }
           />
 
-          {/* Divider */}
+          {/* Optional: Lecture slides — always visible */}
           <div className="flex items-center gap-3 py-1">
             <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
-            <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>or</span>
+            <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>optional</span>
             <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
           </div>
-
-          {/* Secondary: Transcript */}
           <UploadSlot
-            label="Drop a transcript"
-            accept=".txt"
-            file={transcriptFile}
-            onFileChange={onTranscriptChange}
-            hint="Plain text file"
+            label="Add lecture slides"
+            accept=".pdf"
+            file={slidesFile}
+            onFileChange={onSlidesChange}
+            hint="PDF — higher quality slide images"
             icon={
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                <polyline points="14,2 14,8 20,8" />
+                <rect x="2" y="3" width="20" height="14" rx="2" />
+                <path d="M8 21h8M12 17v4" />
               </svg>
             }
           />
-
-          {/* Optional: Lecture slides */}
-          {(videoFile || transcriptFile) && (
-            <>
-              <div className="flex items-center gap-3 py-1">
-                <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
-                <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>optional</span>
-                <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
-              </div>
-              <UploadSlot
-                label="Add lecture slides"
-                accept=".pdf"
-                file={slidesFile}
-                onFileChange={onSlidesChange}
-                hint="PDF — higher quality visuals than video frames"
-                icon={
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="2" y="3" width="20" height="14" rx="2" />
-                    <path d="M8 21h8M12 17v4" />
-                  </svg>
-                }
-              />
-            </>
-          )}
         </>
       )}
     </div>

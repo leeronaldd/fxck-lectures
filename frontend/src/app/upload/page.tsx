@@ -74,7 +74,7 @@ export default function UploadPage() {
           </button>
 
           <p className="text-center text-xs mt-4" style={{ color: "var(--text-muted)" }}>
-            Supports .mp4 lecture recordings and .txt transcripts
+            Supports .mp4/.mp3 lecture recordings and .txt transcripts
           </p>
         </div>
 
