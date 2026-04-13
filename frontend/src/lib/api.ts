@@ -217,7 +217,7 @@ export async function deleteSession(sessionId: string): Promise<boolean> {
   return res.ok;
 }
 
-const PIPELINE_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes — pipeline never takes longer
+const PIPELINE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes — long lectures with transcription can take ~20 min
 
 export function runPipeline(
   fileId: string,
@@ -235,7 +235,7 @@ export function runPipeline(
     if (!cancelled) {
       cancelled = true;
       controller.abort();
-      onError("Processing timed out after 15 minutes. Please try again.");
+      onError("__timeout__");
     }
   }, PIPELINE_TIMEOUT_MS);
 

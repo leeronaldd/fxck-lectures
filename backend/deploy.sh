@@ -23,7 +23,7 @@ gcloud run deploy "$SERVICE_NAME" \
   --use-http2 \
   --memory 2Gi \
   --cpu 4 \
-  --timeout 900 \
+  --timeout 1800 \
   --concurrency 80 \
   --min-instances 1 \
   --max-instances 1 \

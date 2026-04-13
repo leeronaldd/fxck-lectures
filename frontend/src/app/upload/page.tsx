@@ -31,6 +31,7 @@ export default function UploadPage() {
   const isRunning = activeRun?.isProcessing ?? false;
   const isDone = activeRun?.isDone ?? false;
   const pipelineError = activeRun?.error ?? null;
+  const isTimeout = pipelineError === "__timeout__";
   const isUploading = activeRun?.isUploading ?? false;
   const uploadProgress = activeRun?.uploadProgress ?? 0;
   const stages = activeRun?.stages ?? [];
@@ -103,7 +104,14 @@ export default function UploadPage() {
             {/* Inline progress — same page, no navigation */}
             <div className="text-center mb-8">
               <div className="mb-4 flex justify-center">
-                {pipelineError ? (
+                {isTimeout ? (
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
+                    style={{ background: "var(--accent-dim)", border: "1px solid rgba(255, 107, 53, 0.2)" }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" /><polyline points="12,6 12,12 16,14" />
+                    </svg>
+                  </div>
+                ) : pipelineError ? (
                   <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
                     style={{ background: "rgba(255, 68, 68, 0.1)", border: "1px solid rgba(255, 68, 68, 0.2)" }}>
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FF4444" strokeWidth="2" strokeLinecap="round">
@@ -127,17 +135,19 @@ export default function UploadPage() {
                 )}
               </div>
 
-              <h1 className="text-xl font-bold mb-1" style={{ color: pipelineError ? "#FF6666" : "var(--text-primary)" }}>
-                {pipelineError ? "Something went wrong" : isDone ? "Ready!" : isUploading ? "Uploading your lecture..." : "Transforming your lecture..."}
+              <h1 className="text-xl font-bold mb-1" style={{ color: isTimeout ? "var(--text-primary)" : pipelineError ? "#FF6666" : "var(--text-primary)" }}>
+                {isTimeout ? "Still generating in the background..." : pipelineError ? "Something went wrong" : isDone ? "Ready!" : isUploading ? "Uploading your lecture..." : "Transforming your lecture..."}
               </h1>
               <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                {pipelineError
-                  ? pipelineError
-                  : isDone
-                    ? "Taking you to your lecture..."
-                    : isUploading
-                      ? "Sending your file to the server..."
-                      : "This usually takes a few minutes. You can switch tabs — it'll keep going."}
+                {isTimeout
+                  ? "Long lectures can take up to 25 minutes. The server is still working — check your sessions in a few minutes and it'll be there."
+                  : pipelineError
+                    ? pipelineError
+                    : isDone
+                      ? "Taking you to your lecture..."
+                      : isUploading
+                        ? "Sending your file to the server..."
+                        : "This usually takes a few minutes. You can switch tabs — it'll keep going."}
               </p>
             </div>
 
@@ -166,7 +176,29 @@ export default function UploadPage() {
 
             {/* Actions */}
             <div className="mt-6 flex justify-center gap-3">
-              {pipelineError && (
+              {isTimeout && (
+                <>
+                  <button
+                    onClick={async () => {
+                      await useAppStore.getState().loadSessions();
+                      useAppStore.getState().reset();
+                      router.push("/reader");
+                    }}
+                    className="btn-glow px-6 py-2.5 text-sm font-semibold rounded-xl"
+                    style={{ background: "linear-gradient(135deg, var(--accent), #FF8555)", color: "#fff", boxShadow: "0 8px 32px var(--accent-glow)" }}
+                  >
+                    Check sessions
+                  </button>
+                  <button
+                    onClick={() => { useAppStore.getState().reset(); }}
+                    className="px-4 py-2 text-sm rounded-xl"
+                    style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}
+                  >
+                    Upload new file
+                  </button>
+                </>
+              )}
+              {pipelineError && !isTimeout && (
                 <button
                   onClick={() => { useAppStore.getState().reset(); }}
                   className="btn-glow px-6 py-2.5 text-sm font-semibold rounded-xl"
