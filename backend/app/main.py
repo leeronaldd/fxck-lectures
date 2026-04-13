@@ -131,28 +131,51 @@ async def _record_usage(user: dict, request: Request) -> None:
         )
 
 
-async def _save_session(user: dict, request: Request, name: str, output: dict) -> str:
-    """Save pipeline output as a session in Supabase. Returns session ID."""
+async def _save_session(user: dict, request: Request, name: str, output: dict, session_id: str | None = None) -> str:
+    """Save pipeline output as a session in Supabase. Updates existing session if session_id provided, otherwise creates new. Returns session ID."""
     token = request.headers.get("authorization", "").split(" ", 1)[-1]
-    session_id = str(uuid.uuid4())
     async with httpx.AsyncClient() as client:
-        await client.post(
-            f"{SUPABASE_URL}/rest/v1/sessions",
-            json={
-                "id": session_id,
-                "user_id": user["id"],
-                "name": name,
-                "markdown": output.get("markdown", ""),
-                "concept_groups": output.get("concept_groups", []),
-                "verification_report": output.get("verification_report", []),
-            },
-            headers={
-                "apikey": SUPABASE_ANON_KEY,
-                "Authorization": f"Bearer {token}",
-                "Content-Type": "application/json",
-                "Prefer": "return=minimal",
-            },
-        )
+        if session_id:
+            # Update existing session with pipeline output
+            await client.patch(
+                f"{SUPABASE_URL}/rest/v1/sessions",
+                params={
+                    "id": f"eq.{session_id}",
+                    "user_id": f"eq.{user['id']}",
+                },
+                json={
+                    "name": name,
+                    "markdown": output.get("markdown", ""),
+                    "concept_groups": output.get("concept_groups", []),
+                    "verification_report": output.get("verification_report", []),
+                },
+                headers={
+                    "apikey": SUPABASE_ANON_KEY,
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json",
+                    "Prefer": "return=minimal",
+                },
+            )
+        else:
+            # Create new session (backward compat)
+            session_id = str(uuid.uuid4())
+            await client.post(
+                f"{SUPABASE_URL}/rest/v1/sessions",
+                json={
+                    "id": session_id,
+                    "user_id": user["id"],
+                    "name": name,
+                    "markdown": output.get("markdown", ""),
+                    "concept_groups": output.get("concept_groups", []),
+                    "verification_report": output.get("verification_report", []),
+                },
+                headers={
+                    "apikey": SUPABASE_ANON_KEY,
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json",
+                    "Prefer": "return=minimal",
+                },
+            )
     return session_id
 
 
@@ -226,6 +249,41 @@ async def upload_slides(
     _slide_files[file_id] = slides_path
 
     return {"status": "ok", "slides_filename": file.filename, "file_id": file_id}
+
+
+@app.post("/api/sessions")
+async def create_session(
+    request: Request,
+    user: dict = Depends(get_current_user),
+):
+    """Create a new empty session (before upload/processing)."""
+    body = await request.json()
+    name = body.get("name", "New Lecture").strip()
+
+    token = request.headers.get("authorization", "").split(" ", 1)[-1]
+    session_id = str(uuid.uuid4())
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"{SUPABASE_URL}/rest/v1/sessions",
+            json={
+                "id": session_id,
+                "user_id": user["id"],
+                "name": name,
+                "markdown": "",
+                "concept_groups": [],
+                "verification_report": [],
+            },
+            headers={
+                "apikey": SUPABASE_ANON_KEY,
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+                "Prefer": "return=representation",
+            },
+        )
+        if resp.status_code in (200, 201):
+            data = resp.json()
+            return data[0] if data else {"id": session_id, "name": name}
+        raise HTTPException(status_code=resp.status_code, detail="Failed to create session")
 
 
 @app.get("/api/sessions")
@@ -379,27 +437,50 @@ async def update_profile(
         "study_year": body.get("study_year"),
         "frustration": body.get("frustration"),
         "referral_source": body.get("referral_source"),
-        "updated_at": "now()",
     }
     # Remove None values
     profile = {k: v for k, v in profile.items() if v is not None}
 
     async with httpx.AsyncClient() as client:
-        # Upsert — insert or update on conflict
-        resp = await client.post(
+        # Check if profile exists
+        check = await client.get(
             f"{SUPABASE_URL}/rest/v1/user_profiles",
-            json=profile,
-            headers={
-                "apikey": SUPABASE_ANON_KEY,
-                "Authorization": f"Bearer {token}",
-                "Content-Type": "application/json",
-                "Prefer": "resolution=merge-duplicates,return=representation",
-            },
+            params={"user_id": f"eq.{user['id']}", "select": "id", "limit": "1"},
+            headers={"apikey": SUPABASE_ANON_KEY, "Authorization": f"Bearer {token}"},
         )
+        exists = check.status_code == 200 and check.json()
+
+        if exists:
+            # Update existing profile (user has UPDATE policy)
+            resp = await client.patch(
+                f"{SUPABASE_URL}/rest/v1/user_profiles",
+                params={"user_id": f"eq.{user['id']}"},
+                json=profile,
+                headers={
+                    "apikey": SUPABASE_ANON_KEY,
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json",
+                    "Prefer": "return=representation",
+                },
+            )
+        else:
+            # Insert new profile — use service role key to bypass RLS INSERT policy
+            service_key = os.environ.get("SUPABASE_SERVICE_KEY", SUPABASE_ANON_KEY)
+            resp = await client.post(
+                f"{SUPABASE_URL}/rest/v1/user_profiles",
+                json=profile,
+                headers={
+                    "apikey": SUPABASE_ANON_KEY,
+                    "Authorization": f"Bearer {service_key}" if service_key != SUPABASE_ANON_KEY else f"Bearer {token}",
+                    "Content-Type": "application/json",
+                    "Prefer": "return=representation",
+                },
+            )
+
         if resp.status_code in (200, 201):
             data = resp.json()
             return data[0] if data else profile
-        raise HTTPException(status_code=resp.status_code, detail="Failed to save profile")
+        raise HTTPException(status_code=resp.status_code, detail=f"Failed to save profile: {resp.text}")
 
 
 @app.post("/api/checkout")
@@ -432,6 +513,7 @@ async def create_checkout_session(
 @app.get("/api/run/{file_id}")
 async def run_pipeline_stream(
     file_id: str,
+    session_id: str | None = None,
     user: dict = Depends(get_current_user),
     request: Request = None,
 ):
@@ -520,7 +602,7 @@ async def run_pipeline_stream(
                         try:
                             await _record_usage(user, request)
                             session_name = original_filename.replace("-", " ").replace("_", " ").title()
-                            await _save_session(user, request, session_name, progress["output"])
+                            await _save_session(user, request, session_name, progress["output"], session_id=session_id)
                         except Exception:
                             pass  # Non-fatal — don't fail the pipeline for tracking issues
 
