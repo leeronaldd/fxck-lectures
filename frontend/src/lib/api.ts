@@ -251,11 +251,13 @@ export function runPipeline(
       });
 
       if (!res.ok) {
+        const body = await res.json().catch(() => null);
         if (res.status === 403) {
-          const body = await res.json().catch(() => ({ detail: "Usage limit reached" }));
-          onError(body.detail || "You've used your free lecture. Upgrade for unlimited access.");
+          onError(body?.detail || "You've used your free lecture. Upgrade for unlimited access.");
+        } else if (res.status === 404) {
+          onError("Upload not found on server — your file may have been lost in transit. Please upload it again.");
         } else {
-          onError(`Pipeline failed: ${res.statusText}`);
+          onError(body?.detail || `Something went wrong (${res.status}). Please try again.`);
         }
         return;
       }

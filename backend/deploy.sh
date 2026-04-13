@@ -24,9 +24,9 @@ gcloud run deploy "$SERVICE_NAME" \
   --memory 2Gi \
   --cpu 4 \
   --timeout 900 \
-  --concurrency 1 \
-  --min-instances 0 \
-  --max-instances 3 \
+  --concurrency 80 \
+  --min-instances 1 \
+  --max-instances 1 \
   --set-env-vars "SUPABASE_JWT_SECRET=$SUPABASE_JWT_SECRET,GCP_PROJECT_ID=$PROJECT_ID,GROQ_API_KEY=$GROQ_API_KEY,WHISPER_SERVICE_URL=$WHISPER_SERVICE_URL,GCS_SCREENSHOTS_BUCKET=fxck-lectures-screenshots"
 
 echo ""
