@@ -32,31 +32,45 @@ export async function uploadFile(
     throw new Error(`File too large (${sizeMB.toFixed(0)} MB). Maximum is ${MAX_UPLOAD_MB} MB.`);
   }
 
-  const token = await getToken();
-  console.log("[Upload] Starting upload, token length:", token.length, "file:", file.name, file.size);
-
   if (onProgress) onProgress(10);
 
-  const formData = new FormData();
-  formData.append("file", file);
+  // Retry up to 3 times — Chrome can abort fetch when tab is backgrounded
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const token = await getToken();
+      console.log(`[Upload] Attempt ${attempt + 1}, file: ${file.name} (${file.size} bytes)`);
 
-  const res = await fetch(`${API_URL}/api/upload`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: formData,
-  });
+      const formData = new FormData();
+      formData.append("file", file);
 
-  if (onProgress) onProgress(90);
-  console.log("[Upload] Response:", res.status, res.statusText);
+      const res = await fetch(`${API_URL}/api/upload`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
 
-  if (!res.ok) {
-    const body = await res.text();
-    console.error("[Upload] Error body:", body);
-    throw new Error(`Upload failed: ${res.status} ${res.statusText}`);
+      if (onProgress) onProgress(90);
+      console.log("[Upload] Response:", res.status, res.statusText);
+
+      if (!res.ok) {
+        const body = await res.text();
+        console.error("[Upload] Error body:", body);
+        throw new Error(`Upload failed: ${res.status} ${res.statusText}`);
+      }
+
+      if (onProgress) onProgress(100);
+      return res.json();
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      console.warn(`[Upload] Attempt ${attempt + 1} failed: ${lastError.message}`);
+      if (attempt < 2) {
+        // Brief wait before retry — give browser time to settle after tab switch
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+    }
   }
-
-  if (onProgress) onProgress(100);
-  return res.json();
+  throw lastError || new Error("Upload failed after 3 attempts");
 }
 
 export async function uploadSlides(
