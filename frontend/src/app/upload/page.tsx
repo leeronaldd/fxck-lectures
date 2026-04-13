@@ -2,8 +2,10 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import * as Progress from "@radix-ui/react-progress";
 import { useAppStore } from "@/lib/store";
 import UploadZone from "@/components/UploadZone";
+import PipelineStepper from "@/components/PipelineStepper";
 
 export default function UploadPage() {
   const router = useRouter();
@@ -17,80 +19,174 @@ export default function UploadPage() {
     setVideoFile,
     setSlidesFile,
     startPipeline,
-    uploadProgress,
-    isUploading,
     pipelineRuns,
+    activePipelineId,
   } = useAppStore();
 
-  // If there's an active pipeline run (upload or processing), send the user back to it
-  // so navigating away doesn't make it look like the upload stopped
-  useEffect(() => {
-    const activeRun = Object.values(pipelineRuns).find((r) => r.isProcessing);
-    if (activeRun) {
-      router.replace(`/processing?id=${activeRun.fileId}`);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Get the active run for this page (the one we started, or any in-progress one)
+  const activeRun = activePipelineId
+    ? pipelineRuns[activePipelineId]
+    : Object.values(pipelineRuns).find((r) => r.isProcessing || r.isDone);
 
-  const handleGenerate = () => {
-    startPipeline();
-    router.push("/processing");
-  };
+  const isRunning = activeRun?.isProcessing ?? false;
+  const isDone = activeRun?.isDone ?? false;
+  const pipelineError = activeRun?.error ?? null;
+  const isUploading = activeRun?.isUploading ?? false;
+  const uploadProgress = activeRun?.uploadProgress ?? 0;
+  const stages = activeRun?.stages ?? [];
+  const currentStageIndex = activeRun?.currentStageIndex ?? -1;
+  const subProgress = activeRun?.subProgress ?? 0;
+
+  // Auto-navigate to reader when done
+  useEffect(() => {
+    if (isDone) {
+      const t = setTimeout(() => router.push("/reader"), 600);
+      return () => clearTimeout(t);
+    }
+  }, [isDone, router]);
 
   const hasFile = transcriptFile || videoFile;
+  const showProgress = isRunning || isDone || !!pipelineError;
 
   return (
     <div className="flex-1 relative overflow-hidden overflow-y-auto">
-      {/* Background effects */}
       <div className="hero-glow hero-glow-pulse" />
 
-      {/* Content */}
       <div className="relative z-10 max-w-lg mx-auto px-4 sm:px-6 pt-10 sm:pt-16 pb-16">
-        {/* Greeting */}
-        <div className="text-center mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold mb-2" style={{ color: "var(--text-primary)" }}>
-            {user.isLoggedIn ? `Welcome back, ${user.name.split(" ")[0]}` : "Transform a lecture"}
-          </h1>
-          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-            Drop your lecture recording or transcript and we'll rewrite it as a tutor-quality read.
-          </p>
-        </div>
 
-        {/* Upload card */}
-        <div className="glass rounded-2xl p-6 sm:p-8">
-          <UploadZone
-            videoFile={videoFile}
-            transcriptFile={transcriptFile}
-            slidesFile={slidesFile}
-            onVideoChange={setVideoFile}
-            onTranscriptChange={setTranscriptFile}
-            onSlidesChange={setSlidesFile}
-            uploadProgress={uploadProgress}
-            isUploading={isUploading}
-          />
+        {!showProgress ? (
+          <>
+            {/* Upload form */}
+            <div className="text-center mb-8">
+              <h1 className="text-2xl sm:text-3xl font-bold mb-2" style={{ color: "var(--text-primary)" }}>
+                {user.isLoggedIn ? `Welcome back, ${user.name.split(" ")[0]}` : "Transform a lecture"}
+              </h1>
+              <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                Drop your lecture recording or transcript and we'll rewrite it as a tutor-quality read.
+              </p>
+            </div>
 
-          {/* Generate button */}
-          <button
-            onClick={handleGenerate}
-            disabled={!hasFile}
-            className="btn-glow w-full mt-6 py-3.5 px-6 rounded-xl text-sm font-semibold transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-            style={{
-              background: hasFile
-                ? "linear-gradient(135deg, var(--accent), #FF8555)"
-                : "var(--bg-elevated)",
-              color: hasFile ? "#fff" : "var(--text-muted)",
-              boxShadow: hasFile ? "0 8px 32px var(--accent-glow)" : "none",
-            }}
-          >
-            Transform Lecture
-          </button>
+            <div className="glass rounded-2xl p-6 sm:p-8">
+              <UploadZone
+                videoFile={videoFile}
+                transcriptFile={transcriptFile}
+                slidesFile={slidesFile}
+                onVideoChange={setVideoFile}
+                onTranscriptChange={setTranscriptFile}
+                onSlidesChange={setSlidesFile}
+                uploadProgress={uploadProgress}
+                isUploading={isUploading}
+              />
 
-          <p className="text-center text-xs mt-4" style={{ color: "var(--text-muted)" }}>
-            Supports .mp4/.mp3 lecture recordings and .txt transcripts
-          </p>
-        </div>
+              <button
+                onClick={() => startPipeline()}
+                disabled={!hasFile}
+                className="btn-glow w-full mt-6 py-3.5 px-6 rounded-xl text-sm font-semibold transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                style={{
+                  background: hasFile
+                    ? "linear-gradient(135deg, var(--accent), #FF8555)"
+                    : "var(--bg-elevated)",
+                  color: hasFile ? "#fff" : "var(--text-muted)",
+                  boxShadow: hasFile ? "0 8px 32px var(--accent-glow)" : "none",
+                }}
+              >
+                Transform Lecture
+              </button>
 
-        {/* Recent sessions are shown in the sidebar */}
+              <p className="text-center text-xs mt-4" style={{ color: "var(--text-muted)" }}>
+                Supports .mp4/.mp3 lecture recordings and .txt transcripts
+              </p>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Inline progress — same page, no navigation */}
+            <div className="text-center mb-8">
+              <div className="mb-4 flex justify-center">
+                {pipelineError ? (
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
+                    style={{ background: "rgba(255, 68, 68, 0.1)", border: "1px solid rgba(255, 68, 68, 0.2)" }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FF4444" strokeWidth="2" strokeLinecap="round">
+                      <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
+                    </svg>
+                  </div>
+                ) : isDone ? (
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
+                    style={{ background: "rgba(74, 222, 128, 0.1)", border: "1px solid rgba(74, 222, 128, 0.2)" }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2" strokeLinecap="round">
+                      <path d="M20 6L9 17l-5-5" />
+                    </svg>
+                  </div>
+                ) : (
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center animate-spin-slow"
+                    style={{ background: "var(--accent-dim)", border: "1px solid rgba(255, 107, 53, 0.2)" }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round">
+                      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                    </svg>
+                  </div>
+                )}
+              </div>
+
+              <h1 className="text-xl font-bold mb-1" style={{ color: pipelineError ? "#FF6666" : "var(--text-primary)" }}>
+                {pipelineError ? "Something went wrong" : isDone ? "Ready!" : isUploading ? "Uploading your lecture..." : "Transforming your lecture..."}
+              </h1>
+              <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                {pipelineError
+                  ? pipelineError
+                  : isDone
+                    ? "Taking you to your lecture..."
+                    : isUploading
+                      ? "Sending your file to the server..."
+                      : "This usually takes a few minutes. You can switch tabs — it'll keep going."}
+              </p>
+            </div>
+
+            <div className="glass rounded-2xl p-6">
+              {isUploading ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>Uploading...</span>
+                    <span className="text-sm font-mono" style={{ color: "var(--accent)" }}>{uploadProgress}%</span>
+                  </div>
+                  <Progress.Root className="relative overflow-hidden rounded-full w-full h-2" style={{ background: "var(--bg-elevated)" }} value={uploadProgress}>
+                    <Progress.Indicator
+                      className="w-full h-full rounded-full transition-transform duration-300 ease-out"
+                      style={{
+                        background: "linear-gradient(90deg, var(--accent), #FF8555)",
+                        transform: `translateX(-${100 - uploadProgress}%)`,
+                        boxShadow: "0 0 12px var(--accent-glow)",
+                      }}
+                    />
+                  </Progress.Root>
+                </div>
+              ) : (
+                <PipelineStepper stages={stages} currentStageIndex={currentStageIndex} subProgress={subProgress} />
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="mt-6 flex justify-center gap-3">
+              {pipelineError && (
+                <button
+                  onClick={() => { useAppStore.getState().reset(); }}
+                  className="btn-glow px-6 py-2.5 text-sm font-semibold rounded-xl"
+                  style={{ background: "linear-gradient(135deg, var(--accent), #FF8555)", color: "#fff", boxShadow: "0 8px 32px var(--accent-glow)" }}
+                >
+                  Try Again
+                </button>
+              )}
+              {!isDone && !pipelineError && (
+                <button
+                  onClick={() => { useAppStore.getState().cancelPipeline(); useAppStore.getState().reset(); }}
+                  className="px-4 py-2 text-sm rounded-xl"
+                  style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
