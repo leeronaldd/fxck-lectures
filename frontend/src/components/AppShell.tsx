@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useAppStore } from "@/lib/store";
 import AppSidebar from "./AppSidebar";
 
-const PROTECTED_PATHS = ["/upload", "/processing", "/reader"];
+const PROTECTED_PATHS = ["/upload", "/processing", "/reader", "/chat"];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -32,7 +32,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   // Don't show app shell on sign-in, quiz, preview, or landing page (for guests only)
   const isPreviewPage = pathname === "/preview";
-  if (isSignInPage || isQuizPage || isPreviewPage || (isLandingPage && !user.isLoggedIn)) {
+  const isChatPage = pathname.startsWith("/chat");
+  if (isSignInPage || isQuizPage || isPreviewPage || isChatPage || (isLandingPage && !user.isLoggedIn)) {
     return <>{children}</>;
   }
 
