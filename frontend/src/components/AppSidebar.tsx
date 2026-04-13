@@ -43,8 +43,6 @@ export default function AppSidebar() {
       if (e.key === "Escape") {
         if (deleteConfirm) {
           setDeleteConfirm(null);
-        } else if (renaming) {
-          setRenaming(null);
         } else if (window.innerWidth < 1024) {
           useAppStore.getState().setSidebarOpen(false);
         }
@@ -52,7 +50,7 @@ export default function AppSidebar() {
     };
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
-  }, [deleteConfirm, renaming]);
+  }, [deleteConfirm]);
 
   if (!sidebarOpen) return null;
 
