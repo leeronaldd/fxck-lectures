@@ -117,19 +117,21 @@ interface AppState {
 const INITIAL_SESSIONS: Session[] = [];
 
 const TEXT_STAGES: PipelineStage[] = [
-  { name: "Chunking transcript", weight: 10, mockDuration: 800, mockResult: "12 chunks", status: "pending" },
+  { name: "Chunking transcript", weight: 8, mockDuration: 800, mockResult: "12 chunks", status: "pending" },
   { name: "Validating slides", weight: 5, mockDuration: 400, mockResult: "Slides match confirmed", status: "pending" },
-  { name: "Preparing teaching context", weight: 15, mockDuration: 1500, mockResult: "Summaries ready", status: "pending" },
-  { name: "Generating lecture", weight: 65, mockDuration: 4000, mockResult: "Slides + transcript ready", hasSubProgress: true, status: "pending" },
+  { name: "Describing slides", weight: 8, mockDuration: 1500, mockResult: "Slides described", status: "pending" },
+  { name: "Planning lecture structure", weight: 15, mockDuration: 2500, mockResult: "Teaching plan ready", status: "pending" },
+  { name: "Generating lecture", weight: 59, mockDuration: 4000, mockResult: "Slides + transcript ready", hasSubProgress: true, status: "pending" },
   { name: "Assembling output", weight: 5, mockDuration: 300, mockResult: "Done!", status: "pending" },
 ];
 
 const VIDEO_STAGES: PipelineStage[] = [
-  { name: "Transcribing lecture", weight: 12, mockDuration: 2000, mockResult: "Transcribed", status: "pending" },
-  { name: "Chunking transcript", weight: 8, mockDuration: 800, mockResult: "12 chunks", status: "pending" },
-  { name: "Extracting lecture slides", weight: 10, mockDuration: 1500, mockResult: "Slides extracted", status: "pending" },
-  { name: "Preparing teaching context", weight: 12, mockDuration: 1500, mockResult: "Summaries ready", status: "pending" },
-  { name: "Generating lecture", weight: 53, mockDuration: 4000, mockResult: "Slides + transcript ready", hasSubProgress: true, status: "pending" },
+  { name: "Transcribing lecture", weight: 15, mockDuration: 3000, mockResult: "Transcribed", status: "pending" },
+  { name: "Chunking transcript", weight: 5, mockDuration: 800, mockResult: "12 chunks", status: "pending" },
+  { name: "Extracting lecture slides", weight: 5, mockDuration: 1500, mockResult: "Slides extracted", status: "pending" },
+  { name: "Describing slides", weight: 5, mockDuration: 1500, mockResult: "Slides described", status: "pending" },
+  { name: "Planning lecture structure", weight: 15, mockDuration: 2500, mockResult: "Teaching plan ready", status: "pending" },
+  { name: "Generating lecture", weight: 50, mockDuration: 4000, mockResult: "Slides + transcript ready", hasSubProgress: true, status: "pending" },
   { name: "Assembling output", weight: 5, mockDuration: 300, mockResult: "Done!", status: "pending" },
 ];
 
@@ -264,13 +266,17 @@ export const useAppStore = create<AppState>((set, get) => {
       return;
     }
 
-    const isVideo = /\.(mp4|mkv|avi|mov|webm)$/i.test(file.name);
+    const isVideo = /\.(mp4|mkv|avi|mov|webm|mp3|m4a|wav)$/i.test(file.name);
     const stageTemplate = isVideo ? VIDEO_STAGES : TEXT_STAGES;
     const stages = stageTemplate.map((s) => ({ ...s, status: "pending" as const }));
 
     const stageMap: Record<string, number> = {};
     stages.forEach((s, i) => { stageMap[s.name] = i; });
     stageMap["Done"] = stages.length - 1;
+    // Aliases: backend sometimes sends different names for the same stage
+    stageMap["Extracting slides from PDF"] = stageMap["Extracting lecture slides"] ?? stageMap["Describing slides"] ?? 2;
+    stageMap["Validating slides"] = stageMap["Validating slides"] ?? stageMap["Extracting lecture slides"] ?? 2;
+    stageMap["Preparing teaching context"] = stageMap["Planning lecture structure"] ?? 3;
 
     // Generate a temporary ID (will be replaced by fileId after upload)
     const tempId = `pending-${Date.now()}`;
