@@ -558,28 +558,43 @@ async def run_pipeline_stream(
         nonlocal finished
         from app.pipeline import run_pipeline
 
+        last_progress = None
         for progress in run_pipeline(input_path, user_profile=user_profile,
                                      slides_path=str(slides_path) if slides_path else None,
-                                     cancel_event=cancel_event):
+                                     cancel_event=None):  # Never cancel — always finish
             with lock:
                 events.append(progress)
-            if cancel_event.is_set():
-                break
+            last_progress = progress
+
+        # Save session even if client disconnected (result persists in Supabase)
+        if last_progress and last_progress.get("status") == "done" and last_progress.get("output"):
+            try:
+                import asyncio
+                loop = asyncio.new_event_loop()
+                loop.run_until_complete(_record_usage(user, request))
+                session_name = original_filename.replace("-", " ").replace("_", " ").title()
+                loop.run_until_complete(_save_session(user, request, session_name, last_progress["output"], session_id=session_id))
+                loop.close()
+                print(f"  Session saved for {file_id} (background)")
+            except Exception as e:
+                print(f"  Background session save failed: {e}")
+
         with lock:
             finished = True
 
-    # Start pipeline in background thread
-    thread = threading.Thread(target=pipeline_worker, daemon=True)
+    # Start pipeline in background thread (NOT daemon — survives SSE disconnect)
+    thread = threading.Thread(target=pipeline_worker, daemon=False)
     thread.start()
 
     async def event_stream():
         sent = 0
         try:
             while True:
-                # Check if client disconnected
+                # Check if client disconnected — DON'T cancel the pipeline.
+                # Let it finish in the background so the result gets saved
+                # to the user's session. They can reload and find it there.
                 if await request.is_disconnected():
-                    cancel_event.set()
-                    print(f"  Client disconnected — cancelling pipeline for {file_id}")
+                    print(f"  Client disconnected — pipeline continues in background for {file_id}")
                     return
 
                 with lock:
@@ -617,8 +632,8 @@ async def run_pipeline_stream(
                 yield ": keepalive\n\n"
                 await asyncio.sleep(2)
         except asyncio.CancelledError:
-            cancel_event.set()
-            print(f"  SSE stream cancelled — stopping pipeline for {file_id}")
+            # Don't cancel pipeline — let it finish and save the result
+            print(f"  SSE stream cancelled — pipeline continues in background for {file_id}")
 
     return StreamingResponse(
         event_stream(),
