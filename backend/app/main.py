@@ -131,6 +131,51 @@ async def _record_usage(user: dict, request: Request) -> None:
         )
 
 
+async def _save_session_direct(token: str, user_id: str, name: str, output: dict, session_id: str | None = None) -> str:
+    """Save pipeline output to Supabase using a pre-captured auth token.
+
+    Used by background pipeline worker where the request object may be stale.
+    """
+    async with httpx.AsyncClient() as client:
+        if session_id:
+            await client.patch(
+                f"{SUPABASE_URL}/rest/v1/sessions",
+                params={"id": f"eq.{session_id}", "user_id": f"eq.{user_id}"},
+                json={
+                    "name": name,
+                    "markdown": output.get("markdown", ""),
+                    "concept_groups": output.get("concept_groups", []),
+                    "verification_report": output.get("verification_report", []),
+                },
+                headers={
+                    "apikey": SUPABASE_ANON_KEY,
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json",
+                    "Prefer": "return=minimal",
+                },
+            )
+        else:
+            session_id = str(uuid.uuid4())
+            await client.post(
+                f"{SUPABASE_URL}/rest/v1/sessions",
+                json={
+                    "id": session_id,
+                    "user_id": user_id,
+                    "name": name,
+                    "markdown": output.get("markdown", ""),
+                    "concept_groups": output.get("concept_groups", []),
+                    "verification_report": output.get("verification_report", []),
+                },
+                headers={
+                    "apikey": SUPABASE_ANON_KEY,
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json",
+                    "Prefer": "return=minimal",
+                },
+            )
+    return session_id
+
+
 async def _save_session(user: dict, request: Request, name: str, output: dict, session_id: str | None = None) -> str:
     """Save pipeline output as a session in Supabase. Updates existing session if session_id provided, otherwise creates new. Returns session ID."""
     token = request.headers.get("authorization", "").split(" ", 1)[-1]
@@ -551,6 +596,9 @@ async def run_pipeline_stream(
     lock = threading.Lock()
     cancel_event = threading.Event()
 
+    # Capture auth token NOW — request object may be stale after SSE disconnects
+    auth_token = request.headers.get("authorization", "").split(" ", 1)[-1]
+
     # Check if slides were uploaded for this file
     slides_path = _slide_files.get(file_id)
 
@@ -571,9 +619,11 @@ async def run_pipeline_stream(
             try:
                 import asyncio
                 loop = asyncio.new_event_loop()
-                loop.run_until_complete(_record_usage(user, request))
                 session_name = original_filename.replace("-", " ").replace("_", " ").title()
-                loop.run_until_complete(_save_session(user, request, session_name, last_progress["output"], session_id=session_id))
+                loop.run_until_complete(_save_session_direct(
+                    auth_token, user["id"], session_name,
+                    last_progress["output"], session_id=session_id
+                ))
                 loop.close()
                 print(f"  Session saved for {file_id} (background)")
             except Exception as e:
