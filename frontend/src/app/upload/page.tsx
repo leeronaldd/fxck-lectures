@@ -32,6 +32,14 @@ export default function UploadPage() {
   const isDone = activeRun?.isDone ?? false;
   const pipelineError = activeRun?.error ?? null;
   const isTimeout = pipelineError === "__timeout__";
+  // Network drop = SSE connection lost mid-run (pipeline still running on server)
+  const isNetworkDrop = !isTimeout && !!pipelineError && (
+    pipelineError.toLowerCase().includes("network error") ||
+    pipelineError.toLowerCase().includes("failed to fetch") ||
+    pipelineError.toLowerCase().includes("connection lost") ||
+    pipelineError.toLowerCase().includes("load failed")
+  );
+  const isBackgroundRun = isTimeout || isNetworkDrop;
   const isUploading = activeRun?.isUploading ?? false;
   const uploadProgress = activeRun?.uploadProgress ?? 0;
   const stages = activeRun?.stages ?? [];
@@ -104,7 +112,7 @@ export default function UploadPage() {
             {/* Inline progress — same page, no navigation */}
             <div className="text-center mb-8">
               <div className="mb-4 flex justify-center">
-                {isTimeout ? (
+                {isBackgroundRun ? (
                   <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
                     style={{ background: "var(--accent-dim)", border: "1px solid rgba(255, 107, 53, 0.2)" }}>
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -135,18 +143,18 @@ export default function UploadPage() {
                 )}
               </div>
 
-              <h1 className="text-xl font-bold mb-1" style={{ color: isTimeout ? "var(--text-primary)" : pipelineError ? "#FF6666" : "var(--text-primary)" }}>
-                {isTimeout ? "Still generating in the background..." : pipelineError ? "Something went wrong" : isDone ? "Ready!" : isUploading ? "Uploading your lecture..." : "Transforming your lecture..."}
+              <h1 className="text-xl font-bold mb-1" style={{ color: isBackgroundRun ? "var(--text-primary)" : pipelineError ? "#FF6666" : "var(--text-primary)" }}>
+                {isBackgroundRun ? "Still generating in the background..." : pipelineError ? "Something went wrong" : isDone ? "Ready!" : isUploading ? "Uploading your lecture..." : "Transforming your lecture..."}
               </h1>
               <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                {isTimeout
-                  ? "Long lectures can take up to 25 minutes. The server is still working — check your sessions in a few minutes and it'll be there."
+                {isBackgroundRun
+                  ? "The connection dropped but your lecture is still being generated on the server. Check your sessions in a few minutes and it'll be there."
                   : pipelineError
                     ? pipelineError
                     : isDone
                       ? "Taking you to your lecture..."
                       : isUploading
-                        ? "Sending your file to the server..."
+                        ? "Stay on this page until the upload finishes — navigating away may interrupt it."
                         : "This usually takes a few minutes. You can switch tabs — it'll keep going."}
               </p>
             </div>
@@ -176,7 +184,7 @@ export default function UploadPage() {
 
             {/* Actions */}
             <div className="mt-6 flex justify-center gap-3">
-              {isTimeout && (
+              {isBackgroundRun && (
                 <>
                   <button
                     onClick={async () => {
@@ -198,7 +206,7 @@ export default function UploadPage() {
                   </button>
                 </>
               )}
-              {pipelineError && !isTimeout && (
+              {pipelineError && !isBackgroundRun && (
                 <button
                   onClick={() => { useAppStore.getState().reset(); }}
                   className="btn-glow px-6 py-2.5 text-sm font-semibold rounded-xl"

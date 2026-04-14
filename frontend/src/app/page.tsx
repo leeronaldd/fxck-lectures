@@ -287,10 +287,10 @@ export default function LandingPage() {
         <section className="pb-20">
           <div className="text-center mb-12">
             <h2 className="text-2xl sm:text-3xl font-bold mb-3" style={{ color: "var(--text-primary)" }}>
-              Not another LLM
+              Other tools make bad lectures prettier. We fix them.
             </h2>
             <p className="text-sm sm:text-base max-w-lg mx-auto" style={{ color: "var(--text-secondary)" }}>
-              Most tools summarise lectures as if you already understood the concept. Klare tutors the concepts from scratch.
+              They summarise. We re-teach.
             </p>
           </div>
 
