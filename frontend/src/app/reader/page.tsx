@@ -8,6 +8,7 @@ import NarrativeSection from "@/components/NarrativeSection";
 import ImageLightbox from "@/components/ImageLightbox";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import type { SlideCard, TranscriptSection } from "@/lib/types";
+import { downloadSlidesPDF, downloadTranscriptPDF } from "@/lib/pdf";
 
 export default function ReaderPage() {
   const router = useRouter();
@@ -278,6 +279,30 @@ export default function ReaderPage() {
           {sessionName}
         </h1>
 
+        {/* Download buttons */}
+        <div className="flex gap-2 mb-6">
+          <button
+            onClick={() => downloadSlidesPDF(slides, transcript, sessionName)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+            style={{ background: "var(--bg-elevated)", color: "var(--text-secondary)", border: "1px solid var(--border)" }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = "var(--accent)"; e.currentTarget.style.borderColor = "var(--accent)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-secondary)"; e.currentTarget.style.borderColor = "var(--border)"; }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            Slides PDF
+          </button>
+          <button
+            onClick={() => downloadTranscriptPDF(transcript, sessionName)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+            style={{ background: "var(--bg-elevated)", color: "var(--text-secondary)", border: "1px solid var(--border)" }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = "var(--accent)"; e.currentTarget.style.borderColor = "var(--accent)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-secondary)"; e.currentTarget.style.borderColor = "var(--border)"; }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+            Notes PDF
+          </button>
+        </div>
+
         {/* Current section's slide(s) */}
         {activeSectionSlides.length > 0 ? (
           <SlideCardGroup cards={activeSectionSlides} onImageClick={setLightboxSrc} />
@@ -324,7 +349,7 @@ export default function ReaderPage() {
           onKeyDown={(e) => {
             if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); }
           }}
-          className="md:hidden text-lg font-semibold mb-8 outline-none rounded-lg px-2 py-1 -ml-2 transition-colors"
+          className="md:hidden text-lg font-semibold mb-4 outline-none rounded-lg px-2 py-1 -ml-2 transition-colors"
           style={{ color: "var(--text-secondary)", cursor: "text" }}
           onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-elevated)"; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
@@ -332,6 +357,26 @@ export default function ReaderPage() {
         >
           {sessionName}
         </h1>
+
+        {/* Mobile download buttons */}
+        <div className="md:hidden flex gap-2 mb-8">
+          <button
+            onClick={() => downloadSlidesPDF(slides, transcript, sessionName)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
+            style={{ background: "var(--bg-elevated)", color: "var(--text-secondary)", border: "1px solid var(--border)" }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            Slides PDF
+          </button>
+          <button
+            onClick={() => downloadTranscriptPDF(transcript, sessionName)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
+            style={{ background: "var(--bg-elevated)", color: "var(--text-secondary)", border: "1px solid var(--border)" }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+            Notes PDF
+          </button>
+        </div>
 
         {transcript.map((section, i) => (
           <div

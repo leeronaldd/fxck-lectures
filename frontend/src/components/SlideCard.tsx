@@ -54,8 +54,8 @@ function SlideImage({ src, alt, onClick }: { src: string; alt: string; onClick: 
           ref={imgRef}
           src={src}
           alt={alt}
-          className="w-full h-auto transition-opacity duration-200"
-          style={{ opacity: status === "loaded" ? 1 : 0 }}
+          className="w-full transition-opacity duration-200"
+          style={{ opacity: status === "loaded" ? 1 : 0, maxHeight: "280px", objectFit: "contain" }}
           loading="lazy"
           onLoad={() => setStatus("loaded")}
           onError={() => setStatus("error")}
