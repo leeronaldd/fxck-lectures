@@ -191,6 +191,7 @@ export function SlideCardGroup({
   onImageClick?: (src: string) => void;
 }) {
   const [activeIdx, setActiveIdx] = useState(0);
+  const safeIdx = Math.min(activeIdx, cards.length - 1);
 
   if (cards.length === 1) {
     return <SlideCardComponent card={cards[0]} onImageClick={onImageClick} />;
@@ -198,7 +199,7 @@ export function SlideCardGroup({
 
   return (
     <div className="space-y-2">
-      <SlideCardComponent card={cards[activeIdx]} onImageClick={onImageClick} />
+      <SlideCardComponent card={cards[safeIdx]} onImageClick={onImageClick} />
       {/* Dot indicators */}
       <div className="flex items-center justify-center gap-2 py-1">
         {cards.map((card, i) => (

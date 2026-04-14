@@ -305,7 +305,7 @@ export default function ReaderPage() {
 
         {/* Current section's slide(s) */}
         {activeSectionSlides.length > 0 ? (
-          <SlideCardGroup cards={activeSectionSlides} onImageClick={setLightboxSrc} />
+          <SlideCardGroup key={activeSection} cards={activeSectionSlides} onImageClick={setLightboxSrc} />
         ) : (
           <div
             className="rounded-2xl p-8 text-center border"
