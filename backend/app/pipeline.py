@@ -258,17 +258,30 @@ def run_pipeline(
                         gcs_lookup[stem] = s["gcs_url"]
                 if gcs_lookup:
                     replaced = 0
+                    # Replace in slide card image_refs
                     for slide in api_response.get("slides", []):
                         ref = slide.get("image_ref", "")
                         if ref in gcs_lookup:
                             slide["image_ref"] = gcs_lookup[ref]
                             replaced += 1
                         elif ref.startswith("screenshots/"):
-                            # Try stem match: "screenshots/slide_005.jpg" → stem "slide_005"
                             ref_stem = ref.split("/", 1)[1].rsplit(".", 1)[0] if "." in ref else ref
                             if ref_stem in gcs_lookup:
                                 slide["image_ref"] = gcs_lookup[ref_stem]
                                 replaced += 1
+
+                    # Also replace in transcript narrative text
+                    # (writers embed ![desc](screenshots/slide_XXX.png) in transcript)
+                    for section in api_response.get("transcript", []):
+                        if isinstance(section, dict):
+                            for field in ("narrative", "text"):
+                                val = section.get(field, "")
+                                if val and "screenshots/" in val:
+                                    for local_path, gcs_url in gcs_lookup.items():
+                                        if local_path.startswith("screenshots/"):
+                                            val = val.replace(local_path, gcs_url)
+                                    section[field] = val
+
                     print(f"  Replaced {replaced} screenshot refs with GCS URLs")
             except Exception as e:
                 print(f"  Warning: GCS URL replacement failed: {e}")
