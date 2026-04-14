@@ -234,7 +234,7 @@ export default function ReaderPage() {
     : [];
 
   return (
-    <div className="flex flex-1 overflow-hidden">
+    <div className="flex h-full overflow-hidden">
       {/* Lightbox */}
       {lightboxSrc && (
         <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
