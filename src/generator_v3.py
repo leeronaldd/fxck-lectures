@@ -1756,6 +1756,76 @@ def _strip_professor_commentary(text: str) -> str:
 # Lecture generator — V3 orchestrator
 # ═══════════════════════════════════════════════════════════════════════════
 
+def _ensure_all_slides_included(
+    sections: list[GeneratedSection],
+    teaching_groups: list[SlideGroup],
+    screenshots: list[dict],
+) -> None:
+    """Auto-include every professor slide as a SlideCard.
+
+    The writer only references 1-2 slides per group in its output. The
+    student should see ALL slides the professor showed. This scans each
+    group's slide_indices and adds SlideCard objects for any slides the
+    writer missed.
+
+    Writer-generated cards (with exam tips) are kept first. Auto-filled
+    cards are appended after — they show the slide image with a title
+    from the Flash description but no exam tip.
+    """
+    if not screenshots:
+        return
+
+    # Build set of all image_refs already referenced across all sections
+    existing_refs = set()
+    for section in sections:
+        for card in section.slide_cards:
+            ref = card.image_ref
+            if ref:
+                # Normalize: strip path prefix, get just filename stem
+                fname = ref.split("/")[-1].rsplit(".", 1)[0] if "/" in ref else ref.rsplit(".", 1)[0]
+                existing_refs.add(fname)
+
+    # Match sections to groups by position (both are in teaching order)
+    filled = 0
+    for i, group in enumerate(teaching_groups):
+        if i >= len(sections):
+            break
+
+        section = sections[i]
+
+        for slide_idx in group.slide_indices:
+            if slide_idx >= len(screenshots):
+                continue
+
+            ss = screenshots[slide_idx]
+            filename = ss.get("image_filename", "")
+            stem = filename.rsplit(".", 1)[0] if "." in filename else filename
+
+            # Skip if writer already included this slide
+            if stem in existing_refs:
+                continue
+
+            # Auto-create a SlideCard for this missing slide
+            desc = ss.get("description", "")
+            # Title: first sentence of description, max 60 chars
+            title = desc.split(".")[0][:60] if desc else f"Slide {slide_idx + 1}"
+
+            section.slide_cards.append(SlideCard(
+                slide_id=f"{section.slide_number}{chr(97 + len(section.slide_cards))}",
+                title=title,
+                card_type="professor_slide",
+                image_ref=f"screenshots/{filename}",
+                bullet_points=[],
+                exam_tip="",
+                ei_percent=section.ei_percent,
+            ))
+            existing_refs.add(stem)
+            filled += 1
+
+    if filled:
+        print(f"  Auto-filled {filled} professor slides into slide cards")
+
+
 def generate_lecture_v3(
     screenshots_json: str | Path,
     transcript_path: str | Path,
@@ -1997,5 +2067,9 @@ def generate_lecture_v3(
     print(f"    Textbooks:  {t_tb:.1f}s")
     print(f"    Generation: {t_gen:.1f}s ({len(deep_groups)} Pro + {len(standard_groups)} F+T)")
     print(f"  {'='*50}\n")
+
+    # Ensure every professor slide appears as a SlideCard
+    # (writers only reference 1-2 slides per group, missing the rest)
+    _ensure_all_slides_included(sections, teaching_groups, screenshots)
 
     return sections, groups
