@@ -199,7 +199,7 @@ def describe_screenshots(
     screenshots: list[dict],
     batch_size: int = 5,
     delay: float = 0.5,
-    max_workers: int = 6,
+    max_workers: int = 4,
 ) -> list[dict]:
     """
     Use Gemini Flash multimodal to describe each screenshot in 1-2 sentences.
@@ -226,23 +226,32 @@ def describe_screenshots(
     total = len(screenshots)
 
     def _describe_one(idx: int, ss: dict) -> tuple[int, str]:
-        try:
-            img_path = ss["image_path"]
-            with open(img_path, "rb") as f:
-                image_bytes = f.read()
+        import time as _time
+        img_path = ss["image_path"]
+        with open(img_path, "rb") as f:
+            image_bytes = f.read()
 
-            mime = "image/png" if img_path.lower().endswith(".png") else "image/jpeg"
-            response = client.models.generate_content(
-                model=CHUNKER_FALLBACK_MODEL,
-                contents=[
-                    types.Part.from_bytes(data=image_bytes, mime_type=mime),
-                    "Describe this lecture slide in 1-2 sentences. What topic/concept does it show?",
-                ],
-            )
-            return idx, response.text.strip()
-        except Exception as e:
-            print(f"  Warning: description failed for screenshot {idx + 1}: {e}")
-            return idx, "[Description unavailable]"
+        mime = "image/png" if img_path.lower().endswith(".png") else "image/jpeg"
+
+        # Retry with backoff for 429 RESOURCE_EXHAUSTED
+        for attempt in range(4):
+            try:
+                response = client.models.generate_content(
+                    model=CHUNKER_FALLBACK_MODEL,
+                    contents=[
+                        types.Part.from_bytes(data=image_bytes, mime_type=mime),
+                        "Describe this lecture slide in 1-2 sentences. What topic/concept does it show?",
+                    ],
+                )
+                return idx, response.text.strip()
+            except Exception as e:
+                if "429" in str(e) and attempt < 3:
+                    wait = (attempt + 1) * 5  # 5s, 10s, 15s
+                    _time.sleep(wait)
+                    continue
+                print(f"  Warning: description failed for screenshot {idx + 1}: {e}")
+                return idx, "[Description unavailable]"
+        return idx, "[Description unavailable]"
 
     completed = 0
     with ThreadPoolExecutor(max_workers=max_workers) as executor:

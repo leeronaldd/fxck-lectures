@@ -187,8 +187,9 @@ def run_pipeline(
                     _check_cancelled(cancel_event)
 
                     # Flash multimodal descriptions — V3 needs these to group slides
+                    # Use 3 workers max to avoid Vertex AI 429 rate limits
                     from src.screenshot_extractor import describe_screenshots
-                    describe_screenshots(pdf_slides)
+                    describe_screenshots(pdf_slides, max_workers=3)
 
                     ss_json_path = str(output_dir / f"{job_id}_screenshots.json")
                     with open(ss_json_path, "w", encoding="utf-8") as f:
