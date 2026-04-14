@@ -19,6 +19,21 @@ export default function ReaderPage() {
   const [transcript, setTranscript] = useState<TranscriptSection[]>([]);
   const [isV2, setIsV2] = useState(false);
   const [legacyMarkdown, setLegacyMarkdown] = useState("");
+  const [activeSection, setActiveSection] = useState(0);
+  const sectionRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const rightPanelRef = useRef<HTMLDivElement | null>(null);
+
+  const handleScroll = () => {
+    const refs = sectionRefs.current;
+    const threshold = window.innerHeight * 0.4;
+    let newActive = 0;
+    for (let i = 0; i < refs.length; i++) {
+      const el = refs[i];
+      if (!el) continue;
+      if (el.getBoundingClientRect().top <= threshold) newActive = i;
+    }
+    setActiveSection(newActive);
+  };
 
   // Auto-collapse sidebar on reader page
   useEffect(() => {
@@ -202,8 +217,7 @@ export default function ReaderPage() {
     );
   }
 
-  // V2 rendering — slides + transcript split view
-  // Group slides by slide_number for card groups (1a, 1b, etc.)
+  // V2 rendering — sticky left slide panel + scrollable right narratives
   const slideGroups: Record<number, SlideCard[]> = {};
   for (const card of slides) {
     const num = parseInt(card.slide_id.replace(/[a-z]/g, ""));
@@ -211,104 +225,137 @@ export default function ReaderPage() {
     slideGroups[num].push(card);
   }
 
-  // Get current session name for the editable title
   const activeSession = store.sessions.find((s) => s.id === store.activeSessionId);
   const sessionName = activeSession?.name || "Untitled Lecture";
 
+  const activeSectionData = transcript[activeSection];
+  const activeSectionSlides = activeSectionData
+    ? (slideGroups[activeSectionData.slide_number] || [])
+    : [];
+
   return (
-    <div className="flex flex-1 overflow-x-hidden">
+    <div className="flex flex-1 overflow-hidden">
       {/* Lightbox */}
       {lightboxSrc && (
         <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
       )}
 
-      <div className="flex-1 min-w-0 overflow-y-auto">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-8 pb-16">
-          {/* Editable session title */}
-          <h1
-            contentEditable
-            suppressContentEditableWarning
-            onBlur={async (e) => {
-              const val = e.currentTarget.textContent?.trim() || "";
-              if (val && val !== sessionName && store.activeSessionId) {
-                const sessionId = store.activeSessionId;
-                // Optimistically update store synchronously so React re-renders
-                // with the NEW name — prevents the DOM from reverting before the API call completes
-                // Optimistically update store synchronously
-                useAppStore.setState((s) => ({
-                  sessions: s.sessions.map((sess) =>
-                    sess.id === sessionId ? { ...sess, name: val } : sess
-                  ),
-                }));
-                // Call API in background without awaiting — it will sync on next session load
-                // Awaiting here and then calling loadSessions() can still race and revert the name
-                const { renameSession } = await import("@/lib/api");
-                renameSession(sessionId, val).catch((err) => {
-                  console.error("Failed to rename session:", err);
-                  // Optionally reload on error to restore server state
-                  store.loadSessions();
-                });
-              }
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); }
-            }}
-            className="text-lg font-semibold mb-8 outline-none rounded-lg px-2 py-1 -ml-2 transition-colors"
-            style={{
-              color: "var(--text-secondary)",
-              cursor: "text",
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-elevated)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-            onFocus={(e) => { e.currentTarget.style.background = "var(--bg-elevated)"; e.currentTarget.style.color = "var(--text-primary)"; }}
+      {/* Desktop: left slide panel — stays pinned, updates as you scroll */}
+      <div
+        className="hidden md:flex flex-col shrink-0 overflow-y-auto"
+        style={{
+          width: "44%",
+          padding: "32px 20px 64px 24px",
+          borderRight: "1px solid var(--border)",
+        }}
+      >
+        {/* Editable session title lives here on desktop */}
+        <h1
+          contentEditable
+          suppressContentEditableWarning
+          onBlur={async (e) => {
+            const val = e.currentTarget.textContent?.trim() || "";
+            if (val && val !== sessionName && store.activeSessionId) {
+              const sessionId = store.activeSessionId;
+              useAppStore.setState((s) => ({
+                sessions: s.sessions.map((sess) =>
+                  sess.id === sessionId ? { ...sess, name: val } : sess
+                ),
+              }));
+              const { renameSession } = await import("@/lib/api");
+              renameSession(sessionId, val).catch(() => store.loadSessions());
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); }
+          }}
+          className="text-lg font-semibold mb-6 outline-none rounded-lg px-2 py-1 -ml-2 transition-colors"
+          style={{ color: "var(--text-secondary)", cursor: "text" }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-elevated)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+          onFocus={(e) => { e.currentTarget.style.background = "var(--bg-elevated)"; e.currentTarget.style.color = "var(--text-primary)"; }}
+        >
+          {sessionName}
+        </h1>
+
+        {/* Current section's slide(s) */}
+        {activeSectionSlides.length > 0 ? (
+          <SlideCardGroup cards={activeSectionSlides} onImageClick={setLightboxSrc} />
+        ) : (
+          <div
+            className="rounded-2xl p-8 text-center border"
+            style={{ background: "var(--bg-surface)", borderColor: "var(--border)" }}
           >
-            {sessionName}
-          </h1>
-          {transcript.map((section, i) => {
-            const sectionSlides = slideGroups[section.slide_number] || [];
+            <p className="text-sm" style={{ color: "var(--text-muted)" }}>No slides for this section</p>
+          </div>
+        )}
 
-            return (
-              <div key={i} className="mb-12">
-                {/* Desktop: 50/50 split */}
-                <div className="hidden md:grid gap-8" style={{ gridTemplateColumns: "1fr 1fr" }}>
-                  {/* Left: slide cards */}
-                  <div className="sticky top-4 self-start space-y-4">
-                    {sectionSlides.length > 0 ? (
-                      <SlideCardGroup cards={sectionSlides} onImageClick={setLightboxSrc} />
-                    ) : (
-                      <div
-                        className="rounded-2xl p-8 text-center border"
-                        style={{ background: "var(--bg-surface)", borderColor: "var(--border)" }}
-                      >
-                        <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                          No slides for this section
-                        </p>
-                      </div>
-                    )}
-                  </div>
+        {transcript.length > 1 && (
+          <p className="mt-4 text-xs" style={{ color: "var(--text-muted)" }}>
+            Section {activeSection + 1} / {transcript.length}
+          </p>
+        )}
+      </div>
 
-                  {/* Right: narrative */}
-                  <div className="pl-8 border-l" style={{ borderColor: "var(--border)" }}>
-                    <NarrativeSection section={section} />
-                  </div>
-                </div>
+      {/* Right: scrollable narratives */}
+      <div
+        ref={rightPanelRef}
+        className="flex-1 min-w-0 overflow-y-auto"
+        style={{ padding: "32px 24px 64px 32px" }}
+        onScroll={handleScroll}
+      >
+        {/* Mobile: title at top of scroll */}
+        <h1
+          contentEditable
+          suppressContentEditableWarning
+          onBlur={async (e) => {
+            const val = e.currentTarget.textContent?.trim() || "";
+            if (val && val !== sessionName && store.activeSessionId) {
+              const sessionId = store.activeSessionId;
+              useAppStore.setState((s) => ({
+                sessions: s.sessions.map((sess) =>
+                  sess.id === sessionId ? { ...sess, name: val } : sess
+                ),
+              }));
+              const { renameSession } = await import("@/lib/api");
+              renameSession(sessionId, val).catch(() => store.loadSessions());
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); }
+          }}
+          className="md:hidden text-lg font-semibold mb-8 outline-none rounded-lg px-2 py-1 -ml-2 transition-colors"
+          style={{ color: "var(--text-secondary)", cursor: "text" }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-elevated)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+          onFocus={(e) => { e.currentTarget.style.background = "var(--bg-elevated)"; e.currentTarget.style.color = "var(--text-primary)"; }}
+        >
+          {sessionName}
+        </h1>
 
-                {/* Mobile: stacked */}
-                <div className="md:hidden space-y-6">
-                  {sectionSlides.length > 0 && (
-                    <SlideCardGroup cards={sectionSlides} onImageClick={setLightboxSrc} />
-                  )}
-                  <NarrativeSection section={section} />
-                </div>
+        {transcript.map((section, i) => (
+          <div
+            key={i}
+            ref={(el) => { sectionRefs.current[i] = el; }}
+            className="mb-12"
+          >
+            {/* Mobile: slide cards above narrative */}
+            <div className="md:hidden mb-6">
+              {(slideGroups[section.slide_number] || []).length > 0 && (
+                <SlideCardGroup
+                  cards={slideGroups[section.slide_number]}
+                  onImageClick={setLightboxSrc}
+                />
+              )}
+            </div>
 
-                {/* Section divider */}
-                {i < transcript.length - 1 && (
-                  <hr className="mt-12" style={{ borderColor: "var(--border)" }} />
-                )}
-              </div>
-            );
-          })}
-        </div>
+            <NarrativeSection section={section} />
+
+            {i < transcript.length - 1 && (
+              <hr className="mt-12" style={{ borderColor: "var(--border)" }} />
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );
