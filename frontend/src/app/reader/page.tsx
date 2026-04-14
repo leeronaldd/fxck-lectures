@@ -70,8 +70,8 @@ export default function ReaderPage() {
       if (store.markdown.trim().startsWith("{")) {
         try {
           const parsed = JSON.parse(store.markdown);
-          setSlides(parsed.slides || []);
-          setTranscript(parsed.transcript || []);
+          setSlides((parsed.slides || []).filter(Boolean));
+          setTranscript((parsed.transcript || []).filter(Boolean));
           setIsV2(true);
         } catch {
           // JSON parse failed — treat as legacy markdown

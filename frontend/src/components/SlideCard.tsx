@@ -87,6 +87,7 @@ export function SlideCardComponent({
   card: SlideCard;
   onImageClick?: (src: string) => void;
 }) {
+  if (!card) return null;
   const isProfSlide = card.card_type === "professor_slide";
 
   return (

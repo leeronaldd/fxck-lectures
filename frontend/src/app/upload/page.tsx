@@ -189,7 +189,10 @@ export default function UploadPage() {
                   <button
                     onClick={async () => {
                       await useAppStore.getState().loadSessions();
-                      useAppStore.getState().reset();
+                      const sessions = useAppStore.getState().sessions;
+                      if (sessions.length > 0) {
+                        await useAppStore.getState().loadSession(sessions[0].id);
+                      }
                       router.push("/reader");
                     }}
                     className="btn-glow px-6 py-2.5 text-sm font-semibold rounded-xl"
