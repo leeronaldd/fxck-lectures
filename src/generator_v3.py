@@ -287,11 +287,16 @@ moving to the next thing.
 
 Rules:
 - Every slide index below must appear in exactly ONE group
-- Aim for 8-20 groups depending on how many distinct concepts exist
+- Expect roughly 1 group per 2-3 slides — for {len(non_blank)} slides that means \
+roughly {len(non_blank) // 3}-{len(non_blank) // 2} groups
 - Slides showing the same concept from different angles → same group
 - Slides on different topics → different groups, even if consecutive
 - Quiz, review, or activity slides → group with the nearest teaching slide
 - Order groups in the sequence a student should learn them
+- Give the SAME attention to slides at the end of the lecture as the beginning. \
+A student needs endospores and biofilms taught just as carefully as viral capsids. \
+If you find yourself making one large group for "everything after slide 20," stop \
+and split it — those are separate topics that need separate groups
 
 SLIDES:
 {slides_text}
