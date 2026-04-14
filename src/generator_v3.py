@@ -114,11 +114,20 @@ def plan_lecture(
     debug_dir.mkdir(parents=True, exist_ok=True)
 
     # ── Identify non-blank slides ──
+    # Only filter truly empty slides — be conservative. A slide with ANY
+    # content (even just a title or partial diagram) should be kept.
     non_blank = set()
     blank_indices = set()
     for i, s in enumerate(screenshots):
-        desc = s.get("description", "").lower()
-        if "blank" in desc or "no visible" in desc or "solid black" in desc:
+        desc = s.get("description", "").lower().strip()
+        is_blank = (
+            not desc  # No description at all
+            or desc in ("blank", "blank slide", "blank screen")
+            or "solid black screen" in desc
+            or "no visible text, diagrams, or content" in desc
+            or (desc.startswith("the provided image is") and "blank" in desc)
+        )
+        if is_blank:
             blank_indices.add(i)
         else:
             non_blank.add(i)
