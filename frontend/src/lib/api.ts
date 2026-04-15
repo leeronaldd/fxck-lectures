@@ -99,6 +99,12 @@ export async function uploadSlides(
   }
 }
 
+export interface StreamedSection {
+  index: number;
+  slide: { slide_id: string; title: string; card_type: "professor_slide" | "diagram"; image_ref: string; bullet_points: string[]; exam_tip: string; ei_percent: number };
+  transcript: { slide_number: number; title: string; narrative: string; ei_percent: number; ei_reasoning: string };
+}
+
 export interface PipelineEvent {
   status: string;
   current_stage: string | null;
@@ -111,6 +117,7 @@ export interface PipelineEvent {
     concept_groups: unknown[];
     verification_report: unknown[];
   } | null;
+  section?: StreamedSection | null;
 }
 
 /**
@@ -119,7 +126,7 @@ export interface PipelineEvent {
  *
  * Returns a cancel function.
  */
-export async function fetchSessions(): Promise<{ id: string; name: string; created_at: string }[]> {
+export async function fetchSessions(): Promise<{ id: string; name: string; created_at: string; status?: string; error_message?: string | null }[]> {
   const token = await getToken();
   const res = await fetch(`${API_URL}/api/sessions`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -134,6 +141,8 @@ export async function fetchSession(sessionId: string): Promise<{
   markdown: string;
   concept_groups: unknown[];
   verification_report: unknown[];
+  status?: string;
+  error_message?: string | null;
 } | null> {
   const token = await getToken();
   const res = await fetch(`${API_URL}/api/sessions/${sessionId}`, {
@@ -225,6 +234,7 @@ export function runPipeline(
   onError: (error: string) => void,
   onDone: (output: PipelineEvent["output"]) => void,
   sessionId?: string,
+  onSection?: (section: StreamedSection) => void,
 ): () => void {
   let cancelled = false;
   const controller = new AbortController();
@@ -282,7 +292,10 @@ export function runPipeline(
         for (const part of parts) {
           if (part.startsWith("data: ")) {
             const data = JSON.parse(part.slice(6)) as PipelineEvent;
-            if (!cancelled) onUpdate(data);
+            if (!cancelled) {
+              if (data.section && onSection) onSection(data.section);
+              onUpdate(data);
+            }
 
             if (data.status === "done") {
               if (!cancelled) onDone(data.output);

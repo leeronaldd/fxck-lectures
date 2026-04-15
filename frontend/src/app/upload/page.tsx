@@ -46,13 +46,18 @@ export default function UploadPage() {
   const currentStageIndex = activeRun?.currentStageIndex ?? -1;
   const subProgress = activeRun?.subProgress ?? 0;
 
-  // Auto-navigate to reader when done
+  // Auto-navigate to reader when done OR as soon as the first streamed
+  // section arrives — reader will keep appending sections as they stream.
+  const hasStreamedSection = (activeRun?.streamingTranscript.length ?? 0) > 0;
   useEffect(() => {
     if (isDone) {
       const t = setTimeout(() => router.push("/reader"), 600);
       return () => clearTimeout(t);
     }
-  }, [isDone, router]);
+    if (hasStreamedSection) {
+      router.push("/reader");
+    }
+  }, [isDone, hasStreamedSection, router]);
 
   const hasFile = transcriptFile || videoFile;
   const showProgress = isRunning || isDone || !!pipelineError;
@@ -143,12 +148,12 @@ export default function UploadPage() {
                 )}
               </div>
 
-              <h1 className="text-xl font-bold mb-1" style={{ color: isBackgroundRun ? "var(--text-primary)" : pipelineError ? "#FF6666" : "var(--text-primary)" }}>
-                {isBackgroundRun ? "Still generating in the background..." : pipelineError ? "Something went wrong" : isDone ? "Ready!" : isUploading ? "Uploading your lecture..." : "Transforming your lecture..."}
+              <h1 className="text-xl font-bold mb-1" style={{ color: pipelineError ? "#FF6666" : "var(--text-primary)" }}>
+                {isBackgroundRun ? "Your lecture is being rebuilt..." : pipelineError ? "Something went wrong" : isDone ? "Ready!" : isUploading ? "Uploading your lecture..." : "Transforming your lecture..."}
               </h1>
               <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
                 {isBackgroundRun
-                  ? "The connection dropped but your lecture is still being generated on the server. Check your sessions in a few minutes and it'll be there."
+                  ? "This usually takes 8–10 minutes. Feel free to close this tab — we'll save it to your sessions when it's ready."
                   : pipelineError
                     ? pipelineError
                     : isDone

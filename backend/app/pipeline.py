@@ -13,6 +13,7 @@ Yields progress dicts for the SSE stream.
 """
 
 import json
+import os
 import sys
 import threading
 from pathlib import Path
@@ -63,9 +64,11 @@ def run_pipeline(
 
     try:
         from src.chunker import chunk_transcript
+        from src.run_tracker import TRACKER
 
         input_file = Path(input_path)
         job_id = input_file.stem
+        TRACKER.reset(job_id)
         video_extensions = {".mp4", ".mkv", ".avi", ".mov", ".webm"}
         audio_extensions = {".mp3", ".m4a", ".wav", ".ogg", ".flac", ".aac"}
         is_video = input_file.suffix.lower() in video_extensions
@@ -187,9 +190,12 @@ def run_pipeline(
                     _check_cancelled(cancel_event)
 
                     # Flash multimodal descriptions — V3 needs these to group slides
-                    # Use 3 workers max to avoid Vertex AI 429 rate limits
+                    # 8 workers — with retry+backoff in call_with_timeout and the
+                    # per-worker 429-backoff loop in describe_screenshots, this
+                    # is safe and roughly halves slide-description wallclock
+                    # (~170s at 3 workers → ~65s at 8 on a 37-slide deck).
                     from src.screenshot_extractor import describe_screenshots
-                    describe_screenshots(pdf_slides, max_workers=3)
+                    describe_screenshots(pdf_slides, max_workers=8)
 
                     ss_json_path = str(output_dir / f"{job_id}_screenshots.json")
                     with open(ss_json_path, "w", encoding="utf-8") as f:
@@ -214,10 +220,16 @@ def run_pipeline(
 
         yield {"status": "running", "stage": "Planning lecture structure", "progress": 24}
 
-        from src.generator_v3 import generate_lecture_v3
+        # Generator selection: USE_SINGLE_WRITER env var picks the single-Pro-call
+        # pipeline (cheaper, faster, equivalent or better quality on tested
+        # lectures) over the multi-agent pipeline (more breadth, more code,
+        # more cost). Multi-agent stays as the safe default until single-writer
+        # has been validated across the full lecture inventory.
+        use_single_writer = os.environ.get("USE_SINGLE_WRITER", "").lower() in ("1", "true", "yes")
+
         from src.generator_v2 import assemble_api_response
 
-        # Save transcript to temp file for V3 (it takes a path, not text)
+        # Save transcript to temp file (both pipelines take a path, not text)
         transcript_path = output_dir / f"{job_id}_transcript.txt"
         if not transcript_path.exists():
             transcript_path.write_text(text, encoding="utf-8")
@@ -225,18 +237,147 @@ def run_pipeline(
         _check_cancelled(cancel_event)
         yield {"status": "running", "stage": "Generating lecture", "progress": 30}
 
-        sections, groups = generate_lecture_v3(
-            screenshots_json=screenshots_json,  # None for transcript-only
-            transcript_path=str(transcript_path),
-            subject=subject,
-            parallel=True,
-            job_id=job_id,
-        )
+        if use_single_writer:
+            # Load GCS URL lookup up front so we can patch image refs on each
+            # streamed section as it arrives (not just at end-of-pipeline).
+            gcs_lookup: dict[str, str] = {}
+            if screenshots_json:
+                try:
+                    with open(screenshots_json, "r", encoding="utf-8") as f:
+                        ss_meta = json.load(f)
+                    for s in ss_meta:
+                        if s.get("gcs_url"):
+                            fname = s["image_filename"]
+                            stem = fname.rsplit(".", 1)[0] if "." in fname else fname
+                            gcs_lookup[f"screenshots/{fname}"] = s["gcs_url"]
+                            gcs_lookup[fname] = s["gcs_url"]
+                            gcs_lookup[stem] = s["gcs_url"]
+                except Exception as e:
+                    print(f"  [pipeline] GCS lookup prebuild failed: {e}")
+
+            def _resolve_gcs(ref: str) -> str:
+                """Map a local ref (screenshots/x.png, x.png, or stem) to GCS URL."""
+                if not ref or not gcs_lookup:
+                    return ref or ""
+                if ref in gcs_lookup:
+                    return gcs_lookup[ref]
+                # Handle .jpg/.png mismatches via stem
+                if ref.startswith("screenshots/"):
+                    stem = ref.split("/", 1)[1].rsplit(".", 1)[0]
+                    if stem in gcs_lookup:
+                        return gcs_lookup[stem]
+                return ref
+
+            disable_streaming = os.environ.get("DISABLE_STREAMING", "").lower() in ("1", "true", "yes")
+
+            if disable_streaming:
+                print(f"  [pipeline] USE_SINGLE_WRITER=1 (non-streaming) → single-writer pipeline")
+                from src.single_writer import generate_lecture_single
+                sections, groups = generate_lecture_single(
+                    screenshots_json=screenshots_json,
+                    transcript_path=str(transcript_path),
+                    subject=subject,
+                    job_id=job_id,
+                    enable_grounding=True,
+                )
+            else:
+                print(f"  [pipeline] USE_SINGLE_WRITER=1 (streaming) → single-writer streaming pipeline")
+                from src.single_writer import generate_lecture_single_streaming
+                sections = []
+                groups = []
+                # Expected section count guides the progress bar; we update it
+                # once we see sections flow in.
+                for event in generate_lecture_single_streaming(
+                    screenshots_json=screenshots_json,
+                    transcript_path=str(transcript_path),
+                    subject=subject,
+                    job_id=job_id,
+                    enable_grounding=True,
+                ):
+                    if event.get("kind") == "section":
+                        # Convert the raw Pro JSON dicts into the frontend
+                        # shape (matches what assemble_api_response emits per
+                        # item). Apply GCS URL mapping so images render live.
+                        tx = event.get("transcript_item", {}) or {}
+                        sc = event.get("slide_card", {}) or {}
+                        idx = event.get("index", 0)
+
+                        # Map card_type: text_only → diagram for SlideCard compat
+                        raw_card_type = sc.get("card_type", "professor_slide") if sc else "professor_slide"
+                        if raw_card_type == "text_only":
+                            card_type = "diagram"
+                        elif raw_card_type in ("professor_slide", "diagram"):
+                            card_type = raw_card_type
+                        else:
+                            card_type = "professor_slide"
+
+                        image_ref = _resolve_gcs(sc.get("image_ref", "") if sc else "")
+
+                        # Embed image at top of narrative for professor_slide cards
+                        narrative = tx.get("narrative", "") or ""
+                        if card_type == "professor_slide" and image_ref and image_ref not in narrative:
+                            title = sc.get("title", tx.get("title", "")) if sc else tx.get("title", "")
+                            narrative = f"![{title}]({image_ref})\n\n{narrative}"
+
+                        slide_payload = {
+                            "slide_id": str(sc.get("slide_id", tx.get("slide_number", idx + 1))) if sc else str(tx.get("slide_number", idx + 1)),
+                            "title": sc.get("title", tx.get("title", "")) if sc else tx.get("title", ""),
+                            "card_type": card_type,
+                            "image_ref": image_ref,
+                            "bullet_points": (sc.get("bullet_points", []) if sc else []) or [],
+                            "exam_tip": (sc.get("exam_tip", "") if sc else "") or "",
+                            "ei_percent": int((sc.get("ei_percent") if sc else None) or tx.get("ei_percent", 50)),
+                        }
+                        transcript_payload = {
+                            "slide_number": int(tx.get("slide_number", idx + 1) or idx + 1),
+                            "title": tx.get("title", ""),
+                            "narrative": narrative,
+                            "ei_percent": int(tx.get("ei_percent", 50)),
+                            "ei_reasoning": tx.get("ei_reasoning", ""),
+                        }
+
+                        yield {
+                            "status": "running",
+                            "stage": "Writing sections",
+                            # Scale 30 → 78 over ~20 sections
+                            "progress": min(30 + idx * 2, 78),
+                            "section": {
+                                "index": idx,
+                                "slide": slide_payload,
+                                "transcript": transcript_payload,
+                            },
+                        }
+                    elif event.get("kind") == "done":
+                        sections = event.get("sections", []) or []
+                        groups = event.get("groups", []) or []
+        else:
+            from src.generator_v3 import generate_lecture_v3
+            sections, groups = generate_lecture_v3(
+                screenshots_json=screenshots_json,  # None for transcript-only
+                transcript_path=str(transcript_path),
+                subject=subject,
+                parallel=True,
+                job_id=job_id,
+            )
 
         if not sections:
             yield {"status": "error", "stage": "Generating lecture", "progress": 30,
                    "error": "No sections generated. The lecture may be too short or entirely housekeeping."}
             return
+
+        # ── Completeness check (final safety net) ──
+        # Compares generated output against raw transcript, patches HIGH-severity
+        # missed content into the relevant sections. Strategy A only — patches
+        # are appended to sections, no regeneration. Skipped silently on any
+        # error so a failed check never kills the user's run.
+        yield {"status": "running", "stage": "Verifying coverage", "progress": 85}
+        try:
+            from src.completeness_checker import check_completeness
+            sections, _missed = check_completeness(
+                sections, text, apply_patches=True
+            )
+        except Exception as e:
+            print(f"  [completeness] Skipped due to error: {e}")
 
         yield {"status": "running", "stage": "Assembling output", "progress": 90}
 
@@ -255,7 +396,10 @@ def run_pipeline(
                         fname = s['image_filename']
                         stem = fname.rsplit('.', 1)[0] if '.' in fname else fname
                         gcs_lookup[f"screenshots/{fname}"] = s["gcs_url"]
-                        # Also index by stem so .jpg/.png mismatches still resolve
+                        # Also index by bare filename — single-writer sometimes
+                        # emits "slide_014.png" without the screenshots/ prefix.
+                        gcs_lookup[fname] = s["gcs_url"]
+                        # And by stem so .jpg/.png mismatches still resolve
                         gcs_lookup[stem] = s["gcs_url"]
                 if gcs_lookup:
                     replaced = 0
@@ -272,16 +416,19 @@ def run_pipeline(
                                 replaced += 1
 
                     # Also replace in transcript narrative text
-                    # (writers embed ![desc](screenshots/slide_XXX.png) in transcript)
+                    # (writers embed ![desc](screenshots/slide_XXX.png) or
+                    # ![desc](slide_XXX.png) in transcript)
                     for section in api_response.get("transcript", []):
                         if isinstance(section, dict):
                             for field in ("narrative", "text"):
                                 val = section.get(field, "")
-                                if val and "screenshots/" in val:
-                                    for local_path, gcs_url in gcs_lookup.items():
-                                        if local_path.startswith("screenshots/"):
-                                            val = val.replace(local_path, gcs_url)
-                                    section[field] = val
+                                if not val:
+                                    continue
+                                # Replace both prefixed and bare filenames
+                                for local_path, gcs_url in gcs_lookup.items():
+                                    if local_path and local_path != gcs_url:
+                                        val = val.replace(local_path, gcs_url)
+                                section[field] = val
 
                     print(f"  Replaced {replaced} screenshot refs with GCS URLs")
             except Exception as e:
@@ -290,6 +437,14 @@ def run_pipeline(
         # Serialize as JSON string into the markdown field (no schema migration needed)
         # Frontend detects JSON vs plain markdown and renders accordingly
         v2_json = json.dumps(api_response, ensure_ascii=False)
+
+        # Per-run cost + time report — printed to logs, saved to JSON,
+        # also returned in the SSE done payload so the frontend can show it.
+        cost_report = None
+        try:
+            cost_report = TRACKER.report(job_id)
+        except Exception as e:
+            print(f"  Cost report failed: {e}")
 
         yield {
             "status": "done",
@@ -301,6 +456,7 @@ def run_pipeline(
                 "transcript": api_response.get("transcript", []),
                 "concept_groups": [],
                 "verification_report": [],
+                "cost_report": cost_report,
             },
         }
 

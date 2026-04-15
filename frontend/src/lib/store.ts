@@ -3,7 +3,8 @@ import { toast } from "sonner";
 import { ConceptGroup, VerificationClaim, TrustStats } from "./types";
 import { computeTrustStats } from "./data";
 import { uploadFile, uploadSlides, runPipeline, fetchSessions, fetchSession, createSession as apiCreateSession } from "./api";
-import type { PipelineEvent } from "./api";
+import type { PipelineEvent, StreamedSection } from "./api";
+import type { SlideCard, TranscriptSection } from "./types";
 
 export interface PipelineStage {
   name: string;
@@ -38,6 +39,8 @@ export interface Session {
   name: string;
   date: string;
   groups: number;
+  status?: "pending" | "processing" | "ready" | "failed";
+  errorMessage?: string | null;
 }
 
 // Per-session pipeline state for concurrent processing
@@ -54,6 +57,11 @@ export interface PipelineRun {
   isUploading: boolean;
   uploadProgress: number;
   cancel: (() => void) | null;
+  // Progressive-render state: sections as they stream in from Pro. Reader
+  // shows these while pipeline is still running; once isDone fires, the
+  // canonical markdown from the final 'done' event takes over.
+  streamingSlides: SlideCard[];
+  streamingTranscript: TranscriptSection[];
 }
 
 interface AppState {
@@ -193,6 +201,8 @@ export const useAppStore = create<AppState>((set, get) => {
         name: s.name,
         date: new Date(s.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
         groups: 0,
+        status: (s.status as Session["status"]) ?? "ready",
+        errorMessage: s.error_message ?? null,
       }));
       set({ sessions });
     } catch (e) {
@@ -208,6 +218,15 @@ export const useAppStore = create<AppState>((set, get) => {
         (data.concept_groups || []) as ConceptGroup[],
         (data.verification_report || []) as VerificationClaim[],
       );
+      // Mirror status into the sessions list so the reader can react to
+      // processing/failed without a second round-trip.
+      const status = (data.status as Session["status"]) ?? "ready";
+      const errorMessage = data.error_message ?? null;
+      set((s) => ({
+        sessions: s.sessions.map((sess) =>
+          sess.id === sessionId ? { ...sess, status, errorMessage } : sess
+        ),
+      }));
     }
   },
   createNewSession: async () => {
@@ -311,6 +330,8 @@ export const useAppStore = create<AppState>((set, get) => {
       isUploading: true,
       uploadProgress: 0,
       cancel: null,
+      streamingSlides: [],
+      streamingTranscript: [],
     };
 
     set((s) => ({
@@ -413,6 +434,34 @@ export const useAppStore = create<AppState>((set, get) => {
             });
           },
           activeSession || undefined,
+          // onSection — progressive rendering. Append each section to the
+          // run's streaming arrays; reader reads from these while the run
+          // is in flight. Replace any existing entry at the same index to
+          // allow late-arriving slide metadata to upgrade a section.
+          (section: StreamedSection) => {
+            set((s) => {
+              const runs = { ...s.pipelineRuns };
+              const r = runs[file_id];
+              if (!r) return s;
+              const slides = [...r.streamingSlides];
+              const transcript = [...r.streamingTranscript];
+              const existingIdx = transcript.findIndex(
+                (t) => t.slide_number === section.transcript.slide_number
+              );
+              if (existingIdx >= 0) {
+                transcript[existingIdx] = section.transcript;
+                // Update or add matching slide
+                const slideIdx = slides.findIndex((sl) => sl.slide_id === section.slide.slide_id);
+                if (slideIdx >= 0) slides[slideIdx] = section.slide;
+                else slides.push(section.slide);
+              } else {
+                transcript.push(section.transcript);
+                slides.push(section.slide);
+              }
+              runs[file_id] = { ...r, streamingSlides: slides, streamingTranscript: transcript };
+              return { pipelineRuns: runs };
+            });
+          },
         );
 
         // Store the cancel function

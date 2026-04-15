@@ -42,16 +42,25 @@ export default function ReaderPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-poll only when we have an active pipeline run for this session and are waiting for content
+  // Derive the current session row (carries status from Supabase) for use
+  // in both the polling effect below and the empty-state branch.
+  const activeSession = store.sessions.find((s) => s.id === store.activeSessionId);
+  const sessionStatus = activeSession?.status;
+
+  // Auto-poll while we're waiting for content. Two triggers, either is enough:
+  //   1. There's a live pipeline run in this tab (legacy behavior).
+  //   2. Supabase says the session is still 'processing' (survives refresh).
+  // This means even a user who refreshes mid-run keeps seeing the spinner
+  // and gets the result automatically when the background pipeline finishes.
   const pollingSessionId = useRef<string | null>(null);
   useEffect(() => {
     if (store.markdown || !store.activeSessionId) return;
     const id = store.activeSessionId;
-    // Only poll if there's a live pipeline run tracking this session
     const hasActivePipeline = Object.values(store.pipelineRuns).some(
       (r) => r.isProcessing && r.sessionId === id
     );
-    if (!hasActivePipeline) return;
+    const isServerProcessing = sessionStatus === "processing" || sessionStatus === "pending";
+    if (!hasActivePipeline && !isServerProcessing) return;
     pollingSessionId.current = id;
     const interval = setInterval(() => {
       if (pollingSessionId.current === id) store.loadSession(id);
@@ -61,7 +70,18 @@ export default function ReaderPage() {
       pollingSessionId.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store.markdown, store.activeSessionId, store.pipelineRuns]);
+  }, [store.markdown, store.activeSessionId, store.pipelineRuns, sessionStatus]);
+
+  // Pull streaming state from any in-flight pipeline run bound to this session.
+  // When the pipeline is mid-run, we render the sections as they arrive; once
+  // 'done' fires, the canonical markdown takes over with the full assembled
+  // output (including completeness-checker patches applied at the end).
+  const streamingRun = Object.values(store.pipelineRuns).find(
+    (r) => r.sessionId === store.activeSessionId && r.isProcessing
+  );
+  const streamingSlides = streamingRun?.streamingSlides ?? [];
+  const streamingTranscript = streamingRun?.streamingTranscript ?? [];
+  const hasStreamingContent = streamingTranscript.length > 0;
 
   // Load data — detect V2 JSON vs legacy markdown
   useEffect(() => {
@@ -83,9 +103,17 @@ export default function ReaderPage() {
         setLegacyMarkdown(store.markdown);
         setIsV2(false);
       }
+      setLoading(false);
+    } else if (hasStreamingContent) {
+      // Mid-pipeline: render whatever has streamed in so far
+      setSlides(streamingSlides);
+      setTranscript(streamingTranscript);
+      setIsV2(true);
+      setLoading(false);
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [store.markdown]);
+  }, [store.markdown, hasStreamingContent, streamingSlides, streamingTranscript]);
 
   if (loading) {
     return (
@@ -138,13 +166,63 @@ export default function ReaderPage() {
     );
   }
 
-  // Empty state — only show "still processing" when we have an active pipeline run for this session
-  if (!store.markdown) {
-    // Find an active pipeline run for the current session (tracked this tab, not lost on refresh)
+  // Empty state — three branches:
+  //   1. failed   → error + retry button (status from Supabase, survives refresh)
+  //   2. processing/pending → spinner + ETA (live pipeline run OR server status)
+  //   3. idle     → "no lecture loaded" + upload CTA
+  if (!store.markdown && !hasStreamingContent) {
     const activePipelineRun = Object.values(store.pipelineRuns).find(
       (r) => r.isProcessing && r.sessionId === store.activeSessionId
     );
-    const isActivelyProcessing = !!activePipelineRun;
+    const isFailed = sessionStatus === "failed";
+    const isActivelyProcessing =
+      !!activePipelineRun || sessionStatus === "processing" || sessionStatus === "pending";
+
+    if (isFailed) {
+      return (
+        <div className="flex-1 flex items-center justify-center px-4 py-24">
+          <div className="text-center max-w-md">
+            <div
+              className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6"
+              style={{ background: "rgba(239, 68, 68, 0.12)", color: "#ef4444" }}
+            >
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold mb-2" style={{ color: "var(--text-primary)" }}>
+              Generation failed
+            </h2>
+            <p className="text-sm mb-2" style={{ color: "var(--text-secondary)" }}>
+              Something went wrong while building this lecture. Your other lectures are unaffected.
+            </p>
+            {activeSession?.errorMessage ? (
+              <p
+                className="text-xs mb-6 font-mono px-3 py-2 rounded-lg text-left"
+                style={{ background: "var(--bg-elevated)", color: "var(--text-secondary)" }}
+              >
+                {activeSession.errorMessage}
+              </p>
+            ) : (
+              <div className="mb-6" />
+            )}
+            <button
+              onClick={() => router.push("/upload")}
+              className="btn-glow px-6 py-3 rounded-xl text-sm font-semibold"
+              style={{
+                background: "linear-gradient(135deg, var(--accent), #FF8555)",
+                color: "#fff",
+                boxShadow: "0 8px 32px var(--accent-glow)",
+              }}
+            >
+              Try again
+            </button>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className="flex-1 flex items-center justify-center px-4 py-24">
@@ -226,7 +304,6 @@ export default function ReaderPage() {
     slideGroups[num].push(card);
   }
 
-  const activeSession = store.sessions.find((s) => s.id === store.activeSessionId);
   const sessionName = activeSession?.name || "Untitled Lecture";
 
   const activeSectionData = transcript[activeSection];
@@ -401,6 +478,20 @@ export default function ReaderPage() {
             )}
           </div>
         ))}
+
+        {/* Streaming indicator — still generating, more sections to come */}
+        {hasStreamingContent && !store.markdown && (
+          <div
+            className="flex items-center gap-3 py-8 px-4 rounded-xl"
+            style={{ background: "var(--bg-elevated)", color: "var(--text-muted)" }}
+          >
+            <div
+              className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin shrink-0"
+              style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }}
+            />
+            <span className="text-sm">Writing more sections…</span>
+          </div>
+        )}
       </div>
     </div>
   );
