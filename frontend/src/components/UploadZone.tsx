@@ -119,9 +119,11 @@ interface UploadZoneProps {
   videoFile: File | null;
   transcriptFile: File | null;
   slidesFile: File | null;
+  slidesFiles?: File[];
   onVideoChange: (f: File | null) => void;
   onTranscriptChange: (f: File | null) => void;
   onSlidesChange: (f: File | null) => void;
+  onSlidesFilesChange?: (files: File[]) => void;
   uploadProgress?: number;
   isUploading?: boolean;
 }
@@ -130,9 +132,11 @@ export default function UploadZone({
   videoFile,
   transcriptFile,
   slidesFile,
+  slidesFiles = [],
   onVideoChange,
   onTranscriptChange,
   onSlidesChange,
+  onSlidesFilesChange,
   uploadProgress = 0,
   isUploading = false,
 }: UploadZoneProps) {
@@ -204,19 +208,70 @@ export default function UploadZone({
             <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>optional</span>
             <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
           </div>
-          <UploadSlot
-            label="Add lecture slides"
-            accept=".pdf"
-            file={slidesFile}
-            onFileChange={onSlidesChange}
-            hint="PDF — higher quality slide images"
-            icon={
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="2" y="3" width="20" height="14" rx="2" />
-                <path d="M8 21h8M12 17v4" />
-              </svg>
-            }
-          />
+          {/* Multi-file slides upload — supports split slide decks */}
+          {slidesFiles.length > 0 ? (
+            <div
+              className="rounded-xl border p-4"
+              style={{ background: "var(--bg-surface)", borderColor: "var(--border)" }}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                  {slidesFiles.length} slide file{slidesFiles.length > 1 ? "s" : ""}
+                </span>
+                <button
+                  onClick={() => onSlidesFilesChange?.([])}
+                  className="text-xs px-2 py-1 rounded-md"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Clear
+                </button>
+              </div>
+              {slidesFiles.map((f, i) => (
+                <div key={i} className="flex items-center gap-2 text-xs py-1" style={{ color: "var(--text-secondary)" }}>
+                  <span>📄</span>
+                  <span className="truncate">{f.name}</span>
+                  <span style={{ color: "var(--text-muted)" }}>
+                    {f.size < 1024 * 1024 ? `${(f.size / 1024).toFixed(0)} KB` : `${(f.size / (1024 * 1024)).toFixed(1)} MB`}
+                  </span>
+                </div>
+              ))}
+              <label
+                className="flex items-center gap-1.5 mt-2 text-xs cursor-pointer"
+                style={{ color: "var(--accent)" }}
+              >
+                <input
+                  type="file"
+                  accept=".pdf"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    const newFiles = Array.from(e.target.files || []);
+                    if (newFiles.length > 0) {
+                      onSlidesFilesChange?.([...slidesFiles, ...newFiles]);
+                    }
+                    e.target.value = "";
+                  }}
+                />
+                + Add more slides
+              </label>
+            </div>
+          ) : (
+            <UploadSlot
+              label="Add lecture slides"
+              accept=".pdf"
+              file={null}
+              onFileChange={(f) => {
+                if (f) onSlidesFilesChange?.([f]);
+              }}
+              hint="PDF — supports multiple files"
+              icon={
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="3" width="20" height="14" rx="2" />
+                  <path d="M8 21h8M12 17v4" />
+                </svg>
+              }
+            />
+          )}
         </>
       )}
     </div>

@@ -15,9 +15,11 @@ export default function UploadPage() {
     transcriptFile,
     videoFile,
     slidesFile,
+    slidesFiles,
     setTranscriptFile,
     setVideoFile,
     setSlidesFile,
+    setSlidesFiles,
     startPipeline,
     pipelineRuns,
     activePipelineId,
@@ -85,9 +87,11 @@ export default function UploadPage() {
                 videoFile={videoFile}
                 transcriptFile={transcriptFile}
                 slidesFile={slidesFile}
+                slidesFiles={slidesFiles}
                 onVideoChange={setVideoFile}
                 onTranscriptChange={setTranscriptFile}
                 onSlidesChange={setSlidesFile}
+                onSlidesFilesChange={setSlidesFiles}
                 uploadProgress={uploadProgress}
                 isUploading={isUploading}
               />

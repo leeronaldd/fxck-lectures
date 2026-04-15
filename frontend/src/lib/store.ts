@@ -89,9 +89,11 @@ interface AppState {
   transcriptFile: File | null;
   videoFile: File | null;
   slidesFile: File | null;
+  slidesFiles: File[];
   setTranscriptFile: (f: File | null) => void;
   setVideoFile: (f: File | null) => void;
   setSlidesFile: (f: File | null) => void;
+  setSlidesFiles: (files: File[]) => void;
 
   // Pipeline — per-session concurrent runs
   pipelineRuns: Record<string, PipelineRun>;  // keyed by fileId
@@ -261,9 +263,11 @@ export const useAppStore = create<AppState>((set, get) => {
   transcriptFile: null,
   videoFile: null,
   slidesFile: null,
+  slidesFiles: [],
   setTranscriptFile: (f) => set({ transcriptFile: f }),
   setVideoFile: (f) => set({ videoFile: f }),
-  setSlidesFile: (f) => set({ slidesFile: f }),
+  setSlidesFile: (f) => set({ slidesFile: f, slidesFiles: f ? [f] : [] }),
+  setSlidesFiles: (files) => set({ slidesFiles: files, slidesFile: files[0] || null }),
 
   // Pipeline runs
   pipelineRuns: {},
@@ -351,12 +355,14 @@ export const useAppStore = create<AppState>((set, get) => {
           });
         });
 
-        // Upload slides PDF if provided (non-fatal — pipeline runs without slides)
-        const slidesFile = get().slidesFile;
-        if (slidesFile) {
+        // Upload slides PDFs if provided (non-fatal — pipeline runs without slides)
+        const slidesFiles = get().slidesFiles;
+        if (slidesFiles.length > 0) {
           try {
-            toast.loading("Uploading slides...", { id: `upload-${tempId}` });
-            await uploadSlides(file_id, slidesFile);
+            toast.loading(`Uploading ${slidesFiles.length} slide file${slidesFiles.length > 1 ? "s" : ""}...`, { id: `upload-${tempId}` });
+            for (const sf of slidesFiles) {
+              await uploadSlides(file_id, sf);
+            }
           } catch (err) {
             console.warn("[Pipeline] Slides upload failed, continuing without slides:", err);
           }
@@ -527,6 +533,7 @@ export const useAppStore = create<AppState>((set, get) => {
       transcriptFile: null,
       videoFile: null,
       slidesFile: null,
+      slidesFiles: [],
       activePipelineId: null,
       activeSessionId: null,
       markdown: "",

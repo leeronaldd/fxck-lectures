@@ -15,6 +15,11 @@ export default function NarrativeSection({ section }: { section: TranscriptSecti
       // Escape HTML first to prevent XSS, then apply markdown formatting
       // Use [\s\S] instead of . to match across line breaks within a paragraph
       const html = escapeHtml(cleanPara)
+        // Images: ![alt](url) → <img> tag (must run before bold/italic which would mangle the syntax)
+        .replace(
+          /!\[([^\]]*)\]\(([^)]+)\)/g,
+          '<img src="$2" alt="$1" style="max-width:100%;border-radius:12px;margin:8px 0" loading="lazy" />'
+        )
         .replace(/\*\*([\s\S]+?)\*\*/g, '<strong style="color: var(--accent)">$1</strong>')
         .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, "<em>$1</em>")
         .replace(/~~([\s\S]+?)~~/g, '<del style="opacity: 0.4">$1</del>');
