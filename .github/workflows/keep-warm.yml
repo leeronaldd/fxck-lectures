@@ -1,0 +1,21 @@
+name: Keep Cloud Run warm
+
+# Pings the backend every 10 minutes to prevent cold starts during active hours.
+# GitHub Actions cron is best-effort (can run a few minutes late) — that's fine
+# for warm-ping purposes. Cost: $0 on GitHub's free tier for public repos.
+
+on:
+  schedule:
+    # Every 10 minutes. Note: GitHub may skip runs under heavy load; acceptable
+    # since even a hit every 15 min keeps the instance warm (idle timeout ~15m).
+    - cron: '*/10 * * * *'
+  workflow_dispatch:  # allow manual trigger from Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hit /api/health
+        run: |
+          curl -sS -o /dev/null -w "status=%{http_code} time=%{time_total}s\n" \
+            https://fxck-lectures-api-211270844056.australia-southeast1.run.app/api/health
