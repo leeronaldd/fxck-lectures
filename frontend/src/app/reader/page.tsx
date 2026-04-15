@@ -252,18 +252,18 @@ export default function ReaderPage() {
               : "Upload a lecture recording or transcript to get started."}
           </p>
           {isActivelyProcessing ? (
-            <div className="flex items-center justify-center gap-3">
-              <button
-                onClick={() => router.push("/upload")}
-                className="btn-glow px-6 py-3 rounded-xl text-sm font-semibold"
+            <div className="flex flex-col items-center justify-center gap-3">
+              {/* Spinner */}
+              <div
+                className="w-6 h-6 rounded-full border-2 animate-spin"
                 style={{
-                  background: "linear-gradient(135deg, var(--accent), #FF8555)",
-                  color: "#fff",
-                  boxShadow: "0 8px 32px var(--accent-glow)",
+                  borderColor: "var(--border)",
+                  borderTopColor: "var(--accent)",
                 }}
-              >
-                View progress
-              </button>
+              />
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                This page updates automatically — no need to refresh.
+              </p>
             </div>
           ) : (
             <button
@@ -403,7 +403,7 @@ export default function ReaderPage() {
       <div
         ref={rightPanelRef}
         className="flex-1 min-w-0 overflow-y-auto"
-        style={{ padding: "32px 24px 64px 32px" }}
+        style={{ padding: "32px 24px 50vh 32px" }}
         onScroll={handleScroll}
       >
         {/* Mobile: title at top of scroll */}
