@@ -261,15 +261,15 @@ function SettingsContent() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Free */}
                   <div
-                    className="p-5 rounded-xl"
+                    className="p-5 rounded-xl flex flex-col"
                     style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)" }}
                   >
                     <h3 className="text-lg font-bold mb-1" style={{ color: "var(--text-primary)" }}>Free</h3>
                     <p className="text-2xl font-bold mb-1" style={{ color: "var(--text-primary)" }}>
-                      $0
+                      $0<span className="text-sm font-normal" style={{ color: "var(--text-muted)" }}>&nbsp;</span>
                     </p>
-                    <div className="mb-3" />
-                    <ul className="space-y-2 mb-5 text-sm" style={{ color: "var(--text-secondary)" }}>
+                    <div className="mb-3" style={{ height: "1rem" }} />
+                    <ul className="space-y-2 mb-5 text-sm flex-1" style={{ color: "var(--text-secondary)" }}>
                       <li className="flex items-center gap-2">
                         <span style={{ color: "var(--accent)" }}>&#10003;</span> 2 free lectures
                       </li>
@@ -281,7 +281,7 @@ function SettingsContent() {
                       </li>
                     </ul>
                     <button
-                      className="w-full py-2.5 rounded-xl text-sm font-medium"
+                      className="w-full py-2.5 rounded-xl text-sm font-medium mt-auto"
                       style={{ background: "var(--bg-base)", border: "1px solid var(--border)", color: "var(--text-muted)" }}
                       disabled
                     >
@@ -291,7 +291,7 @@ function SettingsContent() {
 
                   {/* Pro */}
                   <div
-                    className="p-5 rounded-xl relative"
+                    className="p-5 rounded-xl relative flex flex-col"
                     style={{ background: "var(--bg-elevated)", border: "1px solid rgba(255, 107, 53, 0.3)" }}
                   >
                     <div
@@ -307,14 +307,14 @@ function SettingsContent() {
                         /mo
                       </span>
                     </p>
-                    {billingPeriod === "yearly" ? (
-                      <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
-                        Billed as $69.99/yr — <span style={{ color: "#22C55E" }}>save 55%</span>
-                      </p>
-                    ) : (
-                      <div className="mb-3" />
-                    )}
-                    <ul className="space-y-2 mb-5 text-sm" style={{ color: "var(--text-secondary)" }}>
+                    <p className="text-xs mb-3" style={{ color: "var(--text-muted)", minHeight: "1rem" }}>
+                      {billingPeriod === "yearly" ? (
+                        <>Billed as $69.99/yr — <span style={{ color: "#22C55E" }}>save 55%</span></>
+                      ) : (
+                        <>&nbsp;</>
+                      )}
+                    </p>
+                    <ul className="space-y-2 mb-5 text-sm flex-1" style={{ color: "var(--text-secondary)" }}>
                       <li className="flex items-center gap-2">
                         <span style={{ color: "var(--accent)" }}>&#10003;</span> 15 lectures per month
                       </li>
@@ -338,7 +338,7 @@ function SettingsContent() {
                           toast("Something went wrong. Please try again.");
                         }
                       }}
-                      className="w-full py-2.5 rounded-xl text-sm font-semibold"
+                      className="w-full py-2.5 rounded-xl text-sm font-semibold mt-auto"
                       style={{
                         background: "linear-gradient(135deg, var(--accent), #FF8555)",
                         color: "#fff",
@@ -350,7 +350,7 @@ function SettingsContent() {
 
                   {/* Max */}
                   <div
-                    className="p-5 rounded-xl relative"
+                    className="p-5 rounded-xl relative flex flex-col"
                     style={{ background: "var(--bg-elevated)", border: "1px solid rgba(255, 107, 53, 0.3)" }}
                   >
                     <h3 className="text-lg font-bold mb-1" style={{ color: "var(--text-primary)" }}>Max</h3>
@@ -360,14 +360,14 @@ function SettingsContent() {
                         /mo
                       </span>
                     </p>
-                    {billingPeriod === "yearly" ? (
-                      <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
-                        Billed as $199.99/yr — <span style={{ color: "#22C55E" }}>save 44%</span>
-                      </p>
-                    ) : (
-                      <div className="mb-3" />
-                    )}
-                    <ul className="space-y-2 mb-5 text-sm" style={{ color: "var(--text-secondary)" }}>
+                    <p className="text-xs mb-3" style={{ color: "var(--text-muted)", minHeight: "1rem" }}>
+                      {billingPeriod === "yearly" ? (
+                        <>Billed as $199.99/yr — <span style={{ color: "#22C55E" }}>save 44%</span></>
+                      ) : (
+                        <>&nbsp;</>
+                      )}
+                    </p>
+                    <ul className="space-y-2 mb-5 text-sm flex-1" style={{ color: "var(--text-secondary)" }}>
                       <li className="flex items-center gap-2">
                         <span style={{ color: "var(--accent)" }}>&#10003;</span> 50 lectures per month
                       </li>
@@ -391,7 +391,7 @@ function SettingsContent() {
                           toast("Something went wrong. Please try again.");
                         }
                       }}
-                      className="w-full py-2.5 rounded-xl text-sm font-semibold"
+                      className="w-full py-2.5 rounded-xl text-sm font-semibold mt-auto"
                       style={{
                         background: "linear-gradient(135deg, var(--accent), #FF8555)",
                         color: "#fff",
