@@ -19,8 +19,6 @@ jobs:
         run: |
           curl -sS -o /dev/null -w "backend: status=%{http_code} time=%{time_total}s\n" \
             https://fxck-lectures-api-211270844056.australia-southeast1.run.app/api/health
-      - name: Ping Whisper service
-        run: |
-          curl -sS -o /dev/null -w "whisper: status=%{http_code} time=%{time_total}s\n" \
-            --max-time 10 \
-            https://fxck-lectures-whisper-2elcrqz4oa-as.a.run.app/ || true
+      # NOTE: Whisper service has L4 GPU (~$0.84/hr idle). Do NOT ping it —
+      # accept the 3-5 min cold start for transcription. Only warm the
+      # CPU-only backend which costs ~$0.02/hr idle.
