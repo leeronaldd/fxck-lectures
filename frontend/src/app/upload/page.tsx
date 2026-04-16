@@ -48,18 +48,15 @@ export default function UploadPage() {
   const currentStageIndex = activeRun?.currentStageIndex ?? -1;
   const subProgress = activeRun?.subProgress ?? 0;
 
-  // Auto-navigate to reader when done OR as soon as the first streamed
-  // section arrives — reader will keep appending sections as they stream.
-  const hasStreamedSection = (activeRun?.streamingTranscript.length ?? 0) > 0;
+  // Auto-navigate to reader when pipeline finishes with full output.
+  // No early redirect on streaming sections — the 30s time saving isn't
+  // worth the UX issues (lost state, wrong page, manual navigation).
   useEffect(() => {
     if (isDone) {
       const t = setTimeout(() => router.push("/reader"), 600);
       return () => clearTimeout(t);
     }
-    if (hasStreamedSection) {
-      router.push("/reader");
-    }
-  }, [isDone, hasStreamedSection, router]);
+  }, [isDone, router]);
 
   const hasFile = transcriptFile || videoFile;
   const showProgress = isRunning || isDone || !!pipelineError;
