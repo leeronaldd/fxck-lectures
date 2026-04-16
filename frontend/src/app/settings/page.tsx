@@ -229,7 +229,7 @@ function SettingsContent() {
             {showPlanSelector && (
               <div>
                 {/* Period toggle */}
-                <div className="flex items-center justify-center mb-6">
+                <div className="flex flex-col items-center justify-center mb-6 gap-2">
                   <div className="inline-grid grid-cols-2 rounded-lg p-0.5 w-64" style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)" }}>
                     <button
                       onClick={() => setBillingPeriod("monthly")}
@@ -252,19 +252,23 @@ function SettingsContent() {
                       Yearly
                     </button>
                   </div>
+                  <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+                    All prices in AUD. Cancel anytime.
+                  </p>
                 </div>
 
                 {/* Plan cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Free */}
                   <div
                     className="p-5 rounded-xl"
                     style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)" }}
                   >
                     <h3 className="text-lg font-bold mb-1" style={{ color: "var(--text-primary)" }}>Free</h3>
-                    <p className="text-2xl font-bold mb-3" style={{ color: "var(--text-primary)" }}>
+                    <p className="text-2xl font-bold mb-1" style={{ color: "var(--text-primary)" }}>
                       $0
                     </p>
+                    <div className="mb-3" />
                     <ul className="space-y-2 mb-5 text-sm" style={{ color: "var(--text-secondary)" }}>
                       <li className="flex items-center gap-2">
                         <span style={{ color: "var(--accent)" }}>&#10003;</span> 2 free lectures
@@ -303,21 +307,22 @@ function SettingsContent() {
                         /mo
                       </span>
                     </p>
-                    {billingPeriod === "yearly" && (
+                    {billingPeriod === "yearly" ? (
                       <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
                         Billed as $69.99/yr — <span style={{ color: "#22C55E" }}>save 55%</span>
                       </p>
+                    ) : (
+                      <div className="mb-3" />
                     )}
-                    {billingPeriod === "monthly" && <div className="mb-3" />}
                     <ul className="space-y-2 mb-5 text-sm" style={{ color: "var(--text-secondary)" }}>
                       <li className="flex items-center gap-2">
                         <span style={{ color: "var(--accent)" }}>&#10003;</span> 15 lectures per month
                       </li>
                       <li className="flex items-center gap-2">
-                        <span style={{ color: "var(--accent)" }}>&#10003;</span> Priority processing
+                        <span style={{ color: "var(--accent)" }}>&#10003;</span> 5 lectures per day
                       </li>
                       <li className="flex items-center gap-2">
-                        <span style={{ color: "var(--accent)" }}>&#10003;</span> All free features included
+                        <span style={{ color: "var(--accent)" }}>&#10003;</span> Priority processing
                       </li>
                       <li className="flex items-center gap-2">
                         <span style={{ color: "var(--accent)" }}>&#10003;</span> Personalized learning profile
@@ -326,7 +331,7 @@ function SettingsContent() {
                     <button
                       onClick={async () => {
                         const { createCheckoutSession } = await import("@/lib/api");
-                        const url = await createCheckoutSession(billingPeriod);
+                        const url = await createCheckoutSession(billingPeriod, "pro");
                         if (url) {
                           window.location.href = url;
                         } else {
@@ -340,6 +345,59 @@ function SettingsContent() {
                       }}
                     >
                       Upgrade to Pro
+                    </button>
+                  </div>
+
+                  {/* Max */}
+                  <div
+                    className="p-5 rounded-xl relative"
+                    style={{ background: "var(--bg-elevated)", border: "1px solid rgba(255, 107, 53, 0.3)" }}
+                  >
+                    <h3 className="text-lg font-bold mb-1" style={{ color: "var(--text-primary)" }}>Max</h3>
+                    <p className="text-2xl font-bold mb-1" style={{ color: "var(--text-primary)" }}>
+                      {billingPeriod === "yearly" ? "$16.66" : "$29.99"}
+                      <span className="text-sm font-normal" style={{ color: "var(--text-muted)" }}>
+                        /mo
+                      </span>
+                    </p>
+                    {billingPeriod === "yearly" ? (
+                      <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
+                        Billed as $199.99/yr — <span style={{ color: "#22C55E" }}>save 44%</span>
+                      </p>
+                    ) : (
+                      <div className="mb-3" />
+                    )}
+                    <ul className="space-y-2 mb-5 text-sm" style={{ color: "var(--text-secondary)" }}>
+                      <li className="flex items-center gap-2">
+                        <span style={{ color: "var(--accent)" }}>&#10003;</span> 50 lectures per month
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <span style={{ color: "var(--accent)" }}>&#10003;</span> 10 lectures per day
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <span style={{ color: "var(--accent)" }}>&#10003;</span> Priority processing
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <span style={{ color: "var(--accent)" }}>&#10003;</span> Built for power users
+                      </li>
+                    </ul>
+                    <button
+                      onClick={async () => {
+                        const { createCheckoutSession } = await import("@/lib/api");
+                        const url = await createCheckoutSession(billingPeriod, "max");
+                        if (url) {
+                          window.location.href = url;
+                        } else {
+                          toast("Something went wrong. Please try again.");
+                        }
+                      }}
+                      className="w-full py-2.5 rounded-xl text-sm font-semibold"
+                      style={{
+                        background: "linear-gradient(135deg, var(--accent), #FF8555)",
+                        color: "#fff",
+                      }}
+                    >
+                      Upgrade to Max
                     </button>
                   </div>
                 </div>

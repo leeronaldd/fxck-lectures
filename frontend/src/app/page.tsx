@@ -45,19 +45,27 @@ const DEMO_SECTIONS: DemoSection[] = [
       title: "Baltimore Classification System",
       narrative: `Remember the viral structures we covered earlier\u2014the capsid and the lipid envelope. Those structures protect the viral payload. But what exactly is that payload, and how does it hijack the host cell?
 
-Viruses do not have their own ribosomes. To manufacture their proteins, they must use the host cell\u2019s machinery. The host ribosome only reads one language: messenger RNA (mRNA). Therefore, no matter what genetic material a virus carries inside its capsid, it must find a way to produce mRNA.
+Viruses do not have their own ribosomes. To manufacture their proteins, they have to borrow the host cell\u2019s machinery. The host ribosome only reads one language: messenger RNA (mRNA). So no matter what kind of genome a virus carries\u2014DNA or RNA, single or double-stranded\u2014it has to end up at the same destination: a positive-sense mRNA strand the host ribosome can translate.
 
-This \u201Call roads lead to mRNA\u201D principle is the foundation of the **Baltimore Classification System**. It categorizes viruses into seven distinct classes based on two features: the type of nucleic acid genome they carry, and the specific pathway they use to generate that functional mRNA.
+This \u201Call roads lead to mRNA\u201D principle is the foundation of the **Baltimore Classification System**. It sorts every virus into one of seven classes based on the route its genome takes to reach that mRNA finish line. Look at the diagram on the slide\u2014notice how the arrows from all seven classes converge on the central golden strand labeled \u201CmRNA (+)\u201D. That\u2019s the mandatory destination.
 
-Look at the diagram on the slide. Notice how the arrows from all seven classes converge on that central, golden strand labeled \u201CmRNA (+)\u201D. That is the mandatory destination for every virus.
+Let\u2019s walk through how each class gets there.
 
-A positive-sense (+) RNA genome is oriented in the 5\u2019 to 3\u2019 direction, making it physically identical to host mRNA. This means the moment it enters the host cell, the host ribosomes can attach and start translating it directly into viral proteins.
+**Class I \u2014 dsDNA.** Double-stranded DNA viruses like Adenovirus and Herpesvirus. This is the same genomic language our own cells use, so the host\u2019s own enzymes can transcribe it straight into mRNA. No special viral machinery required.
 
-Now look at Class V, the negative-sense (-) ssRNA viruses, which includes the Influenza virus. A negative-sense strand runs in the 3\u2019 to 5\u2019 direction. It is the mirror image to mRNA. A host ribosome cannot read it. Therefore, an Influenza virus must physically carry its own viral enzyme\u2014an **RNA-dependent RNA polymerase**\u2014inside its virion to transcribe that negative strand into a readable positive-sense mRNA.
+**Class II \u2014 ssDNA.** Single-stranded DNA, like Parvovirus. The virus first builds a complementary strand to form a dsDNA intermediate, then follows the Class I pathway. One extra step.
 
-Both Class IV and Class VI carry a positive-sense ssRNA genome, but use completely different pathways. Class IV, like Poliovirus, uses its +ssRNA directly as mRNA. Class VI, which includes HIV, is a **retrovirus**. Instead of using its +ssRNA directly, it uses **reverse transcriptase** to convert its RNA into a double-stranded DNA intermediate that physically integrates into the host cell\u2019s own chromosome.
+**Class III \u2014 dsRNA.** Double-stranded RNA, like Rotavirus. The host has no enzyme that reads RNA to make more RNA, so the virus has to bring its own **RNA-dependent RNA polymerase** packaged inside its capsid to transcribe its negative strand into positive-sense mRNA.
 
-The genome dictates the pathway, and the pathway dictates which specific enzymes the virus must bring with it.`,
+**Class IV \u2014 +ssRNA.** Positive-sense single-stranded RNA, like Poliovirus and SARS-CoV-2. A trick to recall this: \u201Cpositive means ready to proceed.\u201D This strand is functionally identical to mRNA. The moment it enters the cell, host ribosomes can translate it directly. No extra enzymes needed.
+
+**Class V \u2014 \u2212ssRNA.** Negative-sense single-stranded RNA, like Influenza and Rabies. This strand is the mirror image of mRNA\u2014if a host ribosome looks at it, it sees gibberish. So the virus has to carry its own RNA-dependent RNA polymerase inside the capsid to transcribe the negative strand into a readable positive strand before translation can begin.
+
+**Class VI \u2014 +ssRNA retrovirus.** This is HIV\u2019s class. The genome looks like Class IV (+ssRNA) but the strategy is completely different. Instead of translating directly, the virus uses an enzyme called **reverse transcriptase** to convert its RNA backwards into double-stranded DNA. That viral DNA then physically integrates into the host\u2019s own chromosome\u2014the genome becomes part of the cell, hidden indefinitely.
+
+**Class VII \u2014 dsDNA reverse-transcribing.** The mirror of Class VI. Hepatitis B is the example. The virus starts with dsDNA but uses an RNA intermediate and reverse transcription to replicate. Genome shape says DNA, replication mechanism says retrovirus.
+
+The genome dictates the pathway, and the pathway dictates which specific enzymes the virus has to bring with it. That\u2019s why Class V viruses like Influenza must pack a polymerase, and why Class VI retroviruses are the only ones we treat with reverse-transcriptase inhibitors\u2014other classes don\u2019t use that enzyme.`,
       ei_percent: 90,
       ei_reasoning: "The Baltimore classification system and the distinction between positive/negative sense RNA are fundamental virology concepts universally tested in medical microbiology curricula.",
     },
@@ -389,7 +397,14 @@ export default function LandingPage() {
         </section>
 
         {/* ───── Footer ───── */}
-        <footer className="pb-8 text-center">
+        <footer className="pb-8 text-center space-y-2">
+          <div className="flex items-center justify-center gap-4 text-xs" style={{ color: "var(--text-muted)" }}>
+            <a href="/terms" className="hover:opacity-80 underline-offset-4 hover:underline">Terms</a>
+            <span>·</span>
+            <a href="/privacy" className="hover:opacity-80 underline-offset-4 hover:underline">Privacy</a>
+            <span>·</span>
+            <a href="mailto:hello@klareai.com" className="hover:opacity-80 underline-offset-4 hover:underline">Contact</a>
+          </div>
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>
             Built by <span style={{ color: "var(--accent)" }}>Klare</span>
           </p>

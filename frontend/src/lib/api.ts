@@ -175,7 +175,10 @@ export async function updateProfile(profile: Record<string, string>): Promise<bo
   return res.ok;
 }
 
-export async function createCheckoutSession(period: "monthly" | "yearly"): Promise<string | null> {
+export async function createCheckoutSession(
+  period: "monthly" | "yearly",
+  tier: "pro" | "max" = "pro",
+): Promise<string | null> {
   const token = await getToken();
   const res = await fetch(`${API_URL}/api/checkout`, {
     method: "POST",
@@ -183,7 +186,7 @@ export async function createCheckoutSession(period: "monthly" | "yearly"): Promi
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ period }),
+    body: JSON.stringify({ period, tier }),
   });
   if (!res.ok) return null;
   const data = await res.json();

@@ -313,7 +313,14 @@ export default function SignInPage() {
 
           {/* Footer */}
           <p className="text-center text-xs mt-6" style={{ color: "var(--text-muted)" }}>
-            By signing in, you agree to our Terms of Service and Privacy Policy
+            By signing in, you agree to our{" "}
+            <a href="/terms" className="underline hover:opacity-80" style={{ color: "var(--text-secondary)" }}>
+              Terms of Service
+            </a>{" "}
+            and{" "}
+            <a href="/privacy" className="underline hover:opacity-80" style={{ color: "var(--text-secondary)" }}>
+              Privacy Policy
+            </a>
           </p>
         </div>
       </main>
