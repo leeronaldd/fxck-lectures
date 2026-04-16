@@ -30,6 +30,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.isLoggedIn, authLoading, pathname, router]);
 
+  // Refresh session list when tab becomes visible (handles cross-device/tab sync)
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && user.isLoggedIn) {
+        useAppStore.getState().loadSessions();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [user.isLoggedIn]);
+
   // Don't show app shell on sign-in, quiz, preview, or landing page (for guests only)
   const isPreviewPage = pathname === "/preview";
   const isChatPage = pathname.startsWith("/chat");

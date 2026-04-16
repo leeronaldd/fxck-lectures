@@ -230,8 +230,8 @@ export default function AppSidebar() {
                     </button>
                   </div>
                 ) : (
-                  <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    {/* Delete */}
+                  <div className="flex items-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                    {/* Delete — always visible on touch (no hover), hover-reveal on desktop */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

@@ -38,6 +38,7 @@ export interface Session {
   id: string;
   name: string;
   date: string;
+  createdAt?: string;  // ISO timestamp for staleness checks
   groups: number;
   status?: "pending" | "processing" | "ready" | "failed";
   errorMessage?: string | null;
@@ -202,6 +203,7 @@ export const useAppStore = create<AppState>((set, get) => {
         id: s.id,
         name: s.name,
         date: new Date(s.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+        createdAt: s.created_at,
         groups: 0,
         status: (s.status as Session["status"]) ?? "ready",
         errorMessage: s.error_message ?? null,
@@ -306,7 +308,7 @@ export const useAppStore = create<AppState>((set, get) => {
     const tempId = `pending-${Date.now()}`;
     const sessionName = file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
 
-    // If we have an active session, rename it to the file name
+    // Rename active session to file name if one exists
     const currentSessionId = get().activeSessionId;
     if (currentSessionId) {
       import("./api").then(({ renameSession }) => {
@@ -385,7 +387,30 @@ export const useAppStore = create<AppState>((set, get) => {
         toast.success("Upload complete!", { id: `upload-${tempId}` });
         toast.loading("Processing lecture...", { id: `pipeline-${file_id}` });
 
-        const activeSession = get().activeSessionId;
+        // Ensure a session exists so the backend can PATCH it with the result.
+        // Without this, session_id is null and the backend creates a duplicate row.
+        let activeSession = get().activeSessionId;
+        if (!activeSession) {
+          const created = await apiCreateSession(sessionName);
+          if (created) {
+            activeSession = created.id;
+            set((s) => ({
+              activeSessionId: created.id,
+              sessions: [
+                { id: created.id, name: sessionName, date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), groups: 0, status: "pending" },
+                ...s.sessions,
+              ],
+            }));
+            // Update the pipeline run with the new session ID
+            set((s) => {
+              const runs = { ...s.pipelineRuns };
+              const r = runs[file_id];
+              if (r) runs[file_id] = { ...r, sessionId: created.id };
+              return { pipelineRuns: runs };
+            });
+          }
+        }
+
         const cancelFn = runPipeline(
           file_id,
           // onUpdate

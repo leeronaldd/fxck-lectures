@@ -224,17 +224,25 @@ export default function ReaderPage() {
       );
     }
 
+    // Check if a server-side "processing" session has been stuck too long (no live pipeline in this tab)
+    const isStale = (() => {
+      if (!activeSession?.createdAt || !!activePipelineRun) return false;
+      if (sessionStatus !== "processing" && sessionStatus !== "pending") return false;
+      const ageMs = Date.now() - new Date(activeSession.createdAt).getTime();
+      return ageMs > 20 * 60 * 1000; // 20 minutes
+    })();
+
     return (
       <div className="flex-1 flex items-center justify-center px-4 py-24">
         <div className="text-center max-w-md">
           <div
             className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6"
-            style={{ background: "var(--accent-dim)", color: "var(--accent)" }}
+            style={{ background: isStale ? "rgba(251, 191, 36, 0.12)" : "var(--accent-dim)", color: isStale ? "#fbbf24" : "var(--accent)" }}
           >
             {isActivelyProcessing ? (
               <div
                 className="w-7 h-7 rounded-full border-2 border-t-transparent animate-spin"
-                style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }}
+                style={{ borderColor: isStale ? "#fbbf24" : "var(--accent)", borderTopColor: "transparent" }}
               />
             ) : (
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -244,14 +252,28 @@ export default function ReaderPage() {
             )}
           </div>
           <h2 className="text-xl font-bold mb-2" style={{ color: "var(--text-primary)" }}>
-            {isActivelyProcessing ? "Processing in background..." : "No lecture loaded"}
+            {isStale ? "This is taking longer than expected" : isActivelyProcessing ? "Processing in background..." : "No lecture loaded"}
           </h2>
           <p className="text-sm mb-6" style={{ color: "var(--text-secondary)" }}>
-            {isActivelyProcessing
+            {isStale
+              ? "The generation may have finished on another device, or something went wrong. You can try uploading again."
+              : isActivelyProcessing
               ? "Your lecture is being generated. View the progress or wait here — it'll appear automatically when ready."
               : "Upload a lecture recording or transcript to get started."}
           </p>
-          {isActivelyProcessing ? (
+          {isStale ? (
+            <button
+              onClick={() => router.push("/upload")}
+              className="btn-glow px-6 py-3 rounded-xl text-sm font-semibold"
+              style={{
+                background: "linear-gradient(135deg, var(--accent), #FF8555)",
+                color: "#fff",
+                boxShadow: "0 8px 32px var(--accent-glow)",
+              }}
+            >
+              Try again
+            </button>
+          ) : isActivelyProcessing ? (
             <div className="flex flex-col items-center justify-center gap-3">
               {/* Spinner */}
               <div
