@@ -29,13 +29,16 @@ const QUESTIONS = [
   },
   {
     id: 3,
-    question: "What frustrates you most about lectures?",
-    subtitle: "Pick the one that hits hardest.",
+    question: "What's the one subject your professor can't teach?",
+    subtitle: "Be honest — we've all had that one class.",
     options: [
-      "Spend more time decoding the professor than actually learning",
-      "Too much content",
-      "Professor yaps on easy stuff and skims the hard stuff",
-      "I don't know what's getting tested",
+      "Anatomy",
+      "Physiology",
+      "Biochemistry",
+      "Microbiology",
+      "Pharmacology",
+      "Pathology",
+      "Other",
     ],
   },
   {
