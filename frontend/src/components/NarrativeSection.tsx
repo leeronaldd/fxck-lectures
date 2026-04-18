@@ -39,6 +39,23 @@ function resolveImgSrc(raw: string): string {
 }
 
 /**
+ * Strip a leading markdown image from the narrative.
+ *
+ * The writer (both single-writer and multi-agent V3) emits every section
+ * with the slide image at the top — `![title](screenshots/xxx.png)\n\n...`.
+ * That was originally for markdown-only previews, but in the two-panel
+ * reader the SlideCard component already displays the image (left pane
+ * on desktop, stacked above the narrative on mobile). Rendering the
+ * inline image here shows it twice.
+ *
+ * Strip only the *first* leading image so images mid-narrative (rare but
+ * possible — an OpenStax figure referenced inline) still render.
+ */
+function stripLeadingImage(md: string): string {
+  return md.replace(/^\s*!\[[^\]]*\]\([^)]*\)\s*\n+/, "");
+}
+
+/**
  * Renders a transcript section's narrative as markdown with KaTeX math.
  *
  * Previously this had its own inline regex-based renderer, which ignored
@@ -94,7 +111,7 @@ export default function NarrativeSection({
             ),
           }}
         >
-          {section.narrative}
+          {stripLeadingImage(section.narrative)}
         </ReactMarkdown>
       </div>
     </div>
