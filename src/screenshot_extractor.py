@@ -21,6 +21,9 @@ from src.config import (
     GCP_PROJECT_ID,
     GCS_SCREENSHOTS_BUCKET,
     SCREENSHOTS_DIR,
+    FLASH_TIMEOUT_S,
+    call_with_timeout,
+    VertexTimeoutError,
 )
 from src.models import Chunk, Screenshot
 
@@ -53,25 +56,80 @@ def _upload_to_gcs(local_path: str, job_id: str) -> str:
 # Frame extraction
 # ---------------------------------------------------------------------------
 
+def _ahash(image: Image.Image, size: int = 8) -> int:
+    """8×8 average-hash fingerprint packed into a 64-bit int. Used for
+    splitting time-gap clusters when the prof flips slides within the same
+    ~10-second window (consecutive frames look very different even though
+    close in time).
+    """
+    small = image.convert("L").resize((size, size), Image.LANCZOS)
+    arr = np.asarray(small, dtype=np.uint8)
+    mean = arr.mean()
+    bits = (arr > mean).flatten()
+    h = 0
+    for b in bits:
+        h = (h << 1) | int(bool(b))
+    return h
+
+
+def _hamming(a: int, b: int) -> int:
+    return bin(a ^ b).count("1")
+
+
 def extract_frames(
     video_path: str,
     output_dir: str,
-    threshold: float = 30.0,
+    threshold: float = 15.0,
     skip_seconds: int = 60,
-    dedup_window: float = 3.0,
+    sample_fps: int = 2,
+    time_gap_s: float = 10.0,
+    hamming_split_threshold: int = 18,
 ) -> list[dict]:
     """
     Extract key frames from a lecture video by detecting visual transitions.
 
-    Reads the video at 1 fps, compares consecutive frames using mean absolute
-    difference, and saves frames where the change exceeds *threshold*.
+    Algorithm (tuned 2026-04-18 from experimentation on CHEM.mp4):
+
+      1. Sample the video at *sample_fps* frames per second (default 2).
+      2. For each sampled frame compute mean-absolute pixel difference
+         against the previous sampled frame. Mark as a CANDIDATE if
+         diff > *threshold* (default 15 — low enough to catch subtle
+         build-ins and pen strokes; raised to 30 before this caused
+         many slides to be missed).
+      3. Cluster candidates by time proximity: if a candidate is within
+         *time_gap_s* of the previous accepted candidate AND visually
+         similar (Hamming distance ≤ *hamming_split_threshold* on an
+         8×8 aHash), it joins the same cluster. This groups a drawing
+         session or a PowerPoint build-in sequence into one cluster.
+      4. Keep the LAST frame of each cluster — for a drawing, that's
+         the completed drawing; for a build-in, that's the fully
+         revealed slide.
+      5. Re-capture each kept frame at a point 2 seconds BEFORE the
+         next cluster's first transition. That's the final moment the
+         slide was displayed — guaranteed to show the fully-built state
+         before the prof flipped away.
+
+    Why this matters: the old algorithm (threshold 30, 1 fps, 3s dedup,
+    re-capture at 80%) missed ~30% of slides on lectures where the prof
+    drew live on paper (each stroke registered as a transition and ate
+    detection budget) and captured title-only frames on animated
+    PowerPoint slides (re-capturing at 80% still landed mid-build).
 
     Args:
         video_path: Path to the lecture video file.
-        output_dir: Directory to save extracted JPEG screenshots.
-        threshold: Mean absolute difference threshold for detecting a new slide.
+        output_dir: Directory to save extracted JPEG/PNG screenshots.
+        threshold: Mean absolute difference threshold for detecting a
+            transition candidate. 15 is tuned; lower = more noise,
+            higher = misses subtle slide changes.
         skip_seconds: Seconds to skip at the start (title/loading screens).
-        dedup_window: Minimum seconds between two detections to keep both.
+        sample_fps: How many frames per second to sample for transition
+            detection. 2 is tuned; 1 misses brief slides, 4 is wasteful.
+        time_gap_s: Candidates within this many seconds of the previous
+            accepted candidate join the same cluster.
+        hamming_split_threshold: If two consecutive candidates in a time
+            window differ by more than this many bits in their 8×8 aHash,
+            split them into separate clusters (prof flipped slides
+            mid-window).
 
     Returns:
         List of dicts with keys: timestamp_seconds, image_path.
@@ -85,108 +143,111 @@ def extract_frames(
     fps = cap.get(cv2.CAP_PROP_FPS)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     duration = total_frames / fps if fps > 0 else 0
-    frame_interval = max(1, int(round(fps)))  # read ~1 frame per second
+    frame_interval = max(1, int(round(fps / max(1, sample_fps))))
 
     print(f"Video: {duration:.0f}s ({duration / 60:.1f} min), {fps:.1f} fps")
-    print(f"Reading every {frame_interval} frames (~1 fps), skipping first {skip_seconds}s")
+    print(f"Sampling every {frame_interval} frames ({sample_fps} fps), "
+          f"skipping first {skip_seconds}s, threshold {threshold}")
 
+    # ── Pass 1: collect candidates ──
     prev_gray = None
-    detections: list[dict] = []
-    frame_idx = 0
-
-    # Jump to skip_seconds
-    start_frame = int(skip_seconds * fps)
-    cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
-    frame_idx = start_frame
+    candidates: list[dict] = []
+    frame_idx = int(skip_seconds * fps)
+    cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
 
     while True:
         ret, frame = cap.read()
         if not ret:
             break
-
-        timestamp = frame_idx / fps
-
-        # Only process at ~1 fps
         if frame_idx % frame_interval != 0:
             frame_idx += 1
             continue
 
+        timestamp = frame_idx / fps
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        if prev_gray is not None:
-            diff = cv2.absdiff(prev_gray, gray)
-            mean_diff = float(np.mean(diff))
-
-            if mean_diff > threshold:
-                # Dedup: skip if too close to last detection
-                if detections and (timestamp - detections[-1]["timestamp_seconds"]) < dedup_window:
-                    frame_idx += 1
-                    prev_gray = gray
-                    continue
-
-                # Save frame
-                idx_str = f"{len(detections) + 1:03d}"
-                filename = f"screenshot_{idx_str}.png"
-                save_path = os.path.join(output_dir, filename)
-
-                # Use Pillow for JPEG quality control
-                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                img = Image.fromarray(frame_rgb)
-                img.save(save_path, "PNG")
-
-                detections.append({
-                    "timestamp_seconds": round(timestamp, 1),
-                    "image_path": save_path,
-                })
-        else:
-            # Always save the first frame after skip as a baseline
-            idx_str = f"{len(detections) + 1:03d}"
-            filename = f"screenshot_{idx_str}.png"
-            save_path = os.path.join(output_dir, filename)
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            img = Image.fromarray(frame_rgb)
-            img.save(save_path, "PNG")
-            detections.append({
-                "timestamp_seconds": round(timestamp, 1),
-                "image_path": save_path,
+        if prev_gray is None:
+            # Baseline: capture the first sampled frame
+            candidates.append({
+                "timestamp": round(timestamp, 2),
+                "frame_bgr": frame.copy(),
+                "diff": 0.0,
             })
+        else:
+            diff = float(np.mean(cv2.absdiff(prev_gray, gray)))
+            if diff > threshold:
+                candidates.append({
+                    "timestamp": round(timestamp, 2),
+                    "frame_bgr": frame.copy(),
+                    "diff": round(diff, 1),
+                })
 
         prev_gray = gray
         frame_idx += 1
 
     cap.release()
-    print(f"Detected {len(detections)} slide transitions")
+    print(f"Detected {len(candidates)} transition candidates")
 
-    # Re-capture frames near the END of each slide (not the transition moment)
-    # This ensures the slide content is fully rendered/visible
-    print("Re-capturing frames near end of each slide for best content...")
+    # ── Pass 2: time-gap clustering ──
+    for c in candidates:
+        frame_rgb = cv2.cvtColor(c["frame_bgr"], cv2.COLOR_BGR2RGB)
+        c["hash"] = _ahash(Image.fromarray(frame_rgb))
+
+    clusters: list[list[dict]] = [[candidates[0]]] if candidates else []
+    for c in candidates[1:]:
+        last = clusters[-1][-1]
+        time_close = (c["timestamp"] - last["timestamp"]) <= time_gap_s
+        visually_close = _hamming(c["hash"], last["hash"]) <= hamming_split_threshold
+        if time_close and visually_close:
+            clusters[-1].append(c)
+        else:
+            clusters.append([c])
+
+    kept: list[dict] = []
+    for cluster in clusters:
+        last = cluster[-1]
+        last["cluster_span_s"] = last["timestamp"] - cluster[0]["timestamp"]
+        last["cluster_start_t"] = cluster[0]["timestamp"]
+        kept.append(last)
+
+    print(f"Collapsed {len(candidates)} candidates into {len(kept)} unique slides")
+
+    # ── Pass 3: re-capture the settled state ──
+    # Target: 2s BEFORE the next cluster's first transition. That's the
+    # moment right before the prof flipped — slide is fully built. For
+    # long-span clusters (drawings), the cluster's last frame is already
+    # the final state, so skip re-capture.
     cap2 = cv2.VideoCapture(video_path)
-    if cap2.isOpened():
-        for i, det in enumerate(detections):
-            # Target: 5 seconds before the next slide starts (or 80% through the slide)
-            t_start = det["timestamp_seconds"]
-            if i + 1 < len(detections):
-                t_end = detections[i + 1]["timestamp_seconds"]
-            else:
-                t_end = duration
+    for i, d in enumerate(kept):
+        span = d.get("cluster_span_s", 0.0)
+        if span > 15.0:
+            continue  # drawing — final frame already correct
 
-            slide_duration = t_end - t_start
-            if slide_duration > 10:
-                # Capture at 5 seconds before the end, or 80% through, whichever is earlier
-                target_time = min(t_end - 5, t_start + slide_duration * 0.8)
-            else:
-                # Short slide: capture at midpoint
-                target_time = t_start + slide_duration * 0.5
+        t = d["timestamp"]
+        if i + 1 < len(kept):
+            next_start = kept[i + 1].get("cluster_start_t", kept[i + 1]["timestamp"])
+            target_t = next_start - 2.0
+        else:
+            target_t = min(duration - 5.0, t + 120.0)
+        target_t = max(t + 3.0, target_t)
 
-            target_frame = int(target_time * fps)
-            cap2.set(cv2.CAP_PROP_POS_FRAMES, target_frame)
-            ret, frame = cap2.read()
-            if ret:
-                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                img = Image.fromarray(frame_rgb)
-                img.save(det["image_path"], "JPEG", quality=85)
+        cap2.set(cv2.CAP_PROP_POS_FRAMES, int(target_t * fps))
+        ret, frame = cap2.read()
+        if ret:
+            d["frame_bgr"] = frame
+    cap2.release()
 
-        cap2.release()
+    # ── Save images + return in the legacy-compatible shape ──
+    detections: list[dict] = []
+    for i, d in enumerate(kept):
+        filename = f"screenshot_{i + 1:03d}.png"
+        save_path = os.path.join(output_dir, filename)
+        frame_rgb = cv2.cvtColor(d["frame_bgr"], cv2.COLOR_BGR2RGB)
+        Image.fromarray(frame_rgb).save(save_path, "PNG")
+        detections.append({
+            "timestamp_seconds": round(d["timestamp"], 1),
+            "image_path": save_path,
+        })
 
     return detections
 
@@ -233,17 +294,47 @@ def describe_screenshots(
 
         mime = "image/png" if img_path.lower().endswith(".png") else "image/jpeg"
 
-        # Retry with backoff for 429 RESOURCE_EXHAUSTED
+        # Retry with backoff for 429 RESOURCE_EXHAUSTED + hard per-call timeout.
+        # Each describe is one image + 1-sentence prompt, normally <5s. We cap at
+        # FLASH_TIMEOUT_S so a stuck call can never freeze the whole extraction
+        # (this was the friend-stuck-at-20% bug).
         for attempt in range(4):
             try:
-                response = client.models.generate_content(
-                    model=CHUNKER_FALLBACK_MODEL,
-                    contents=[
-                        types.Part.from_bytes(data=image_bytes, mime_type=mime),
-                        "Describe this lecture slide in 1-2 sentences. What topic/concept does it show?",
-                    ],
+                from google.genai import types as genai_types
+                response = call_with_timeout(
+                    lambda: client.models.generate_content(
+                        model=CHUNKER_FALLBACK_MODEL,
+                        contents=[
+                            types.Part.from_bytes(data=image_bytes, mime_type=mime),
+                            # The downstream planner only needs a topic label,
+                            # not an essay. But we MUST disable Flash 3 thinking
+                            # here — otherwise thinking tokens eat the output
+                            # budget and we get truncated "This lecture" strings
+                            # (verified in run 5aaa4cc6: 14s per call, 0-18
+                            # chars of visible output, all slides grouped wrong).
+                            "In ONE short sentence, name the topic this lecture slide covers.",
+                        ],
+                        config={
+                            "max_output_tokens": 200,
+                            "temperature": 0.1,
+                            # Thinking off — no reasoning needed for vision → label
+                            "thinking_config": genai_types.ThinkingConfig(
+                                thinking_budget=0,
+                            ),
+                        },
+                    ),
+                    timeout=FLASH_TIMEOUT_S,
+                    label=f"slide_describe[{idx}]",
+                    retries=0,  # we own the retry loop here for 429 backoff
                 )
                 return idx, response.text.strip()
+            except VertexTimeoutError as e:
+                # Treat timeout same as a transient failure — backoff and retry.
+                if attempt < 3:
+                    _time.sleep((attempt + 1) * 3)
+                    continue
+                print(f"  Warning: description timed out for screenshot {idx + 1}: {e}")
+                return idx, "[Description unavailable]"
             except Exception as e:
                 if "429" in str(e) and attempt < 3:
                     wait = (attempt + 1) * 5  # 5s, 10s, 15s
@@ -395,8 +486,9 @@ def extract_pdf_slides(
     total_pages = len(doc)
     print(f"PDF: {total_pages} pages — {pdf_path}")
 
-    # 300 DPI: scale factor relative to 72 DPI default
-    zoom = 300 / 72
+    # 150 DPI: sharp enough for both Pro (text recognition) and student
+    # (slide panel is ~600px wide). 300 DPI was overkill and doubled render time.
+    zoom = 150 / 72
     matrix = fitz.Matrix(zoom, zoom)
 
     results: list[dict] = []
@@ -464,7 +556,7 @@ def extract_all(
     chunks_path: str,
     output_dir: str | None = None,
     output_json: str | None = None,
-    threshold: float = 30.0,
+    threshold: float = 15.0,
     skip_describe: bool = False,
     job_id: str = "",
 ) -> list[Screenshot]:

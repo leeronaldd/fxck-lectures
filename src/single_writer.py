@@ -41,6 +41,8 @@ from src.config import (
     GCP_PROJECT_ID,
     GCP_LOCATION,
     GENERATOR_MODEL,
+    PRO_TIMEOUT_S,
+    call_with_timeout,
 )
 from src.generator_v2 import GeneratedSection, SlideCard
 from src.json_repair import extract_json
@@ -132,6 +134,19 @@ skimmed something and it's a complex mechanism or standard curriculum
 topic, expand into real depth. The amount of transcript tells you
 nothing about how much space a topic deserves.
 
+SCOPE BOUNDARY — sometimes the prof mentions a concept that's genuinely
+beyond the student's syllabus and explicitly says they won't need to
+solve it (Schrödinger's equation, the Heisenberg uncertainty equation,
+multi-variable calculus whose result the student just uses). When you
+hit one of these, set the scope cleanly in the student's head: open
+with "All you need to know is…" followed by the 1-3 specific takeaways
+they walk away with, and stop. Don't then describe the mechanics of
+solving it two paragraphs later — you've already told the student
+they don't need it, and describing the process contradicts the scope
+you just set. The failure mode is a Schrödinger section that reads
+"You don't need to solve it. When you solve it, you get a wave
+function…" — pick one or the other; commit.
+
 FORWARD MOMENTUM — never end a section with a summary paragraph
 ("In conclusion, we've covered…"). Beyond that, handle transitions
 honestly. When two sections are genuinely causally or sequentially
@@ -146,6 +161,20 @@ next heading do the work. The rule is never "every section must seam
 into the next"; it's "no section ends on a dead summary, and no section
 opens with a cold definition when a real transition exists." If the
 transition would be forced, skip it.
+
+ENDING — the document-level close matters too. Read the last few
+minutes of the transcript and match the actual shape of the lecture.
+If the prof wrapped with a genuine recap ("we went from electrons as
+discrete particles through to electrons as waves, and settled on both"),
+mirror it — close with a short paragraph that traces the same arc in
+your own words. Not "in conclusion" or "to summarize," just a real
+closing beat that shows the student where the lecture landed. If the
+prof ran out of time mid-concept and said "we'll pick this up next
+week," flag it in a one-line note at the end: "The lecture cuts off
+here; the prof continues X next session." What you must not do is let
+the document end on a bare fact like a textbook entry — a last
+section reading "Chlorine becomes Cl⁻ with Argon's configuration"
+with no closure leaves the student wondering if they missed a page.
 
 DENSITY — don't faithfully reproduce every point. Trim history, anecdotes,
 repeated easy concepts. Where the prof skimmed exam-critical content
@@ -190,7 +219,78 @@ content. Two cases:
     The frontend renders text-only callouts cleanly. Don't invent or
     reuse an unrelated slide image.
 
-OUTPUT FORMAT — strict JSON, two top-level arrays:
+SLIDE COVERAGE — you decide which slides to teach, but with criteria
+and an audit trail. The failure mode to avoid is slides with real
+content (a formula, a diagram, a distinct named concept) getting
+silently dropped because you judged the topic "too historical" or
+"too setup-y." Maxwell's c = λν and Planck's E = hν are foundational
+and exam-testable even though the prof lingered on history. Keep them.
+
+Reorder the 'transcript' array freely for teaching flow. If Spin
+(slide 14) teaches better BEFORE Magnetic Quantum Number (slide 12),
+reorder. The anatomy prof jumps around the body to build concepts in
+the right order — so should you. Section lengths follow the LENGTH
+section at the bottom; don't invent a competing budget here.
+
+Multiple images per section — allowed, but narrowly. When the prof
+built up ONE concept across two or three adjacent slides (a formula
+derived step-by-step, a diagram progressively labeled, a mechanism
+drawn in stages), you can attach multiple slide_cards to the same
+transcript section. Give them slide_ids with the same integer prefix
+and a letter suffix ("5a", "5b", "5c") and have the transcript entry
+use "slide_number": 5 — the frontend renders them as a swipeable card
+stack. ONLY do this when the slides really are sequential views of
+the SAME concept. Never merge two distinct named concepts (Maxwell's
+equation and Planck's equation, or n and l quantum numbers) into one
+multi-image card — each named concept still gets its own section.
+
+Keep each named concept as its own section. The four quantum numbers
+(n, l, ml, ms) are four separate sections, not one merged "Quantum
+Numbers" card. Each named law, each named principle, each distinct
+scientific term the student needs to put on an exam — own section.
+Don't consolidate for elegance; the student is reading to learn each
+one, and a merged section buries the individual labels that matter.
+
+This includes transcript-only concepts — if the prof spent five
+minutes walking through Maxwell's c = λν, Planck's E = hν, and
+Einstein's photon contribution while the slide image stayed on a
+single "Light" slide, those are three separate foundational equations
+that earn their own text_only sections (card_type "text_only",
+image_ref ""). Don't fold Maxwell and Planck into the same section
+as line spectra just because they shared a slide — each named
+equation the student will see on an exam deserves its own section,
+whether or not it has its own slide.
+
+Judgment rule — when to include vs skip:
+  INCLUDE any slide with a formula, diagram, named concept, example,
+    mechanism, or distinct teaching content. Bias toward inclusion —
+    if you're unsure, include it with a short narrative rather than
+    drop it.
+  JUDGMENT CALL on summary/overview slides: include with a short
+    callback paragraph if they reinforce real content; skip if they're
+    pure repetition of what you already taught.
+  SKIP OK: pure transitions (black screens, fades, section breaks,
+    intermediate drawing frames when the prof is drawing live on
+    paper), title/agenda slides with no content beyond the section
+    name, "thank you / questions / see you next week" closers, exact
+    content duplicates of an earlier slide the prof re-showed.
+
+For every slide you skip, add an entry to 'dropped_slides' with the
+slide_id (using the input-deck numbering — "1" for screenshot_001.jpg,
+etc.) and a one-sentence reason. This is the audit trail — it lets us
+see what you judged as non-content and tune the criteria if you're
+wrong. Silent drops are the failure mode; documented drops are fine.
+
+SLIDE_ID CONVENTION — slide_id starts with the sequence position of
+the input image as a plain integer string: "1" for screenshot_001.jpg
+(or slide_001.png in PDF mode), "2" for the second, etc. Use this
+even if the actual slide has a different number printed on it.
+Optionally add a letter suffix when you're grouping multiple images
+into ONE section per the multi-image rule above ("5a", "5b"). The
+frontend parses the integer prefix to pair cards with transcript
+sections by 'slide_number'.
+
+OUTPUT FORMAT — strict JSON, three top-level arrays:
 
   "slides": [
     {{
@@ -208,16 +308,31 @@ OUTPUT FORMAT — strict JSON, two top-level arrays:
   ],
   "transcript": [
     {{
-      "slide_number": 1,                  // matches slide_id (as integer)
+      "slide_number": 1,                  // matches slide_id's integer prefix
       "title": "Section title",           // matches slide title
       "narrative": "Full prose, 250-500 words. Anatomy-prof voice. **Bold** key terms on first use.",
       "ei_percent": 85,
       "ei_reasoning": "One sentence: why this EI%."
     }}
+  ],
+  "dropped_slides": [                     // audit trail — input slides you chose not to teach
+    {{
+      "slide_id": "1",
+      "reason": "Title page — 'Electron Configuration' with no content beyond the section name"
+    }}
   ]
 
 Every slide MUST have ≥2 bullet_points and a real exam_tip — these render
 as the student's study card. Empty arrays make the card look broken.
+
+MATH NOTATION — the frontend renders inline math via KaTeX. Wrap any
+math expression in `$...$` (single dollars for inline). Examples:
+`$1s^2$`, `$2p^6$`, `$p_x$`, `$p_y$`, `$p_z$`, `$E = h\\nu$`,
+`$c = \\lambda\\nu$`, `$Na^+$`, `$Cl^-$`, `$3 \\times 10^8$` m/s.
+Use `_x` / `_y` / `_z` for single-character subscripts and `^{{...}}`
+for multi-character superscripts. Unwrapped math shows up as literal
+ASCII to the student — they see `1s^2` instead of 1s² — which looks
+broken. Plain prose sentences don't need `$`; only the notation itself.
 
 LENGTH — produce 14-22 paired sections covering the full lecture. Total
 narrative 4,000-6,000 words. Deep sections (multi-step mechanisms,
@@ -324,13 +439,29 @@ def generate_lecture_single(
             parts.append(types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg"))
             images_added += 1
 
+    # Explicit slide inventory — gives Pro a checklist to account for every
+    # input slide. Prevents silent drops; any skip must land in dropped_slides
+    # with a reason (see SLIDE COVERAGE section of the brief).
+    if screenshots:
+        total_slides = len(screenshots)
+        parts.append(types.Part.from_text(text=
+            f"\n\n=== SLIDE INVENTORY — account for every slide_id ===\n"
+            f"The deck has {total_slides} slides, numbered slide_id \"1\" "
+            f"through \"{total_slides}\". Every one must appear in your output "
+            f"— either as a taught entry in 'slides' + 'transcript', OR as "
+            f"an entry in 'dropped_slides' with a one-sentence reason. No "
+            f"silent drops. Reorder the 'transcript' array freely for "
+            f"teaching flow."
+        ))
+
     parts.append(types.Part.from_text(text=
         "\n\nNow: identify the spine, plan sections, fact-check uncertain "
         "claims via search if needed, then write the full document with "
         "bullets and exam tips for every section. Output JSON only."
     ))
 
-    print(f"  [single-writer] Prompt: {len(parts)} parts, {images_added} images")
+    print(f"  [single-writer] Prompt: {len(parts)} parts, {images_added} images, "
+          f"{len(screenshots)} slides in inventory")
 
     # ── Call Pro ──
     client = genai.Client(vertexai=True, project=GCP_PROJECT_ID, location=GCP_LOCATION)
@@ -345,10 +476,15 @@ def generate_lecture_single(
         config_kwargs["tools"] = [types.Tool(google_search=types.GoogleSearch())]
 
     start_time = time.time()
-    resp = client.models.generate_content(
-        model=model_name,
-        contents=parts,
-        config=types.GenerateContentConfig(**config_kwargs),
+    resp = call_with_timeout(
+        lambda: client.models.generate_content(
+            model=model_name,
+            contents=parts,
+            config=types.GenerateContentConfig(**config_kwargs),
+        ),
+        timeout=PRO_TIMEOUT_S,
+        label="single_writer.generate",
+        retries=3,
     )
     elapsed = time.time() - start_time
 
@@ -391,9 +527,111 @@ def generate_lecture_single(
           f"{len(raw_transcript)} sections, "
           f"{sum(len(t.get('narrative','').split()) for t in raw_transcript)} words")
 
+    _log_slide_coverage(
+        input_count=len(screenshots),
+        raw_slides=raw_slides,
+        raw_transcript=raw_transcript,
+        dropped_slides=parsed.get("dropped_slides", []),
+        log_prefix="single-writer",
+    )
+
     # ── Convert to GeneratedSection objects ──
     sections = _convert_to_sections(raw_slides, raw_transcript)
     return sections, []
+
+
+_IMAGE_REF_NUM_RE = __import__("re").compile(
+    r"screenshot_(\d+)\.(?:png|jpe?g)", __import__("re").IGNORECASE
+)
+
+
+def _image_ref_to_num(image_ref: str) -> int | None:
+    """Extract the input slide number from an image_ref like
+    'screenshots/screenshot_005.png' → 5. Returns None if the ref is
+    empty (text_only card) or doesn't match the expected pattern.
+    """
+    if not image_ref:
+        return None
+    m = _IMAGE_REF_NUM_RE.search(image_ref)
+    if not m:
+        return None
+    try:
+        return int(m.group(1))
+    except (TypeError, ValueError):
+        return None
+
+
+def _log_slide_coverage(
+    input_count: int,
+    raw_slides: list[dict],
+    raw_transcript: list[dict],
+    dropped_slides: list[dict],
+    log_prefix: str = "single-writer",
+) -> None:
+    """Audit which input slides landed in the output.
+
+    Matches via image_ref filename (screenshot_NNN.png → slide N), not
+    Pro's arbitrary `slide_id`. Pro sometimes renumbers slide_ids into
+    teaching-sequence IDs (2, 3, …) while image_refs correctly point to
+    the original screenshot files. image_ref is the real source of
+    truth; slide_id is just a join key within Pro's own output.
+
+    For dropped_slides we still trust Pro's slide_id (there's no
+    image_ref attached). The brief asks Pro to use input-deck numbering
+    there — if it drifts into teaching-sequence IDs for drops too, the
+    silent-drop count will spike and the brief needs tightening.
+
+    Purely logging. Doesn't raise or retry; if the brief rules alone
+    aren't enough, we iterate on the brief rather than paper over drops
+    with retry logic.
+    """
+    if input_count <= 0:
+        return  # transcript-only path, nothing to audit
+
+    expected: set[int] = set(range(1, input_count + 1))
+
+    taught_via_image: set[int] = set()
+    text_only_cards = 0
+    for s in raw_slides:
+        n = _image_ref_to_num(s.get("image_ref", "") or "")
+        if n is not None:
+            taught_via_image.add(n)
+        else:
+            text_only_cards += 1
+
+    def _to_int(x) -> int | None:
+        try: return int(str(x).strip())
+        except (TypeError, ValueError): return None
+
+    documented_drops: set[int] = set()
+    for d in dropped_slides:
+        n = _to_int(d.get("slide_id"))
+        if n is not None:
+            documented_drops.add(n)
+
+    accounted = taught_via_image | documented_drops
+    silent_drops = expected - accounted
+
+    print(f"  [{log_prefix}] coverage: input={input_count}, "
+          f"taught_via_image={len(taught_via_image)}, "
+          f"text_only_cards={text_only_cards}, "
+          f"documented_drops={len(documented_drops)}, "
+          f"silent_drops={len(silent_drops)}")
+
+    if dropped_slides:
+        print(f"  [{log_prefix}] documented drops:")
+        for d in sorted(dropped_slides, key=lambda x: _to_int(x.get("slide_id")) or 0):
+            print(f"      slide {d.get('slide_id','?')}: {d.get('reason','(no reason)')}")
+
+    if silent_drops:
+        print(f"  [{log_prefix}] WARN: silent drops "
+              f"(no image_ref points at them, no documented reason): "
+              f"{sorted(silent_drops)}")
+
+    unknown_taught = taught_via_image - expected
+    if unknown_taught:
+        print(f"  [{log_prefix}] WARN: image_refs outside input range: "
+              f"{sorted(unknown_taught)}")
 
 
 def _convert_to_sections(
@@ -658,13 +896,27 @@ def generate_lecture_single_streaming(
             parts.append(types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg"))
             images_added += 1
 
+    # Explicit slide inventory — see generate_lecture_single() for the rationale.
+    if screenshots:
+        total_slides = len(screenshots)
+        parts.append(types.Part.from_text(text=
+            f"\n\n=== SLIDE INVENTORY — account for every slide_id ===\n"
+            f"The deck has {total_slides} slides, numbered slide_id \"1\" "
+            f"through \"{total_slides}\". Every one must appear in your output "
+            f"— either as a taught entry in 'slides' + 'transcript', OR as "
+            f"an entry in 'dropped_slides' with a one-sentence reason. No "
+            f"silent drops. Reorder the 'transcript' array freely for "
+            f"teaching flow."
+        ))
+
     parts.append(types.Part.from_text(text=
         "\n\nNow: identify the spine, plan sections, fact-check uncertain "
         "claims via search if needed, then write the full document with "
         "bullets and exam tips for every section. Output JSON only."
     ))
 
-    print(f"  [single-writer-stream] Prompt: {len(parts)} parts, {images_added} images")
+    print(f"  [single-writer-stream] Prompt: {len(parts)} parts, {images_added} images, "
+          f"{len(screenshots)} slides in inventory")
 
     client = genai.Client(vertexai=True, project=GCP_PROJECT_ID, location=GCP_LOCATION)
     model_name = model or GENERATOR_MODEL
@@ -789,6 +1041,14 @@ def generate_lecture_single_streaming(
     print(f"  [single-writer-stream] Final: {len(raw_slides)} slides + "
           f"{len(raw_transcript)} sections, "
           f"{sum(len(t.get('narrative','').split()) for t in raw_transcript)} words")
+
+    _log_slide_coverage(
+        input_count=len(screenshots),
+        raw_slides=raw_slides,
+        raw_transcript=raw_transcript,
+        dropped_slides=parsed.get("dropped_slides", []),
+        log_prefix="single-writer-stream",
+    )
 
     sections = _convert_to_sections(raw_slides, raw_transcript)
     yield {"kind": "done", "sections": sections, "groups": []}

@@ -3,9 +3,12 @@
 import { useState, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 import rehypeRaw from "rehype-raw";
 import rehypeSlug from "rehype-slug";
+import rehypeKatex from "rehype-katex";
 import type { Components } from "react-markdown";
+import "katex/dist/katex.min.css";
 
 interface MarkdownRendererProps {
   content: string;
@@ -101,8 +104,8 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
     <>
       <div className="doc-content">
         <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
-          rehypePlugins={[rehypeRaw, rehypeSlug]}
+          remarkPlugins={[remarkGfm, remarkMath]}
+          rehypePlugins={[rehypeRaw, rehypeSlug, rehypeKatex]}
           components={components}
         >
           {processedContent}

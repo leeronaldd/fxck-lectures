@@ -88,7 +88,6 @@ export function SlideCardComponent({
   onImageClick?: (src: string) => void;
 }) {
   if (!card) return null;
-  const isProfSlide = card.card_type === "professor_slide";
 
   return (
     <div
@@ -135,8 +134,11 @@ export function SlideCardComponent({
         </span>
       </div>
 
-      {/* Bullet points (diagram cards only) */}
-      {!isProfSlide && card.bullet_points.length > 0 && (
+      {/* Bullet points — render on every card type that has them, not just
+          diagram cards. Previously these were hidden on professor_slide cards
+          so the student only saw the image, but that drops the exam-ready
+          bullet distillation that Pro wrote for the card. */}
+      {card.bullet_points.length > 0 && (
         <div className="px-4 py-3 space-y-1.5">
           {card.bullet_points.map((bp, i) => (
             <div key={i} className="flex items-start gap-2 text-sm">
