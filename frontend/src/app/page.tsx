@@ -196,18 +196,31 @@ export default function LandingPage() {
       <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6">
         {/* ───── Hero Section ───── */}
         <section className="pt-12 sm:pt-20 pb-12 text-center">
+          {/* Audience pill */}
+          <div
+            className="animate-fade-in-up animation-delay-100 inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-6 text-xs font-medium"
+            style={{
+              background: "var(--accent-dim)",
+              color: "var(--accent)",
+              border: "1px solid rgba(255, 107, 53, 0.2)",
+            }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse-dot" style={{ background: "var(--accent)" }} />
+            For medical, health sci &amp; biomed students
+          </div>
+
           {/* Headline */}
-          <h1 className="animate-fade-in-up animation-delay-100 text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight leading-[1.1] mb-6">
+          <h1 className="animate-fade-in-up animation-delay-200 text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight leading-[1.1] mb-6">
             <span className="gradient-text">Fxck Lectures</span>
           </h1>
 
           {/* Subheadline */}
-          <p className="animate-fade-in-up animation-delay-200 text-base sm:text-lg max-w-2xl mx-auto mb-8" style={{ color: "var(--text-secondary)" }}>
-            Your 2-hour medical lecture, rewritten as a 15-minute read by a tutor who actually explains things.
+          <p className="animate-fade-in-up animation-delay-300 text-base sm:text-lg max-w-2xl mx-auto mb-8" style={{ color: "var(--text-secondary)" }}>
+            Turns that one bad professor&rsquo;s 2-hour lecture into a 20-minute read that actually makes sense.
           </p>
 
           {/* CTA button */}
-          <div className="animate-fade-in-up animation-delay-300">
+          <div className="animate-fade-in-up animation-delay-400">
             <button
               onClick={() => router.push("/quiz")}
               className="btn-glow px-10 py-4 rounded-xl text-base font-semibold transition-all"
@@ -217,8 +230,11 @@ export default function LandingPage() {
                 boxShadow: "0 8px 32px var(--accent-glow)",
               }}
             >
-              Try for free
+              Try it on your worst lecture
             </button>
+            <p className="mt-3 text-xs" style={{ color: "var(--text-muted)" }}>
+              Free &middot; no card required
+            </p>
           </div>
         </section>
 
@@ -286,6 +302,49 @@ export default function LandingPage() {
                 {/* Fade overlays */}
                 <div className="absolute top-0 left-0 right-0 h-6 pointer-events-none" style={{ background: "linear-gradient(var(--bg-base), transparent)" }} />
                 <div className="absolute bottom-0 left-0 right-0 h-12 pointer-events-none" style={{ background: "linear-gradient(transparent, var(--bg-base))" }} />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ───── Testimonial ───── */}
+        <section className="pb-20">
+          <div className="max-w-3xl mx-auto">
+            <div
+              className="glass rounded-2xl p-8 sm:p-10 relative"
+              style={{ borderColor: "var(--border-glass)" }}
+            >
+              <svg
+                className="absolute top-5 left-5 opacity-25"
+                width="32"
+                height="32"
+                viewBox="0 0 24 24"
+                fill="var(--accent)"
+                aria-hidden="true"
+              >
+                <path d="M10 11H6a2 2 0 01-2-2V7a4 4 0 014-4h2v4H8a2 2 0 00-2 2h4v2zm10 0h-4a2 2 0 01-2-2V7a4 4 0 014-4h2v4h-2a2 2 0 00-2 2h4v2z" />
+              </svg>
+              <p
+                className="text-base sm:text-lg leading-relaxed mb-6 pl-10"
+                style={{ color: "var(--text-primary)" }}
+              >
+                &ldquo;I went from re-watching a 2-hour microbiology lecture at 2x speed three times, to reading it once in twenty minutes and actually understanding it. I wished I&rsquo;d had this earlier.&rdquo;
+              </p>
+              <div className="flex items-center gap-3 pl-10">
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm shrink-0"
+                  style={{ background: "var(--accent-dim)", color: "var(--accent)" }}
+                >
+                  RL
+                </div>
+                <div>
+                  <div className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                    Rachael L.
+                  </div>
+                  <div className="text-xs" style={{ color: "var(--text-muted)" }}>
+                    1st-year MD, Griffith University
+                  </div>
+                </div>
               </div>
             </div>
           </div>
