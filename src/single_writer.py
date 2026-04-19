@@ -828,6 +828,8 @@ _IMAGE_REF_NUM_RE = __import__("re").compile(
     r"screenshot_(\d+)\.(?:png|jpe?g)", __import__("re").IGNORECASE
 )
 
+_SLIDE_ID_INT_RE = __import__("re").compile(r"\d+")
+
 
 def _image_ref_to_num(image_ref: str) -> int | None:
     """Extract the input slide number from an image_ref like
@@ -841,6 +843,31 @@ def _image_ref_to_num(image_ref: str) -> int | None:
         return None
     try:
         return int(m.group(1))
+    except (TypeError, ValueError):
+        return None
+
+
+def _slide_id_to_int(slide_id) -> int | None:
+    """Normalise any slide_id-ish value to an integer sequence position.
+
+    Pro empirically drifts across several slide_id formats even though the
+    brief says "use plain integer strings" — we've seen '1', '01', '1a'
+    (multi-image suffix), 'slide_001', and bare ints. This helper grabs
+    the first digit-run in the string and parses it, so all of those
+    collapse to the same int key. Returns None when there's no parseable
+    integer (empty string, garbage, None).
+    """
+    if slide_id is None:
+        return None
+    if isinstance(slide_id, bool):
+        return None  # guard: bool is an int subclass in Python
+    if isinstance(slide_id, int):
+        return slide_id
+    m = _SLIDE_ID_INT_RE.search(str(slide_id))
+    if not m:
+        return None
+    try:
+        return int(m.group(0))
     except (TypeError, ValueError):
         return None
 
@@ -926,8 +953,28 @@ def _convert_to_sections(
     that downstream pipeline (assemble_api_response, completeness_checker)
     expects.
     """
-    # Index slides by slide_id for matching
-    slides_by_id = {str(s.get("slide_id", "")).lower(): s for s in raw_slides}
+    # Index slides by slide_id AND by integer-normalised slide_id. The
+    # integer map is the one that actually works reliably — Pro drifts
+    # across formats ('1', '01', '1a', 'slide_001'), so strict string
+    # equality drops most slide cards and leaves sections image-less.
+    slides_by_id: dict[str, dict] = {}
+    slides_by_int: dict[int, dict] = {}
+    for s in raw_slides:
+        raw_sid = str(s.get("slide_id", "")).strip()
+        if raw_sid:
+            slides_by_id[raw_sid.lower()] = s
+        sid_int = _slide_id_to_int(s.get("slide_id"))
+        if sid_int is None:
+            # Fallback — try the image_ref filename. A slide with image_ref
+            # 'screenshots/screenshot_005.png' resolves to 5 even if its
+            # slide_id is garbage.
+            sid_int = _image_ref_to_num(s.get("image_ref", "") or "")
+        if sid_int is not None and sid_int not in slides_by_int:
+            # First slide wins when Pro double-assigns an integer (e.g. a
+            # legit '5' vs a stray '5a' from multi-image). The primary card
+            # is what the frontend renders; we're not supporting multi-card
+            # stacks yet.
+            slides_by_int[sid_int] = s
 
     sections = []
     for t in raw_transcript:
@@ -937,9 +984,15 @@ def _convert_to_sections(
         except (ValueError, TypeError):
             slide_num = len(sections) + 1
 
-        # Find matching slide card
+        # Match by integer first — handles '1a', 'slide_001', '01'
+        # drift. Fall back to raw string equality for anything exotic
+        # the int-extraction didn't catch.
+        sn_int = _slide_id_to_int(sn)
+        if sn_int is None:
+            sn_int = slide_num
         matching_slide = (
-            slides_by_id.get(str(sn).lower())
+            slides_by_int.get(sn_int)
+            or slides_by_id.get(str(sn).lower())
             or slides_by_id.get(str(slide_num).lower())
             or {}
         )
@@ -1229,6 +1282,7 @@ def generate_lecture_single_streaming(
     slides_streamer = _ArrayObjectStreamer(key="slides")
     transcript_streamer = _ArrayObjectStreamer(key="transcript")
     slides_by_id: dict[str, dict] = {}
+    slides_by_int: dict[int, dict] = {}
     pending: list[dict] = []   # transcript items that arrived before their slide
     full_text = ""
     sections_emitted = 0
@@ -1238,7 +1292,14 @@ def generate_lecture_single_streaming(
     def _emit_section(tx_item: dict) -> dict:
         nonlocal sections_emitted
         sn = tx_item.get("slide_number", tx_item.get("slide_id"))
-        slide_card = slides_by_id.get(str(sn), {}) if sn is not None else {}
+        # Match by integer first (handles '1a', 'slide_001' drift),
+        # then fall back to raw string equality.
+        sn_int = _slide_id_to_int(sn)
+        slide_card: dict = {}
+        if sn_int is not None and sn_int in slides_by_int:
+            slide_card = slides_by_int[sn_int]
+        elif sn is not None:
+            slide_card = slides_by_id.get(str(sn), {})
         event = {
             "kind": "section",
             "index": sections_emitted,
@@ -1266,12 +1327,18 @@ def generate_lecture_single_streaming(
                     sid = str(slide.get("slide_id", ""))
                     if sid:
                         slides_by_id[sid] = slide
+                    sid_int = _slide_id_to_int(slide.get("slide_id"))
+                    if sid_int is None:
+                        sid_int = _image_ref_to_num(slide.get("image_ref", "") or "")
+                    if sid_int is not None and sid_int not in slides_by_int:
+                        slides_by_int[sid_int] = slide
 
                     # Any transcript items that were waiting on this slide?
                     still_pending = []
                     for tx in pending:
-                        sn = tx.get("slide_number", tx.get("slide_id"))
-                        if str(sn) == sid:
+                        tx_sn = tx.get("slide_number", tx.get("slide_id"))
+                        tx_int = _slide_id_to_int(tx_sn)
+                        if (tx_int is not None and tx_int == sid_int) or str(tx_sn) == sid:
                             yield _emit_section(tx)
                         else:
                             still_pending.append(tx)
@@ -1280,7 +1347,9 @@ def generate_lecture_single_streaming(
                 # Completed transcript sections
                 for tx in transcript_streamer.feed(text):
                     sn = tx.get("slide_number", tx.get("slide_id"))
-                    if sn is not None and str(sn) in slides_by_id:
+                    sn_int = _slide_id_to_int(sn)
+                    if (sn_int is not None and sn_int in slides_by_int) \
+                       or (sn is not None and str(sn) in slides_by_id):
                         yield _emit_section(tx)
                     else:
                         # Slide hasn't streamed yet — buffer briefly.
