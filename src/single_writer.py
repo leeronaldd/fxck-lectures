@@ -41,11 +41,223 @@ from src.config import (
     GCP_PROJECT_ID,
     GCP_LOCATION,
     GENERATOR_MODEL,
+    CHUNKER_FALLBACK_MODEL,
     PRO_TIMEOUT_S,
+    FLASH_TIMEOUT_S,
     call_with_timeout,
 )
 from src.generator_v2 import GeneratedSection, SlideCard
 from src.json_repair import extract_json
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Flash pre-pass — one cheap call that extracts, per slide, (a) the dot
+# points visible on the slide and (b) every named example the professor
+# dropped in the matching transcript segment.
+#
+# Pro then gets these as a "must-include" list per slide. This solves the
+# failure mode where Pro synthesises at a high level across a 2-hour
+# transcript and silently drops the specific species names, lake names,
+# record-holders, and case studies that students need to memorise for
+# exams. It's the single biggest quality gap observed in sister-testing
+# the M3 Lecture 3 output — named examples like Lake Hillier (WA),
+# Methanopyrus kandleri at 122°C, Aquifex / Thermus aquaticus, and Mono
+# Lake all got lost.
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+_EXTRACTION_PROMPT = """\
+You're the extraction pre-pass for a lecture-replacement pipeline. A
+downstream writer (Gemini Pro) will produce the final notes — but Pro
+synthesises at a high level and sometimes drops the specific named
+things the professor mentioned in passing. Your job is to catch those.
+
+For every slide image in this deck, give me two lists:
+
+  dot_points — the 2–4 bullets actually visible on the slide. Verbatim
+    when the slide shows bullet text; a short paraphrase when the slide
+    is a diagram with labels. Empty list for transition/title/image-only
+    slides.
+
+  named_examples — every proper noun, species binomial, place, person,
+    chemical/drug, record-holder, specific numerical value, or named
+    technique the professor mentions in the transcript segment
+    discussing THIS slide's content. Verbatim from the transcript. If
+    the prof said "Lake Hillier off the coast of Western Australia",
+    write "Lake Hillier (WA)", not "pink halophile lake". If the prof
+    said "Methanopyrus kandleri at 122 degrees", write exactly that.
+    Empty list if none.
+
+Match slides to transcript segments by topic, not by sequence — slides
+may be out of order vs the transcript, and some transcript sections
+may not map to any slide. If you're uncertain which slide a named
+example belongs to, attach it to the slide whose topic most closely
+matches.
+
+The named_examples are the part that matters most. Students will lose
+exam marks if specific lake names, species, or record-holders don't
+appear in the final document. Err on the side of including too many
+rather than missing one.
+
+OUTPUT — strict JSON, no preamble, no markdown fences:
+
+{
+  "slides": [
+    {
+      "slide_id": "1",
+      "dot_points": ["...", "..."],
+      "named_examples": ["...", "..."]
+    },
+    ...
+  ]
+}
+
+slide_id is the sequence position of the input image (1 for the first
+image below, 2 for the second, etc.) — use this even if the slide
+shows a different number.
+"""
+
+
+def _extract_slide_metadata(
+    transcript_text: str,
+    screenshots: list,
+    screenshots_dir: Path | None,
+    model: str | None = None,
+    log_prefix: str = "single-writer",
+) -> dict[str, dict]:
+    """Run the Flash extraction pre-pass. Returns a dict keyed by slide_id
+    with {"dot_points": [...], "named_examples": [...]}.
+
+    Silent-fail on any error — extraction is an enhancement, not a hard
+    dependency. If Flash hiccups, Pro still runs with just the transcript
+    + images and the pipeline degrades to pre-extraction behaviour.
+    """
+    if not screenshots or not screenshots_dir:
+        return {}
+
+    parts: list = [types.Part.from_text(text=_EXTRACTION_PROMPT)]
+    parts.append(types.Part.from_text(
+        text="\n\n=== PROFESSOR'S TRANSCRIPT ===\n\n" + transcript_text
+    ))
+
+    images_added = 0
+    for s in screenshots:
+        img_path = screenshots_dir / s["image_filename"]
+        if not img_path.exists():
+            continue
+        try:
+            img_bytes = img_path.read_bytes()
+        except OSError:
+            continue
+        parts.append(types.Part.from_text(
+            text=f"\n\n=== SLIDE {images_added + 1} ({s['image_filename']}) ==="
+        ))
+        parts.append(types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg"))
+        images_added += 1
+
+    if images_added == 0:
+        return {}
+
+    client = genai.Client(vertexai=True, project=GCP_PROJECT_ID, location=GCP_LOCATION)
+    model_name = model or CHUNKER_FALLBACK_MODEL
+
+    start_time = time.time()
+    try:
+        resp = call_with_timeout(
+            lambda: client.models.generate_content(
+                model=model_name,
+                contents=parts,
+                config=types.GenerateContentConfig(
+                    temperature=0.2,
+                    max_output_tokens=16384,
+                ),
+            ),
+            timeout=FLASH_TIMEOUT_S,
+            label="single_writer.extract_metadata",
+            retries=2,
+        )
+    except Exception as e:
+        print(f"  [{log_prefix}] extraction pre-pass failed: {e} — Pro will run without must-include lists")
+        return {}
+
+    elapsed = time.time() - start_time
+    output = resp.text or ""
+    parsed = extract_json(output, expect_array=False)
+    if not parsed or not isinstance(parsed, dict):
+        print(f"  [{log_prefix}] extraction pre-pass: JSON parse failed — "
+              f"Pro will run without must-include lists")
+        return {}
+
+    raw_slides = parsed.get("slides") or []
+    out: dict[str, dict] = {}
+    total_examples = 0
+    for s in raw_slides:
+        sid = str(s.get("slide_id", "")).strip()
+        if not sid:
+            continue
+        dot_points = [str(x).strip() for x in (s.get("dot_points") or []) if str(x).strip()]
+        named_examples = [str(x).strip() for x in (s.get("named_examples") or []) if str(x).strip()]
+        out[sid] = {"dot_points": dot_points, "named_examples": named_examples}
+        total_examples += len(named_examples)
+
+    print(f"  [{log_prefix}] extraction pre-pass: {elapsed:.1f}s, "
+          f"{len(out)}/{images_added} slides, {total_examples} named examples")
+    return out
+
+
+def _format_extraction_for_pro(extraction: dict[str, dict]) -> str:
+    """Format the Flash extraction results as a text block Pro reads
+    alongside the transcript and slide images.
+    """
+    if not extraction:
+        return ""
+
+    lines = [
+        "\n\n=== MUST-INCLUDE CANDIDATES (per slide) ===",
+        "",
+        "The Flash pre-pass read the full transcript and every slide image,",
+        "and pulled out the named things the professor dropped — species,",
+        "places, record-holders, techniques, specific numbers. Treat this",
+        "as a high-recall catch-net, not a checklist.",
+        "",
+        "For each slide below, 'dot_points' shows what's on the slide itself",
+        "(cross-check against the image if it's unclear). 'named_examples'",
+        "is verbatim from the matching transcript segment.",
+        "",
+        "Use judgment on inclusion:",
+        "  • Exam-relevant specifics (canonical species, record-holders,",
+        "    numerical thresholds, named techniques, case-study locations):",
+        "    weave into the teaching AND wrap in <mark> per the highlighting",
+        "    rule in the brief.",
+        "  • Lab-context trivia the extraction may have pulled (room",
+        "    numbers, lab-partner names, building locations, incidental",
+        "    student anecdotes): these aren't exam material — drop them.",
+        "  • If a named_example is exam-relevant but belongs in a different",
+        "    section than Flash mapped it to, move it. Don't force it into",
+        "    the wrong section just because Flash put it there.",
+        "",
+        "Missing a canonical exam specific (Lake Hillier, Methanopyrus",
+        "kandleri, Aquifex, etc.) costs the student marks. Noise in the",
+        "highlights (James, N44) costs the student reading time. Get both",
+        "right.",
+        "",
+    ]
+    for sid in sorted(extraction.keys(), key=lambda x: (len(x), x)):
+        meta = extraction[sid]
+        lines.append(f"--- slide {sid} ---")
+        if meta.get("dot_points"):
+            lines.append("  dot_points:")
+            for dp in meta["dot_points"]:
+                lines.append(f"    • {dp}")
+        if meta.get("named_examples"):
+            lines.append("  named_examples (MUST appear):")
+            for ne in meta["named_examples"]:
+                lines.append(f"    • {ne}")
+        else:
+            lines.append("  named_examples: (none — prof didn't name anything specific for this slide)")
+        lines.append("")
+
+    return "\n".join(lines)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -197,6 +409,46 @@ CALLBACKS — name concepts, not section numbers. Never write "as discussed
 in Section 3" — write "the capsid we covered earlier." Real cross-references
 across sections are good; numbered references are robotic.
 
+HIGHLIGHTING MEMORISE-WORTHY ITEMS — don't break the prose with a
+separate "Memorise" list. Instead, highlight the exam-worthy specifics
+inline where they appear in the teaching, using raw HTML <mark> tags:
+
+    "The record holder is the archaeon <mark>*Methanopyrus kandleri*</mark>,
+     which grows at <mark>122°C</mark>..."
+    "...<mark>Lake Hillier in Western Australia</mark> is famously pink
+     from the archaeal pigments..."
+
+The frontend renders <mark> as highlighted text — it's the student's
+flashcard pattern baked into the prose, no separate list needed. Use
+judgment: highlight things the student genuinely needs to commit to
+memory for an exam (record-holders, canonical species names, key
+numerical thresholds, named techniques), NOT every proper noun you
+encounter. Ignore lab-context trivia the extraction pass may have
+pulled (room numbers, lab partner names, which building the labs are
+in) — those aren't exam material even if the prof mentioned them.
+Two to four highlights per section is a healthy rhythm; one or zero
+is fine if the section is conceptual with no specific memorise items;
+more than five means you're flagging noise. Organism binomials
+inside <mark> tags should still be italicised: <mark>*E. coli*</mark>.
+
+SPECIFICS YOU CAN FILL VS SPECIFICS YOU MUST SOURCE — there's a sharp
+line between concepts and specifics. Concepts you can fill from textbook
+knowledge — that's the whole point of the tool. If the prof skimmed a
+mechanism, teach it properly; if they forgot to name a process, surface
+the name. But specific numbers, proper nouns, recipes, dates, and exact
+quantities must either come from the transcript or be verified via
+search — never invented because they read as more authoritative. For
+example: if the prof says "the drug's half-life is about a day," don't
+upgrade that to "23.8 hours" to sound precise. If the prof describes a
+receptor without naming its dissociation constant, don't write
+"$K_d = 10$ nM" because a number looks more professional than a range.
+A plausible-sounding specific the prof never said will get quoted on an
+exam and lose the student marks. When in doubt, keep it general ("a
+half-life measured in hours") rather than fabricate. This rule is the
+single most common way this pipeline hallucinates — catch yourself
+reaching for a specific value and ask: did the transcript actually say
+that, or am I inventing it?
+
 ACCURACY — when you mention named pathogens, drug mechanisms, clinical
 diseases, specific molecular structures, or named theories, verify with
 web search if you're not 100% certain. Wrong clinical/technical facts
@@ -232,17 +484,30 @@ reorder. The anatomy prof jumps around the body to build concepts in
 the right order — so should you. Section lengths follow the LENGTH
 section at the bottom; don't invent a competing budget here.
 
-Multiple images per section — allowed, but narrowly. When the prof
-built up ONE concept across two or three adjacent slides (a formula
-derived step-by-step, a diagram progressively labeled, a mechanism
-drawn in stages), you can attach multiple slide_cards to the same
-transcript section. Give them slide_ids with the same integer prefix
-and a letter suffix ("5a", "5b", "5c") and have the transcript entry
-use "slide_number": 5 — the frontend renders them as a swipeable card
-stack. ONLY do this when the slides really are sequential views of
-the SAME concept. Never merge two distinct named concepts (Maxwell's
-equation and Planck's equation, or n and l quantum numbers) into one
-multi-image card — each named concept still gets its own section.
+Multiple images per section — allowed, and you should actively look for
+cases where it helps. Two patterns qualify:
+
+  (1) Sequential buildup — the prof built up ONE concept across two or
+      three adjacent slides (a formula derived step-by-step, a diagram
+      progressively labeled, a mechanism drawn in stages, a life-cycle
+      unfolding phase by phase).
+
+  (2) Parallel categories of the same framework — the prof showed the
+      5 oxygen tolerance tube patterns on separate slides (one per
+      class), or the 4 colony morphologies, or the 3 hemolysis types,
+      or the cardinal-temperature classes laid out as a row of diagrams.
+      These belong together as one teaching section with a card stack,
+      not split into 5 separate one-sentence sections.
+
+Attach multiple slide_cards to the same transcript section by giving
+them slide_ids with the same integer prefix and a letter suffix ("5a",
+"5b", "5c") and having the transcript entry use "slide_number": 5 —
+the frontend renders them as a swipeable card stack. Cap at 3 images
+per section (past that becomes a wall of pictures). Don't merge truly
+distinct named concepts (Maxwell's equation and Planck's equation, or
+n and l quantum numbers) into one multi-image card — each named
+concept still gets its own section. But DO merge when what you're
+really teaching is ONE framework seen through multiple diagrams.
 
 Keep each named concept as its own section. The four quantum numbers
 (n, l, ml, ms) are four separate sections, not one merged "Quantum
@@ -325,14 +590,21 @@ OUTPUT FORMAT — strict JSON, three top-level arrays:
 Every slide MUST have ≥2 bullet_points and a real exam_tip — these render
 as the student's study card. Empty arrays make the card look broken.
 
-MATH NOTATION — the frontend renders inline math via KaTeX. Wrap any
-math expression in `$...$` (single dollars for inline). Examples:
-`$1s^2$`, `$2p^6$`, `$p_x$`, `$p_y$`, `$p_z$`, `$E = h\\nu$`,
-`$c = \\lambda\\nu$`, `$Na^+$`, `$Cl^-$`, `$3 \\times 10^8$` m/s.
-Use `_x` / `_y` / `_z` for single-character subscripts and `^{{...}}`
-for multi-character superscripts. Unwrapped math shows up as literal
-ASCII to the student — they see `1s^2` instead of 1s² — which looks
-broken. Plain prose sentences don't need `$`; only the notation itself.
+MATH NOTATION — the frontend renders inline math via KaTeX. Wrap math
+expressions in single dollar signs. Write them exactly like this, with
+nothing around the dollar signs — no backticks, no quotes, no extra
+wrappers: $1s^2$, $2p^6$, $p_x$, $E = h\\nu$, $c = \\lambda\\nu$,
+$Na^+$, $Cl^-$, $3 \\times 10^8$ m/s, $37^\\circ C$, $10^{{-3}}$. Use
+_x / _y / _z for single-character subscripts and ^{{...}} for
+multi-character superscripts. Do NOT wrap the dollar-delimited math in
+backticks — backticks turn into inline code blocks on the frontend,
+and the student sees literal `$37^\\circ C$` text instead of 37°C.
+Plain prose sentences don't need dollar signs; only the notation
+itself does. When the math is a percentage or a temperature sitting
+inside a normal sentence, it's fine to write "7.5% salt" or "37°C"
+as plain text — the student knows what those mean. Dollar-wrap only
+when you're actually writing subscripts, superscripts, Greek letters,
+or equations that need proper typesetting.
 
 LENGTH — produce 14-22 paired sections covering the full lecture. Total
 narrative 4,000-6,000 words. Deep sections (multi-step mechanisms,
@@ -411,6 +683,15 @@ def generate_lecture_single(
     if not screenshots_dir:
         print(f"  [single-writer] WARN: screenshots dir not found, slides will not be passed as images")
 
+    # ── Flash pre-pass: pull per-slide dot_points + named_examples ──
+    extraction = _extract_slide_metadata(
+        transcript_text=transcript_text,
+        screenshots=screenshots,
+        screenshots_dir=screenshots_dir,
+        log_prefix="single-writer",
+    )
+    extraction_block = _format_extraction_for_pro(extraction)
+
     # ── Build the prompt ──
     brief = _build_brief(subject)
     parts: list = [types.Part.from_text(text=brief)]
@@ -453,6 +734,9 @@ def generate_lecture_single(
             f"silent drops. Reorder the 'transcript' array freely for "
             f"teaching flow."
         ))
+
+    if extraction_block:
+        parts.append(types.Part.from_text(text=extraction_block))
 
     parts.append(types.Part.from_text(text=
         "\n\nNow: identify the spine, plan sections, fact-check uncertain "
@@ -869,6 +1153,15 @@ def generate_lecture_single_streaming(
     print(f"  [single-writer-stream] Loaded {len(transcript_text.split())} words transcript, "
           f"{len(screenshots)} slide images")
 
+    # ── Flash pre-pass: pull per-slide dot_points + named_examples ──
+    extraction = _extract_slide_metadata(
+        transcript_text=transcript_text,
+        screenshots=screenshots,
+        screenshots_dir=screenshots_dir,
+        log_prefix="single-writer-stream",
+    )
+    extraction_block = _format_extraction_for_pro(extraction)
+
     # ── Build the prompt (identical to non-streaming) ──
     brief = _build_brief(subject)
     parts: list = [types.Part.from_text(text=brief)]
@@ -908,6 +1201,9 @@ def generate_lecture_single_streaming(
             f"silent drops. Reorder the 'transcript' array freely for "
             f"teaching flow."
         ))
+
+    if extraction_block:
+        parts.append(types.Part.from_text(text=extraction_block))
 
     parts.append(types.Part.from_text(text=
         "\n\nNow: identify the spine, plan sections, fact-check uncertain "

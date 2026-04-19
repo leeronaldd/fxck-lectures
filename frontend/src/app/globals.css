@@ -270,6 +270,21 @@ body {
   color: var(--text-secondary);
 }
 
+.doc-content mark {
+  background: rgba(255, 107, 53, 0.18);
+  color: inherit;
+  padding: 0.05em 0.25em;
+  border-radius: 3px;
+  font-weight: 500;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.doc-content mark em,
+.doc-content mark strong {
+  color: inherit;
+}
+
 .doc-content ul, .doc-content ol {
   margin-bottom: 1.25rem;
   padding-left: 1.5rem;

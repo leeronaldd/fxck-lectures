@@ -93,6 +93,21 @@ export default function NarrativeSection({
             strong: ({ children }) => (
               <strong style={{ color: "var(--accent)" }}>{children}</strong>
             ),
+            mark: ({ children }) => (
+              <mark
+                style={{
+                  background: "rgba(255, 107, 53, 0.18)",
+                  color: "inherit",
+                  padding: "0.05em 0.25em",
+                  borderRadius: "3px",
+                  fontWeight: 500,
+                  boxDecorationBreak: "clone",
+                  WebkitBoxDecorationBreak: "clone",
+                }}
+              >
+                {children}
+              </mark>
+            ),
             del: ({ children }) => (
               <del style={{ opacity: 0.4 }}>{children}</del>
             ),
