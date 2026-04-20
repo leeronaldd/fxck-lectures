@@ -80,6 +80,21 @@ export default function UploadPage() {
             </div>
 
             <div className="glass rounded-2xl p-6 sm:p-8">
+              <div className="flex justify-center mb-4">
+                <div
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium"
+                  style={{
+                    background: "var(--accent-dim)",
+                    color: "var(--accent)",
+                    border: "1px solid rgba(255, 107, 53, 0.2)",
+                  }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 19V5M5 12l7-7 7 7" />
+                  </svg>
+                  Upload here
+                </div>
+              </div>
               <UploadZone
                 videoFile={videoFile}
                 transcriptFile={transcriptFile}
