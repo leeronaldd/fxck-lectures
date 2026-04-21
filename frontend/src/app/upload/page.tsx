@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as Progress from "@radix-ui/react-progress";
 import { useAppStore } from "@/lib/store";
 import UploadZone from "@/components/UploadZone";
 import PipelineStepper from "@/components/PipelineStepper";
+import type { UsageInfo } from "@/lib/api";
 
 export default function UploadPage() {
   const router = useRouter();
@@ -61,13 +62,69 @@ export default function UploadPage() {
   const hasFile = transcriptFile || videoFile;
   const showProgress = isRunning || isDone || !!pipelineError;
 
+  // Usage — block upload at limit so users don't waste another run finding out
+  // they can't. Hidden for unlimited whitelist.
+  const [usage, setUsage] = useState<UsageInfo | null>(null);
+  useEffect(() => {
+    if (!user.isLoggedIn) return;
+    (async () => {
+      try {
+        const { fetchUsage } = await import("@/lib/api");
+        const u = await fetchUsage();
+        if (u) setUsage(u);
+      } catch {}
+    })();
+  }, [user.isLoggedIn]);
+  const atLimit =
+    !!usage && usage.limit !== -1 && usage.used >= usage.limit;
+
   return (
     <div className="flex-1 relative overflow-hidden overflow-y-auto">
       <div className="hero-glow hero-glow-pulse" />
 
       <div className="relative z-10 max-w-lg mx-auto px-4 sm:px-6 pt-10 sm:pt-16 pb-16">
 
-        {!showProgress ? (
+        {!showProgress && atLimit ? (
+          <>
+            <div className="text-center mb-8">
+              <h1 className="text-2xl sm:text-3xl font-bold mb-2" style={{ color: "var(--text-primary)" }}>
+                You've used all your free lectures
+              </h1>
+              <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                Upgrade to Pro to keep transforming lectures — 15 a month, cancel anytime.
+              </p>
+            </div>
+            <div className="glass rounded-2xl p-6 sm:p-8 text-center">
+              <div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                style={{ background: "rgba(255, 68, 68, 0.1)", border: "1px solid rgba(255, 68, 68, 0.2)" }}
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ff6666" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+              </div>
+              <div className="text-xs font-semibold mb-2" style={{ color: "var(--text-muted)" }}>
+                {usage?.used} / {usage?.limit} lectures used
+              </div>
+              <button
+                onClick={() => router.push("/settings?tab=Billing")}
+                className="btn-glow w-full py-3.5 px-6 rounded-xl text-sm font-semibold"
+                style={{
+                  background: "linear-gradient(135deg, var(--accent), #FF8555)",
+                  color: "#fff",
+                  boxShadow: "0 8px 32px var(--accent-glow)",
+                }}
+              >
+                Upgrade to Pro
+              </button>
+              <p className="text-xs mt-3" style={{ color: "var(--text-muted)" }}>
+                Failed runs are automatically refunded — if something broke, your lecture should be back. Refresh to check.
+              </p>
+            </div>
+          </>
+        ) : !showProgress ? (
           <>
             {/* Upload form */}
             <div className="text-center mb-8">

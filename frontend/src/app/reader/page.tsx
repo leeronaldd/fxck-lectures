@@ -229,7 +229,10 @@ export default function ReaderPage() {
       if (!activeSession?.createdAt || !!activePipelineRun) return false;
       if (sessionStatus !== "processing" && sessionStatus !== "pending") return false;
       const ageMs = Date.now() - new Date(activeSession.createdAt).getTime();
-      return ageMs > 20 * 60 * 1000; // 20 minutes
+      // Our typical run is ~3-5 min. Past 10 min the session is almost
+      // certainly stuck — either Cloud Run crashed or the status update
+      // couldn't flip to 'failed'. Show retry CTA instead of a forever spinner.
+      return ageMs > 10 * 60 * 1000;
     })();
 
     return (
