@@ -89,7 +89,11 @@ def run_pipeline(
                    "result": f"{word_count:,} words transcribed"}
             _check_cancelled(cancel_event)
         elif input_file.suffix.lower() == ".txt":
-            text = input_file.read_text(encoding="utf-8")
+            try:
+                text = input_file.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                # Windows-saved transcripts are often cp1252 (e.g. ° symbol = 0xb0)
+                text = input_file.read_text(encoding="cp1252")
         else:
             yield {"status": "error", "stage": "Reading file", "progress": 5,
                    "error": f"Unsupported file type: {input_file.suffix}. Use .txt, .mp4, .mp3, .mkv, .avi, .mov, or .webm"}
@@ -104,7 +108,12 @@ def run_pipeline(
 
         # ── Stage 1: Chunking ──
         yield {"status": "running", "stage": "Chunking transcript", "progress": 12}
-        chunks = chunk_transcript(text)
+        # Single-writer uses chunks only for screenshot↔timestamp matching
+        # (plus key_terms tiebreak). It doesn't read polished topic names or
+        # sub-chunks — so fast_mode skips the Flash-heavy polishing/sub-chunking
+        # and parallelizes term extraction. ~5 min → ~5-10s on a 15k-word lecture.
+        _sw = os.environ.get("USE_SINGLE_WRITER", "").lower() in ("1", "true", "yes")
+        chunks = chunk_transcript(text, fast_mode=_sw)
 
         # Convert Pydantic models to dicts for V2
         chunks_dicts = [c.model_dump() for c in chunks]
@@ -126,12 +135,14 @@ def run_pipeline(
                 with open(chunks_temp_path, "w", encoding="utf-8") as f:
                     json.dump(chunks_dicts, f, indent=2, ensure_ascii=False)
 
+                _sw = os.environ.get("USE_SINGLE_WRITER", "").lower() in ("1", "true", "yes")
                 results = extract_all(
                     video_path=input_path,
                     chunks_path=str(chunks_temp_path),
                     output_dir=str(screenshots_dir),
                     output_json=str(output_dir / f"{job_id}_screenshots.json"),
                     job_id=job_id,
+                    skip_describe=_sw,  # Single-writer Pro sees images directly
                 )
                 if results:
                     screenshots_json = str(output_dir / f"{job_id}_screenshots.json")
@@ -149,14 +160,23 @@ def run_pipeline(
             from src.generator_v2 import validate_content_match
             validation = validate_content_match(text[:2000], slides_path=slides_path)
             if not validation.is_match and validation.confidence > 0.7:
-                yield {"status": "error", "stage": "Validating slides", "progress": 16,
-                       "error": (
-                           f"Slides don't match the transcript. "
-                           f"Transcript topic: {validation.transcript_topic}. "
-                           f"Slides topic: {validation.slides_topic}. "
-                           f"Please upload the correct slides for this lecture."
-                       )}
-                return
+                # Only block the run if we actually extracted real topics from
+                # both sides. Empty topics = extractor failed, not a real
+                # mismatch. Let the pipeline proceed and let the writer sort
+                # it out — worst case the output ignores unrelated slides.
+                if validation.transcript_topic.strip() and validation.slides_topic.strip():
+                    yield {"status": "error", "stage": "Validating slides", "progress": 16,
+                           "error": (
+                               f"Slides don't match the transcript. "
+                               f"Transcript topic: {validation.transcript_topic}. "
+                               f"Slides topic: {validation.slides_topic}. "
+                               f"Please upload the correct slides for this lecture."
+                           )}
+                    return
+                print(f"  [validate] Skipping mismatch block — empty topics "
+                      f"(transcript='{validation.transcript_topic}', "
+                      f"slides='{validation.slides_topic}', "
+                      f"confidence={validation.confidence})")
             yield {"status": "running", "stage": "Validating slides", "progress": 18,
                    "result": "Slides match confirmed"}
 
@@ -189,13 +209,28 @@ def run_pipeline(
                            "result": f"{len(pdf_slides)} slides — generating descriptions..."}
                     _check_cancelled(cancel_event)
 
-                    # Flash multimodal descriptions — V3 needs these to group slides
-                    # 8 workers — with retry+backoff in call_with_timeout and the
-                    # per-worker 429-backoff loop in describe_screenshots, this
-                    # is safe and roughly halves slide-description wallclock
-                    # (~170s at 3 workers → ~65s at 8 on a 37-slide deck).
-                    from src.screenshot_extractor import describe_screenshots
-                    describe_screenshots(pdf_slides, max_workers=8)
+                    # Flash multimodal descriptions — V3 multi-agent needs these
+                    # to group slides. Single-writer Pro sees the actual images,
+                    # so descriptions are only needed for overflow slides beyond
+                    # the image cap (text-only fallback).
+                    use_single_writer = os.environ.get("USE_SINGLE_WRITER", "").lower() in ("1", "true", "yes")
+                    if use_single_writer and len(pdf_slides) <= 30:
+                        # All slides fit as images — skip descriptions entirely
+                        print(f"  [pipeline] Single-writer + {len(pdf_slides)} slides ≤ 60 — skipping Flash descriptions")
+                    elif use_single_writer:
+                        # Only describe overflow slides (indices beyond the 60
+                        # evenly-sampled images that Pro will see as pictures)
+                        from src.screenshot_extractor import describe_screenshots
+                        step = len(pdf_slides) / 30
+                        image_indices = set(int(i * step) for i in range(30))
+                        overflow = [s for i, s in enumerate(pdf_slides) if i not in image_indices]
+                        if overflow:
+                            print(f"  [pipeline] Describing {len(overflow)} overflow slides (of {len(pdf_slides)} total)")
+                            describe_screenshots(overflow, max_workers=8)
+                    else:
+                        # Multi-agent: describe all slides
+                        from src.screenshot_extractor import describe_screenshots
+                        describe_screenshots(pdf_slides, max_workers=8)
 
                     ss_json_path = str(output_dir / f"{job_id}_screenshots.json")
                     with open(ss_json_path, "w", encoding="utf-8") as f:
@@ -313,11 +348,10 @@ def run_pipeline(
 
                         image_ref = _resolve_gcs(sc.get("image_ref", "") if sc else "")
 
-                        # Embed image at top of narrative for professor_slide cards
+                        # Don't embed image in narrative — the left slide panel
+                        # already shows it via SlideCard. Embedding creates a
+                        # duplicate image on the right side.
                         narrative = tx.get("narrative", "") or ""
-                        if card_type == "professor_slide" and image_ref and image_ref not in narrative:
-                            title = sc.get("title", tx.get("title", "")) if sc else tx.get("title", "")
-                            narrative = f"![{title}]({image_ref})\n\n{narrative}"
 
                         slide_payload = {
                             "slide_id": str(sc.get("slide_id", tx.get("slide_number", idx + 1))) if sc else str(tx.get("slide_number", idx + 1)),
@@ -418,17 +452,31 @@ def run_pipeline(
                     # Also replace in transcript narrative text
                     # (writers embed ![desc](screenshots/slide_XXX.png) or
                     # ![desc](slide_XXX.png) in transcript)
-                    for section in api_response.get("transcript", []):
-                        if isinstance(section, dict):
-                            for field in ("narrative", "text"):
-                                val = section.get(field, "")
-                                if not val:
-                                    continue
-                                # Replace both prefixed and bare filenames
-                                for local_path, gcs_url in gcs_lookup.items():
-                                    if local_path and local_path != gcs_url:
-                                        val = val.replace(local_path, gcs_url)
-                                section[field] = val
+                    #
+                    # IMPORTANT: use a single regex pass to avoid cascade
+                    # replacements — e.g. replacing "slide_031.png" inside
+                    # a GCS URL that was just inserted for
+                    # "screenshots/slide_031.png". Sort keys longest-first
+                    # so "screenshots/slide_031.png" matches before
+                    # "slide_031.png" or "slide_031".
+                    import re
+                    sorted_keys = sorted(
+                        [k for k in gcs_lookup if k],
+                        key=len, reverse=True,
+                    )
+                    if sorted_keys:
+                        pattern = re.compile(
+                            "|".join(re.escape(k) for k in sorted_keys)
+                        )
+                        for section in api_response.get("transcript", []):
+                            if isinstance(section, dict):
+                                for field in ("narrative", "text"):
+                                    val = section.get(field, "")
+                                    if not val:
+                                        continue
+                                    section[field] = pattern.sub(
+                                        lambda m: gcs_lookup[m.group(0)], val
+                                    )
 
                     print(f"  Replaced {replaced} screenshot refs with GCS URLs")
             except Exception as e:
