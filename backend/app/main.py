@@ -222,7 +222,10 @@ async def _reserve_usage_slot(user: dict, request: Request) -> str | None:
     on success, raises 403 if the user is over limit.
 
     Tier logic:
-      • Unlimited whitelist emails → sentinel "unlimited", skip RPC.
+      • Unlimited whitelist emails → 50/day safety cap, otherwise unbounded.
+        Runs through the RPC so a runaway script or stolen token can't burn
+        the API budget. Large period_limit makes it effectively unlimited
+        for legitimate use.
       • Paid (status in PAID_STATUSES) with a known tier → tier-specific
         period_limit + daily_cap. Window anchored to subscription_period_start.
       • Paid but missing period_start (webhook lag) → fall back to free tier
@@ -234,9 +237,6 @@ async def _reserve_usage_slot(user: dict, request: Request) -> str | None:
     `_refund_usage_slot(usage_id)` if the pipeline later fails.
     """
     email = _normalize_email(user.get("email", ""))
-    if email in UNLIMITED_EMAILS:
-        return "unlimited"
-
     user_id = user["id"]
     token = request.headers.get("authorization", "").split(" ", 1)[-1]
 
@@ -250,7 +250,13 @@ async def _reserve_usage_slot(user: dict, request: Request) -> str | None:
         and sub.get("subscription_status") in PAID_STATUSES
         and sub.get("subscription_period_start")
     )
-    if is_paid:
+    if email in UNLIMITED_EMAILS:
+        # Effectively unlimited for real use, but daily cap prevents a
+        # compromised token or runaway loop from eating the Gemini budget.
+        tier_name = "unlimited"
+        limit = 999999
+        daily_cap = 50
+    elif is_paid:
         tier_name = sub.get("subscription_tier") or "pro"  # default to pro if tier wasn't recorded
         tier = TIER_LIMITS.get(tier_name, TIER_LIMITS["pro"])
         limit = tier["period_limit"]
@@ -289,7 +295,15 @@ async def _reserve_usage_slot(user: dict, request: Request) -> str | None:
         result = resp.json()
         if result is None:
             # RPC returns NULL for either the period limit or the daily cap.
-            # Message is paid-tier-specific so the user knows what to do.
+            # Message is tier-specific so the user knows what to do.
+            if tier_name == "unlimited":
+                raise HTTPException(
+                    status_code=429,
+                    detail=(
+                        "Daily safety cap hit (50 runs in 24h). This is a guardrail "
+                        "against runaway loops — try again tomorrow."
+                    ),
+                )
             if is_paid:
                 raise HTTPException(
                     status_code=403,
@@ -308,9 +322,10 @@ async def _reserve_usage_slot(user: dict, request: Request) -> str | None:
 
 async def _refund_usage_slot(token: str, usage_id: str) -> None:
     """Delete a reserved usage row after a pipeline failure. Best-effort —
-    logs and swallows on failure. Safe no-op for the 'unlimited' sentinel.
+    logs and swallows on failure. Unlimited emails now use the RPC too (with
+    a 50/day safety cap) so they refund like everyone else.
     """
-    if not usage_id or usage_id == "unlimited":
+    if not usage_id:
         return
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -902,6 +917,8 @@ async def get_usage(
     token = request.headers.get("authorization", "").split(" ", 1)[-1]
     user_id = user["id"]
 
+    # Unlimited emails: still show as ∞ in UI (limit=-1); the 50/day safety
+    # cap is a backend-only guardrail, not something to surface to the user.
     if email in UNLIMITED_EMAILS:
         return {"used": 0, "limit": -1, "tier": "unlimited", "period_end": None}
 
