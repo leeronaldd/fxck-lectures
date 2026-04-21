@@ -88,6 +88,12 @@ export default function QuizPage() {
           { question: q.question, answer },
         ];
         localStorage.setItem("klare_quiz", JSON.stringify(finalAnswers));
+        import("@/lib/analytics").then(({ trackEvent }) => {
+          const flat = Object.fromEntries(
+            finalAnswers.map((a) => [a.question.slice(0, 32), a.answer])
+          );
+          trackEvent("quiz_complete", flat);
+        });
         router.push("/signin");
       }
     }, 300);

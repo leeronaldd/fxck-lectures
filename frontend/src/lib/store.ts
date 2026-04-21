@@ -439,10 +439,16 @@ export const useAppStore = create<AppState>()(persist((set, get) => {
               return { pipelineRuns: runs };
             });
             toast.error(`Pipeline failed: ${error}`, { id: `pipeline-${file_id}` });
+            import("@/lib/analytics").then(({ trackEvent }) =>
+              trackEvent("upload_failed", { file_id, error })
+            );
           },
           // onDone
           async (output) => {
             toast.success("Your lecture is ready!", { id: `pipeline-${file_id}`, duration: 5000 });
+            import("@/lib/analytics").then(({ trackEvent }) =>
+              trackEvent("upload_complete", { file_id })
+            );
 
             // Only set output if this is the active run
             if (output && get().activePipelineId === file_id) {

@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { createClient } from "@/lib/supabase";
 import { useAppStore } from "@/lib/store";
 import { updateProfile } from "@/lib/api";
+import { identifyUser, resetUser, trackEvent } from "@/lib/analytics";
 
 /** Save quiz answers from localStorage to backend after sign-in */
 async function syncQuizToProfile() {
@@ -45,6 +46,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
           email: u.email || "",
           avatar: u.user_metadata?.avatar_url || null,
         });
+        identifyUser(u.id, { email: u.email });
         loadSessions();
         syncQuizToProfile();
       }
@@ -64,12 +66,23 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
           email: u.email || "",
           avatar: u.user_metadata?.avatar_url || null,
         });
+        identifyUser(u.id, { email: u.email });
         loadSessions();
         if (_event === "SIGNED_IN") {
+          // Distinguish first-time signup from returning login: if created_at
+          // and last_sign_in_at match (or are within a few seconds), it's a
+          // brand-new account.
+          const created = u.created_at ? new Date(u.created_at).getTime() : 0;
+          const lastSignIn = u.last_sign_in_at ? new Date(u.last_sign_in_at).getTime() : 0;
+          const isNewSignup = created && lastSignIn && Math.abs(lastSignIn - created) < 5000;
+          trackEvent(isNewSignup ? "signup_complete" : "login", {
+            provider: u.app_metadata?.provider,
+          });
           syncQuizToProfile();
         }
       } else {
         clearUser();
+        resetUser();
       }
     });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as Progress from "@radix-ui/react-progress";
 import { useAppStore } from "@/lib/store";
@@ -77,6 +77,18 @@ export default function UploadPage() {
   }, [user.isLoggedIn]);
   const atLimit =
     !!usage && usage.limit !== -1 && usage.used >= usage.limit;
+
+  // Fire hit_limit once per atLimit transition so we can measure how many
+  // users actually see the paywall vs drop off before it.
+  const firedLimitRef = useRef(false);
+  useEffect(() => {
+    if (atLimit && !firedLimitRef.current) {
+      firedLimitRef.current = true;
+      import("@/lib/analytics").then(({ trackEvent }) =>
+        trackEvent("hit_limit", { used: usage?.used, limit: usage?.limit, tier: usage?.tier })
+      );
+    }
+  }, [atLimit, usage]);
 
   return (
     <div className="flex-1 relative overflow-hidden overflow-y-auto">
@@ -166,7 +178,16 @@ export default function UploadPage() {
               />
 
               <button
-                onClick={() => startPipeline()}
+                onClick={() => {
+                  import("@/lib/analytics").then(({ trackEvent }) =>
+                    trackEvent("upload_start", {
+                      has_video: !!videoFile,
+                      has_transcript: !!transcriptFile,
+                      has_slides: !!slidesFile || (slidesFiles && slidesFiles.length > 0),
+                    })
+                  );
+                  startPipeline();
+                }}
                 disabled={!hasFile}
                 className="btn-glow w-full mt-6 py-3.5 px-6 rounded-xl text-sm font-semibold transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                 style={{

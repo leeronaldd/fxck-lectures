@@ -33,6 +33,13 @@ function SettingsContent() {
       setActiveTab(tab);
       if (tab === "Billing") setShowPlanSelector(true);
     }
+    // Stripe's success_url appends ?upgraded=true — convert it into a
+    // checkout_complete analytics event so we can measure conversion.
+    if (searchParams.get("upgraded") === "true") {
+      import("@/lib/analytics").then(({ trackEvent }) =>
+        trackEvent("checkout_complete")
+      );
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [displayName, setDisplayName] = useState(user.name || "");
@@ -364,6 +371,8 @@ function SettingsContent() {
                     </ul>
                     <button
                       onClick={async () => {
+                        const { trackEvent } = await import("@/lib/analytics");
+                        trackEvent("checkout_start", { tier: "pro", period: billingPeriod });
                         const { createCheckoutSession } = await import("@/lib/api");
                         const url = await createCheckoutSession(billingPeriod, "pro");
                         if (url) {
@@ -417,6 +426,8 @@ function SettingsContent() {
                     </ul>
                     <button
                       onClick={async () => {
+                        const { trackEvent } = await import("@/lib/analytics");
+                        trackEvent("checkout_start", { tier: "max", period: billingPeriod });
                         const { createCheckoutSession } = await import("@/lib/api");
                         const url = await createCheckoutSession(billingPeriod, "max");
                         if (url) {
