@@ -111,19 +111,56 @@ export default function ProfessorScoreCard({ transcript, sessionName }: Props) {
   const label =
     overall < 25 ? "Train wreck" : overall < 40 ? "Rough" : overall < 55 ? "Needs work" : "Passable";
 
+  // Build the shareable OG image URL with all the score params baked in.
+  // This PNG can be downloaded, posted to stories, or shared via native share.
+  const ogParams = new URLSearchParams({
+    overall: String(overall),
+    clarity: String(clarity),
+    focus: String(focus),
+    efficiency: String(efficiency),
+    roast: roastLine,
+    name: sessionName,
+  });
+  const ogUrl = `/api/og/professor-score?${ogParams.toString()}`;
+
   const handleShare = async () => {
-    const text = `My professor scored ${overall}/100 on the Klare clarity test\n\nClarity: ${clarity}%  Focus: ${focus}%  Efficiency: ${efficiency}%\n\n"${roastLine}"\n\nklareai.com`;
+    const text = `My professor scored ${overall}/100 on the Klare clarity test 📉\n\n"${roastLine}"\n\nklareai.com`;
+    const absoluteOgUrl =
+      typeof window !== "undefined" ? `${window.location.origin}${ogUrl}` : ogUrl;
+
+    // On mobile, try to share the image itself via Web Share API Level 2.
+    // On desktop or unsupported browsers, open the PNG in a new tab so the
+    // user can right-click save or screenshot it.
     try {
-      if (navigator.share) {
-        await navigator.share({ text });
-      } else {
-        await navigator.clipboard.writeText(text);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+      if (typeof navigator !== "undefined" && navigator.share) {
+        try {
+          const res = await fetch(absoluteOgUrl);
+          const blob = await res.blob();
+          const file = new File([blob], "klare-professor-score.png", {
+            type: "image/png",
+          });
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({ text, files: [file] });
+            return;
+          }
+          await navigator.share({ text, url: absoluteOgUrl });
+          return;
+        } catch {
+          // Fallthrough to clipboard
+        }
       }
+      await navigator.clipboard.writeText(`${text}\n${absoluteOgUrl}`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     } catch {
-      // user cancelled share
+      // user cancelled
     }
+  };
+
+  const handleDownload = () => {
+    // Opens the PNG in a new tab. User right-clicks → Save As (desktop) or
+    // long-presses → Save to Photos (mobile).
+    window.open(ogUrl, "_blank");
   };
 
   return (
@@ -180,37 +217,56 @@ export default function ProfessorScoreCard({ transcript, sessionName }: Props) {
         &ldquo;{roastLine}&rdquo;
       </p>
 
-      {/* Time stat + share */}
+      {/* Time stat + actions */}
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs" style={{ color: "var(--text-muted)" }}>
           Klare saved you ~{saved} min
         </p>
-        <button
-          onClick={handleShare}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0"
-          style={{
-            background: copied ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.12)",
-            color: copied ? "#22c55e" : "#ef4444",
-            border: `1px solid ${copied ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)"}`,
-          }}
-        >
-          {copied ? (
-            <>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              Copied
-            </>
-          ) : (
-            <>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
-                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-              </svg>
-              Share my professor&apos;s score
-            </>
-          )}
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={handleDownload}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all"
+            style={{
+              background: "transparent",
+              color: "var(--text-secondary)",
+              border: "1px solid var(--border)",
+            }}
+            title="Preview image to save or post"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <polyline points="21 15 16 10 5 21" />
+            </svg>
+            Preview
+          </button>
+          <button
+            onClick={handleShare}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all"
+            style={{
+              background: copied ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.12)",
+              color: copied ? "#22c55e" : "#ef4444",
+              border: `1px solid ${copied ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)"}`,
+            }}
+          >
+            {copied ? (
+              <>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                Copied
+              </>
+            ) : (
+              <>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
+                  <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                </svg>
+                Share
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );
