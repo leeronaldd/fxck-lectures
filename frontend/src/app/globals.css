@@ -548,3 +548,16 @@ body {
   transform: rotate(-45deg);
   pointer-events: none;
 }
+
+
+/* Landing page — "See it in action" arrow bob animation */
+.read-sample-arrow {
+  animation: read-sample-bob 1.6s ease-in-out infinite;
+}
+@keyframes read-sample-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(3px); }
+}
+.read-sample-link:hover .read-sample-arrow {
+  animation-duration: 0.8s;
+}

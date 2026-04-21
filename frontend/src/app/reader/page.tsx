@@ -7,6 +7,7 @@ import { SlideCardGroup } from "@/components/SlideCard";
 import NarrativeSection from "@/components/NarrativeSection";
 import ImageLightbox from "@/components/ImageLightbox";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
+import ProfessorScoreCard from "@/components/ProfessorScoreCard";
 import type { SlideCard, TranscriptSection } from "@/lib/types";
 import { downloadSlidesPDF, downloadTranscriptPDF } from "@/lib/pdf";
 
@@ -502,6 +503,13 @@ export default function ReaderPage() {
             )}
           </div>
         ))}
+
+        {/* Professor Score Card — shown once the full run is complete */}
+        {store.markdown && transcript.length > 0 && (
+          <div className="mt-8 mb-4">
+            <ProfessorScoreCard transcript={transcript} sessionName={sessionName} />
+          </div>
+        )}
 
         {/* Streaming indicator — still generating, more sections to come */}
         {hasStreamingContent && !store.markdown && (

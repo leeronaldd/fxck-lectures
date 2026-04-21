@@ -11,8 +11,8 @@ const FAQ_ITEMS = [
     a: "Klare (klareai.com) is an AI study tool for university students. It takes a bad lecture recording or transcript and re-teaches the concepts from scratch — like a personal tutor — producing a clear 20-minute read instead of the original 2-hour lecture. It's free to try, no credit card required.",
   },
   {
-    q: "How is Klare different from NotebookLM, Otter.ai, or other AI note-takers?",
-    a: "NotebookLM and Otter.ai clean up and organise what your professor said. Klare does the opposite — it discards the professor's explanation entirely and re-teaches each concept using concrete examples, verified against OpenStax and medical textbooks. If your professor explains things badly, Klare fixes that at the root.",
+    q: "How is Klare different from NotebookLM, Studley, or Turbo AI?",
+    a: "NotebookLM, Studley, and Turbo AI clean up and organise what your professor said. Klare does the opposite — it discards the professor's explanation entirely and re-teaches each concept using concrete examples, verified against OpenStax and medical textbooks. If your professor explains things badly, Klare fixes that at the root.",
   },
   {
     q: "Does Klare work for medical, biomed, or nursing students?",
@@ -24,7 +24,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "How long does Klare take to process a lecture?",
-    a: "Most lectures process in 2–4 minutes. A standard 1-hour lecture produces a 20–30 minute read. Processing time is roughly constant regardless of whether your lecture is 45 minutes or 2 hours.",
+    a: "Most lectures process in 4–6 minutes. A standard 1-hour lecture produces a 20–30 minute read. Processing time is roughly constant regardless of whether your lecture is 45 minutes or 2 hours.",
   },
   {
     q: "What file types does Klare accept?",
@@ -33,6 +33,10 @@ const FAQ_ITEMS = [
   {
     q: "Can Klare understand lectures with heavy accents or unclear audio?",
     a: "Yes. Klare uses Whisper-based transcription which handles a wide range of accents and audio quality. Even if the transcript has errors, Klare's AI corrects common misspellings and muffled terms against known textbook terminology during the re-teaching step.",
+  },
+  {
+    q: "Will Klare miss content from my lecture?",
+    a: "Unlikely. After generating the study document, a second AI reads your original lecture transcript and cross-checks it against the output — anything missed gets patched in automatically. You also see an exam-importance rating per section so you know what got full coverage versus a quick mention.",
   },
   {
     q: "How much does Klare cost?",
@@ -216,23 +220,6 @@ export default function LandingPage() {
         <section id="interactive-demo" className="pb-20 scroll-mt-20">
           <InteractiveDemo />
         </section>
-
-        <style jsx>{`
-          .read-sample-arrow {
-            animation: read-sample-bob 1.6s ease-in-out infinite;
-          }
-          @keyframes read-sample-bob {
-            0%, 100% {
-              transform: translateY(0);
-            }
-            50% {
-              transform: translateY(3px);
-            }
-          }
-          .read-sample-link:hover .read-sample-arrow {
-            animation-duration: 0.8s;
-          }
-        `}</style>
 
         {/* ───── Features Grid ───── */}
         <section className="pb-20">
