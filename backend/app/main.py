@@ -55,16 +55,18 @@ UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", Path(__file__).parent.parent / "d
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # Hard cap per uploaded file. A 2-hour lecture video at 720p is roughly
-# 300-400 MB; 500 MB leaves headroom for higher bitrates. Prevents a single
-# upload from filling the instance's 2 Gi memory or running up GCS costs.
-MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", str(500 * 1024 * 1024)))
+# 300-400 MB; 300 MB covers the typical case and stops a single user from
+# burning transcription + memory on an outlier upload. Override via env var
+# if a legitimate higher-bitrate source shows up.
+MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", str(300 * 1024 * 1024)))
 
 # Map file_id → original filename (in-memory, lost on restart — acceptable)
 _original_filenames: dict[str, str] = {}
 
-# Supabase config
+# Supabase config. No fallback on the anon key — we'd rather fail loud at
+# boot than silently ship a stale key after a rotation.
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://husdhmaijvughqezlmjt.supabase.co")
-SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "sb_publishable_CwLFt3Pfeaeq5iP0foroCA_tMmPucAy")
+SUPABASE_ANON_KEY = os.environ["SUPABASE_ANON_KEY"]
 # Service role key bypasses RLS — used for background saves where user JWT may have expired
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
 
@@ -129,9 +131,10 @@ CUSTOM_LIMITS = {
 def _normalize_email(email: str) -> str:
     """Normalize email for consistent comparison.
 
-    Gmail ignores dots in the local part and is case-insensitive:
-    Lee.Wang.Hong0215@gmail.com = leewanghong0215@gmail.com
-    Also handles googlemail.com (alias for gmail.com).
+    Gmail ignores dots in the local part, is case-insensitive, and treats
+    everything after a + as a tag (you+foo@gmail.com = you@gmail.com).
+    Stripping the tag closes the free-run farming loop where someone signs
+    up as you+1, you+2, etc. Also handles googlemail.com (alias for gmail).
     """
     email = email.lower().strip()
     if not email or "@" not in email:
@@ -139,8 +142,9 @@ def _normalize_email(email: str) -> str:
 
     local, domain = email.rsplit("@", 1)
 
-    # Gmail/Googlemail: strip dots from local part
+    # Gmail/Googlemail: strip dots and + aliases from local part
     if domain in ("gmail.com", "googlemail.com"):
+        local = local.split("+", 1)[0]
         local = local.replace(".", "")
         domain = "gmail.com"  # normalize googlemail → gmail
 
@@ -321,14 +325,33 @@ async def _reserve_usage_slot(user: dict, request: Request) -> str | None:
 
 
 async def _refund_usage_slot(token: str, usage_id: str) -> None:
-    """Delete a reserved usage row after a pipeline failure. Best-effort —
-    logs and swallows on failure. Unlimited emails now use the RPC too (with
-    a 50/day safety cap) so they refund like everyone else.
+    """Delete a reserved usage row after a pipeline failure.
+
+    Uses the service role key to DELETE directly, bypassing RLS and the
+    auth.uid() check in the refund_usage RPC. This closes the silent-failure
+    mode where a JWT close to expiry would make the RPC match zero rows,
+    leaving the user charged for a failed run. Falls back to the RPC with
+    the user's JWT only if SUPABASE_SERVICE_KEY isn't configured.
+
+    Best-effort: logs and swallows on failure so a refund problem never
+    masks the underlying pipeline error.
     """
     if not usage_id:
         return
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
+            if SUPABASE_SERVICE_KEY:
+                resp = await client.delete(
+                    f"{SUPABASE_URL}/rest/v1/usage",
+                    params={"id": f"eq.{usage_id}"},
+                    headers=_service_headers({"Prefer": "return=minimal"}),
+                )
+                if resp.status_code not in (200, 204):
+                    print(f"  [usage] refund DELETE failed {resp.status_code}: {resp.text[:200]}")
+                else:
+                    print(f"  [usage] refunded slot {usage_id} via service role")
+                return
+            # Fallback — older deployments without service key
             resp = await client.post(
                 f"{SUPABASE_URL}/rest/v1/rpc/refund_usage",
                 json={"p_usage_id": usage_id},
@@ -341,7 +364,7 @@ async def _refund_usage_slot(token: str, usage_id: str) -> None:
             if resp.status_code not in (200, 204):
                 print(f"  [usage] refund RPC failed {resp.status_code}: {resp.text[:200]}")
             else:
-                print(f"  [usage] refunded slot {usage_id}")
+                print(f"  [usage] refunded slot {usage_id} via RPC")
     except Exception as e:
         print(f"  [usage] refund raised: {e}")
 
@@ -589,9 +612,25 @@ SCREENSHOTS_DIR = Path(__file__).parent.parent / "data" / "output" / "screenshot
 
 
 @app.get("/api/screenshots/{filename}")
-async def get_screenshot(filename: str):
-    """Serve extracted lecture slide images."""
-    # Sanitize filename to prevent path traversal
+async def get_screenshot(
+    filename: str,
+    user: dict = Depends(get_current_user),
+):
+    """Serve extracted lecture slide images.
+
+    Requires a valid Supabase access token. Filenames are sequential
+    (e.g. slide_001.png) and land in a shared directory, so without auth
+    an unauthenticated attacker could enumerate any user's slides. The
+    frontend AuthImage component handles the Bearer-token fetch since
+    <img> tags don't carry Authorization headers.
+
+    Note: this is a fallback path — in production the pipeline rewrites
+    screenshots/* references to GCS signed URLs, which don't hit this
+    endpoint. Cross-user enumeration by an authenticated attacker is
+    still possible here, but the real fix (namespacing filenames by
+    user_id at extraction time) lives with the pipeline rewrite.
+    """
+    del user  # auth check is the side effect we want
     safe_name = Path(filename).name
     file_path = SCREENSHOTS_DIR / safe_name
     if not file_path.exists():
@@ -671,6 +710,14 @@ async def upload_slides(
     """
     if not file_id:
         raise HTTPException(400, "file_id is required — upload the lecture first")
+
+    # file_id must be a UUID — otherwise `UPLOAD_DIR / f"{file_id}_slides_..."`
+    # lets a caller walk out of UPLOAD_DIR with ../ segments and write files
+    # anywhere inside the container's writable paths.
+    try:
+        uuid.UUID(file_id)
+    except ValueError:
+        raise HTTPException(400, "Invalid file_id")
 
     ext = Path(file.filename or "slides.pdf").suffix.lower()
     if ext not in (".pdf", ".pptx"):
@@ -1369,6 +1416,14 @@ async def run_pipeline_stream(
     request: Request = None,
 ):
     """Run the pipeline and stream progress via SSE."""
+    # file_id goes into a glob pattern — validate as UUID so callers can't
+    # sneak glob metacharacters (*, ?, [) or path segments into the pattern
+    # and trick the server into picking up a file outside the intended one.
+    try:
+        uuid.UUID(file_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid file_id")
+
     # Atomically reserve a usage slot before running. Closes two loopholes:
     #   (a) Parallel clicks can no longer bypass the limit — the RPC serializes
     #       per user_id via pg_advisory_xact_lock.
