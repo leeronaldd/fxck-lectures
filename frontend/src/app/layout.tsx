@@ -19,8 +19,20 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Fxck Lectures — Replace Bad Professors with a 20-Min Read",
   description:
-    "Turns that one bad professor's 2-hour lecture into a 20-minute read that actually makes sense. Textbook-verified, exam-aware, and free to try.",
+    "Turns that one bad professor's 2-hour lecture into a 20-minute read that actually makes sense. Textbook-verified, exam-aware, and free to try. Built for medical, biomed, and nursing students.",
   metadataBase: new URL("https://klareai.com"),
+  keywords: [
+    "AI study tool",
+    "bad professor",
+    "lecture notes AI",
+    "medical student study tool",
+    "biomed study app",
+    "AI lecture replacement",
+    "Klare",
+    "Fxck Lectures",
+    "NotebookLM alternative",
+    "university study AI",
+  ],
   openGraph: {
     title: "Fxck Lectures — Replace Bad Professors with a 20-Min Read",
     description:
@@ -64,6 +76,38 @@ export default function RootLayout({
           }}
         />
         <Analytics />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "SoftwareApplication",
+              name: "Klare",
+              alternateName: "Fxck Lectures",
+              applicationCategory: "EducationalApplication",
+              operatingSystem: "Web",
+              url: "https://klareai.com",
+              description:
+                "AI study tool that transforms bad university lecture recordings into clear, textbook-verified study documents. Re-teaches concepts from scratch using a tutor-style approach. Built for medical, biomed, nursing, and health science students.",
+              offers: {
+                "@type": "Offer",
+                price: "0",
+                priceCurrency: "AUD",
+                description: "Free tier: 1 lecture, no credit card required",
+              },
+              audience: {
+                "@type": "EducationalAudience",
+                educationalRole: "student",
+              },
+              publisher: {
+                "@type": "Organization",
+                name: "Klare",
+                url: "https://klareai.com",
+                email: "hello@klareai.com",
+              },
+            }),
+          }}
+        />
       </body>
     </html>
   );

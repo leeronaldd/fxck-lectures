@@ -5,6 +5,51 @@ import { useAppStore } from "@/lib/store";
 import InteractiveDemo from "@/components/InteractiveDemo";
 import HowKlareWorks from "@/components/HowKlareWorks";
 
+const FAQ_ITEMS = [
+  {
+    q: "What is Klare?",
+    a: "Klare (klareai.com) is an AI study tool for university students. It takes a bad lecture recording or transcript and re-teaches the concepts from scratch — like a personal tutor — producing a clear 20-minute read instead of the original 2-hour lecture. It's free to try, no credit card required.",
+  },
+  {
+    q: "How is Klare different from NotebookLM, Otter.ai, or other AI note-takers?",
+    a: "NotebookLM and Otter.ai clean up and organise what your professor said. Klare does the opposite — it discards the professor's explanation entirely and re-teaches each concept using concrete examples, verified against OpenStax and medical textbooks. If your professor explains things badly, Klare fixes that at the root.",
+  },
+  {
+    q: "Does Klare work for medical, biomed, or nursing students?",
+    a: "Yes. Klare was built specifically for health science students — medical, biomed, nursing, pharmacology, anatomy, and physiology. It's fact-checked against OpenStax, NCBI, and PubMed, and it knows which concepts are exam-critical so it gives depth where it counts.",
+  },
+  {
+    q: "How accurate is Klare? Will it hallucinate?",
+    a: "Every claim in a Klare document is verified against OpenStax, NCBI, or PubMed during generation. A second AI then cross-checks the output against the original lecture and patches any gaps. Klare corrects transcript errors like misspellings and muffled terms, but won't invent facts.",
+  },
+  {
+    q: "How long does Klare take to process a lecture?",
+    a: "Most lectures process in 2–4 minutes. A standard 1-hour lecture produces a 20–30 minute read. Processing time is roughly constant regardless of whether your lecture is 45 minutes or 2 hours.",
+  },
+  {
+    q: "What file types does Klare accept?",
+    a: "Klare accepts MP4 video, MP3 audio, PDF slides, and plain text transcripts. You can upload a lecture recording, a set of slides, or a transcript you already have — or all three together for best results.",
+  },
+  {
+    q: "Can Klare understand lectures with heavy accents or unclear audio?",
+    a: "Yes. Klare uses Whisper-based transcription which handles a wide range of accents and audio quality. Even if the transcript has errors, Klare's AI corrects common misspellings and muffled terms against known textbook terminology during the re-teaching step.",
+  },
+  {
+    q: "How much does Klare cost?",
+    a: "Klare has a free tier — one lecture, no credit card required. Paid plans are billed in AUD monthly or yearly. See full pricing at klareai.com/settings.",
+  },
+];
+
+const FAQ_SCHEMA = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: FAQ_ITEMS.map(({ q, a }) => ({
+    "@type": "Question",
+    name: q,
+    acceptedAnswer: { "@type": "Answer", text: a },
+  })),
+};
+
 const FEATURES = [
   {
     icon: (
@@ -301,6 +346,50 @@ export default function LandingPage() {
             </button>
           </div>
         </section>
+
+        {/* ───── FAQ ───── */}
+        <section id="faq" className="pb-20 scroll-mt-20">
+          <div className="text-center mb-10">
+            <h2 className="text-2xl sm:text-3xl font-bold mb-3" style={{ color: "var(--text-primary)" }}>
+              Common questions
+            </h2>
+          </div>
+          <div className="space-y-3 max-w-2xl mx-auto">
+            {FAQ_ITEMS.map(({ q, a }) => (
+              <details key={q} className="glass rounded-xl group" style={{ borderColor: "var(--border-glass)" }}>
+                <summary
+                  className="flex items-center justify-between px-6 py-4 cursor-pointer select-none list-none"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  <span className="text-sm font-medium pr-4">{q}</span>
+                  <svg
+                    className="shrink-0 transition-transform duration-200 group-open:rotate-180"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ color: "var(--accent)" }}
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </summary>
+                <p className="px-6 pb-5 text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                  {a}
+                </p>
+              </details>
+            ))}
+          </div>
+        </section>
+
+        {/* FAQ JSON-LD schema for AEO */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(FAQ_SCHEMA) }}
+        />
 
         {/* ───── Footer ───── */}
         <footer className="pb-8 text-center space-y-2">

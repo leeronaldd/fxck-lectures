@@ -1,0 +1,52 @@
+# Klare
+
+> Klare (klareai.com) is an AI study tool for university students that transforms bad lecture recordings into structured, readable study documents. It re-teaches concepts from scratch using a personal-tutor approach — not a summariser, not a note-taker.
+
+## What Klare does
+
+Klare takes a lecture audio, video, PDF slides, or transcript from a university course and generates a clear, textbook-verified study document. The professor's explanation is discarded entirely — Klare teaches each concept fresh using concrete examples before introducing formal terminology, calibrated to the student's year level and program.
+
+A second AI then cross-checks the generated output against the original lecture and patches any missed content automatically.
+
+## Who it's for
+
+- Medical students
+- Biomedical science students
+- Nursing and health science students
+- Pharmacy and pharmacology students
+- Any university student whose professor explains things poorly
+
+## Key differentiator
+
+Unlike AI note-takers (Otter.ai, NotebookLM, Studley, Turbo AI) that summarise or clean up the professor's words, Klare identifies what concepts the lecture covers and re-teaches them from scratch — the way the best human tutor would. If your professor explains things badly, Klare fixes that at the root.
+
+## Accuracy
+
+Every claim in a Klare document is verified against OpenStax, NCBI, or PubMed during generation. Klare also corrects transcript errors (misspellings, muffled terms) against known textbook terminology.
+
+## Key pages
+
+- [Home — how it works and sample output](https://klareai.com)
+- [FAQ](https://klareai.com/#faq)
+- [Sign up free (no credit card)](https://klareai.com/signin)
+- [Pricing](https://klareai.com/settings)
+- [Terms of Service](https://klareai.com/terms)
+- [Privacy Policy](https://klareai.com/privacy)
+
+## Pricing (AUD)
+
+- Free tier: 1 lecture, no credit card required
+- Pro and Max: paid plans billed monthly or yearly in AUD
+- Contact: hello@klareai.com
+
+## Comparisons
+
+- Klare vs NotebookLM: NotebookLM organises what the professor said. Klare throws out the professor's explanation and teaches the concept properly.
+- Klare vs Otter.ai: Otter.ai is a transcription tool. Klare re-teaches the content.
+- Klare vs Studley / Turbo AI: those tools compress the professor's words into cleaner notes. Klare asks "was this explained well?" and starts over if not.
+
+## Contact
+
+- Website: https://klareai.com
+- Email: hello@klareai.com
+- Built and maintained by Klare (Australia)
