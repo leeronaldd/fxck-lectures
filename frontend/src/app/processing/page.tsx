@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import * as Progress from "@radix-ui/react-progress";
 import { useAppStore } from "@/lib/store";
 import PipelineStepper from "@/components/PipelineStepper";
@@ -42,12 +43,23 @@ export default function ProcessingPage() {
   }, [isDone, router]);
 
   // Redirect to upload only if there's genuinely no pipeline — not on first mount
-  // (first render can race before Zustand has hydrated the active run)
+  // (first render can race before Zustand has hydrated the active run).
+  // On refresh the pipeline keeps running in the background and the result
+  // gets saved to Supabase, so tell the user where to find it instead of
+  // silently dropping them on /upload.
   useEffect(() => {
     if (run || pipelineError) return;
     const timer = setTimeout(() => {
       const stillNoRun = !useAppStore.getState().pipelineRuns[viewId || ""];
-      if (stillNoRun) router.replace("/upload");
+      if (stillNoRun) {
+        if (pipelineId) {
+          toast("Your lecture is still being built in the background.", {
+            description: "It'll show up in Recent Sessions on the left when ready.",
+            duration: 7000,
+          });
+        }
+        router.replace("/upload");
+      }
     }, 500);
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAppStore } from "@/lib/store";
 import AppSidebar from "./AppSidebar";
+import type { UsageInfo } from "@/lib/api";
 
 const PROTECTED_PATHS = ["/upload", "/processing", "/reader", "/chat"];
 
@@ -40,6 +41,21 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [user.isLoggedIn]);
+
+  // Usage pill — small indicator next to avatar, refreshed when a run finishes
+  const [usage, setUsage] = useState<UsageInfo | null>(null);
+  const { pipelineRuns } = useAppStore();
+  const anyDone = Object.values(pipelineRuns).filter((r) => r.isDone).length;
+  useEffect(() => {
+    if (!user.isLoggedIn) { setUsage(null); return; }
+    (async () => {
+      try {
+        const { fetchUsage } = await import("@/lib/api");
+        const u = await fetchUsage();
+        if (u) setUsage(u);
+      } catch {}
+    })();
+  }, [user.isLoggedIn, anyDone]);
 
   // Don't show app shell on sign-in, quiz, preview, or landing page (for guests only)
   const isPreviewPage = pathname === "/preview";
@@ -108,6 +124,36 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Usage pill (logged-in users only, hidden for unlimited whitelist) */}
+          {user.isLoggedIn && usage && usage.limit !== -1 && (
+            <button
+              onClick={() => router.push("/settings?tab=Usage")}
+              className="hidden sm:flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full transition-all"
+              style={{
+                background:
+                  usage.used >= usage.limit
+                    ? "rgba(255, 68, 68, 0.12)"
+                    : "var(--accent-dim)",
+                color: usage.used >= usage.limit ? "#FF6666" : "var(--accent)",
+                border: `1px solid ${
+                  usage.used >= usage.limit
+                    ? "rgba(255, 68, 68, 0.3)"
+                    : "rgba(255, 107, 53, 0.25)"
+                }`,
+              }}
+              title={
+                usage.used >= usage.limit
+                  ? "You've used all your lectures — upgrade for more"
+                  : `${usage.limit - usage.used} lecture${usage.limit - usage.used === 1 ? "" : "s"} remaining`
+              }
+            >
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: "currentColor" }} />
+              <span>
+                {usage.used}/{usage.limit} runs
+              </span>
+            </button>
+          )}
+
           {/* Sign In / Avatar */}
           {!user.isLoggedIn ? (
             <button

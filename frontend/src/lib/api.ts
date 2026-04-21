@@ -162,6 +162,22 @@ export async function fetchProfile(): Promise<Record<string, string> | null> {
   return Object.keys(data).length > 0 ? data : null;
 }
 
+export interface UsageInfo {
+  used: number;
+  limit: number; // -1 means unlimited
+  tier: "free" | "pro" | "max" | "unlimited";
+  period_end: string | null;
+}
+
+export async function fetchUsage(): Promise<UsageInfo | null> {
+  const token = await getToken();
+  const res = await fetch(`${API_URL}/api/usage`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
 export async function updateProfile(profile: Record<string, string>): Promise<boolean> {
   const token = await getToken();
   const res = await fetch(`${API_URL}/api/profile`, {

@@ -886,6 +886,78 @@ async def get_profile(
         return {}
 
 
+@app.get("/api/usage")
+async def get_usage(
+    user: dict = Depends(get_current_user),
+    request: Request = None,
+):
+    """Return the user's current usage vs limit, so the UI can show it.
+
+    Mirrors the logic in _reserve_usage_slot but without consuming a slot:
+      • Unlimited whitelist → {tier:'unlimited', limit:-1, used:0}
+      • Paid + active → tier limit, count from subscription_period_start
+      • Everyone else → FREE_USAGE_LIMIT, count lifetime
+    """
+    email = _normalize_email(user.get("email", ""))
+    token = request.headers.get("authorization", "").split(" ", 1)[-1]
+    user_id = user["id"]
+
+    if email in UNLIMITED_EMAILS:
+        return {"used": 0, "limit": -1, "tier": "unlimited", "period_end": None}
+
+    sub = await _get_subscription(token, user_id)
+    tier_name: str | None = None
+    limit = CUSTOM_LIMITS.get(email, FREE_USAGE_LIMIT)
+    period_start: str | None = None
+    period_end: str | None = None
+
+    if (
+        sub
+        and sub.get("subscription_status") in PAID_STATUSES
+        and sub.get("subscription_period_start")
+    ):
+        tier_name = sub.get("subscription_tier") or "pro"
+        tier_cfg = TIER_LIMITS.get(tier_name, TIER_LIMITS["pro"])
+        limit = tier_cfg["period_limit"]
+        period_start = sub["subscription_period_start"]
+        period_end = sub.get("subscription_period_end")
+
+    # Count rows in `usage` table — PostgREST Prefer:count returns total in headers
+    params = {"user_id": f"eq.{user_id}", "select": "id"}
+    if period_start:
+        params["created_at"] = f"gte.{period_start}"
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.get(
+                f"{SUPABASE_URL}/rest/v1/usage",
+                params=params,
+                headers={
+                    "apikey": SUPABASE_ANON_KEY,
+                    "Authorization": f"Bearer {token}",
+                    "Prefer": "count=exact",
+                    "Range-Unit": "items",
+                    "Range": "0-0",
+                },
+            )
+            used = 0
+            if resp.status_code in (200, 206):
+                content_range = resp.headers.get("content-range", "")
+                # Format: "0-0/5" or "*/0" — total is after the slash
+                if "/" in content_range:
+                    total_str = content_range.rsplit("/", 1)[-1]
+                    if total_str.isdigit():
+                        used = int(total_str)
+            return {
+                "used": used,
+                "limit": limit,
+                "tier": tier_name or "free",
+                "period_end": period_end,
+            }
+    except Exception as e:
+        print(f"  [usage] count fetch failed: {e}")
+        return {"used": 0, "limit": limit, "tier": tier_name or "free", "period_end": period_end}
+
+
 @app.put("/api/profile")
 async def update_profile(
     request: Request,

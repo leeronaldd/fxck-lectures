@@ -44,6 +44,19 @@ function SettingsContent() {
   const [studyProgram, setStudyProgram] = useState("");
   const [studyYear, setStudyYear] = useState("");
 
+  // Usage info (live from backend)
+  const [usage, setUsage] = useState<{ used: number; limit: number; tier: string; period_end: string | null } | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { fetchUsage } = await import("@/lib/api");
+        const u = await fetchUsage();
+        if (u) setUsage(u);
+      } catch {}
+    })();
+  }, []);
+
   // Load profile from backend (falls back to localStorage)
   useEffect(() => {
     (async () => {
@@ -408,7 +421,7 @@ function SettingsContent() {
 
         {activeTab === "Usage" && (
           <div className="space-y-6">
-            {/* Usage bar */}
+            {/* Usage bar — live */}
             <div
               className="p-5 rounded-xl"
               style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)" }}
@@ -418,14 +431,38 @@ function SettingsContent() {
                   Lectures used
                 </span>
                 <span className="text-sm font-bold" style={{ color: "var(--accent)" }}>
-                  ? / 2
+                  {usage === null
+                    ? "…"
+                    : usage.limit === -1
+                      ? `${usage.used} / ∞`
+                      : `${usage.used} / ${usage.limit}`}
                 </span>
               </div>
               <div className="h-2 rounded-full" style={{ background: "var(--bg-base)" }}>
-                <div className="h-full rounded-full" style={{ width: "50%", background: "var(--accent)" }} />
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{
+                    width:
+                      usage === null
+                        ? "0%"
+                        : usage.limit === -1
+                          ? "100%"
+                          : `${Math.min(100, Math.round((usage.used / Math.max(1, usage.limit)) * 100))}%`,
+                    background:
+                      usage && usage.limit !== -1 && usage.used >= usage.limit
+                        ? "#FF4444"
+                        : "var(--accent)",
+                  }}
+                />
               </div>
               <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>
-                Free plan includes 2 lifetime lectures
+                {usage?.tier === "unlimited"
+                  ? "Unlimited plan — go wild."
+                  : usage?.tier === "pro"
+                    ? `Pro plan: ${usage.limit} lectures this billing period${usage?.period_end ? ` · renews ${new Date(usage.period_end).toLocaleDateString()}` : ""}`
+                    : usage?.tier === "max"
+                      ? `Max plan: ${usage.limit} lectures this billing period${usage?.period_end ? ` · renews ${new Date(usage.period_end).toLocaleDateString()}` : ""}`
+                      : `Free plan includes ${usage?.limit ?? 2} lifetime lectures`}
               </p>
             </div>
 
