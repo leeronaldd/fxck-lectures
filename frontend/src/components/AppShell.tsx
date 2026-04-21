@@ -74,10 +74,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener("mousedown", onDown);
   }, [avatarMenuOpen]);
 
-  // Don't show app shell on sign-in, quiz, preview, or landing page (for guests only)
+  // Don't show app shell on sign-in, quiz, preview, public share pages, or
+  // landing page (for guests only)
   const isPreviewPage = pathname === "/preview";
   const isChatPage = pathname.startsWith("/chat");
-  if (isSignInPage || isQuizPage || isPreviewPage || isChatPage || (isLandingPage && !user.isLoggedIn)) {
+  // `/s/[id]` — public share viewer. Renders its own minimal nav so
+  // logged-out classmates don't see the sidebar or sign-in CTA shell.
+  const isSharePage = pathname.startsWith("/s/");
+  if (isSignInPage || isQuizPage || isPreviewPage || isChatPage || isSharePage || (isLandingPage && !user.isLoggedIn)) {
     return <>{children}</>;
   }
 

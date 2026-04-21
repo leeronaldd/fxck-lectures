@@ -841,6 +841,37 @@ async def get_sessions(
         return []
 
 
+@app.get("/api/public/session/{session_id}")
+async def get_public_session(session_id: str):
+    """Return session content without auth — powers the /s/{id} share link.
+
+    Security model: "anyone with link" (same as Google Docs default share).
+    Session IDs are unguessable UUIDs, so this is safe for sharing study
+    documents with classmates but not for anything genuinely private.
+
+    Returns only public-safe fields: id, name, markdown, created_at. No user
+    metadata, email, or usage data is exposed.
+
+    Uses the service key to bypass RLS — RLS would normally require the
+    owner's JWT to read the row.
+    """
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{SUPABASE_URL}/rest/v1/sessions",
+            params={
+                "id": f"eq.{session_id}",
+                "select": "id,name,markdown,created_at",
+                "limit": "1",
+            },
+            headers=_service_headers(),
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            if data:
+                return data[0]
+        raise HTTPException(status_code=404, detail="Session not found")
+
+
 @app.get("/api/sessions/{session_id}")
 async def get_session(
     session_id: str,

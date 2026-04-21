@@ -10,6 +10,7 @@ import MarkdownRenderer from "@/components/MarkdownRenderer";
 import LectureScoreCard from "@/components/LectureScoreCard";
 import type { SlideCard, TranscriptSection } from "@/lib/types";
 import { downloadSlidesPDF, downloadTranscriptPDF } from "@/lib/pdf";
+import ShareButton from "@/components/ShareButton";
 
 export default function ReaderPage() {
   const router = useRouter();
@@ -381,8 +382,14 @@ export default function ReaderPage() {
           {sessionName}
         </h1>
 
-        {/* Download buttons */}
-        <div className="flex gap-2 mb-6">
+        {/* Download + Share buttons */}
+        <div className="flex gap-2 mb-6 flex-wrap">
+          {store.activeSessionId && (
+            <ShareButton
+              sessionId={store.activeSessionId}
+              sessionName={sessionName}
+            />
+          )}
           <button
             onClick={() => downloadSlidesPDF(slides, transcript, sessionName)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"

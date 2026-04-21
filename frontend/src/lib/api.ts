@@ -153,6 +153,22 @@ export async function fetchSession(sessionId: string): Promise<{
   return res.json();
 }
 
+/**
+ * Public read-only session fetch — no auth required. Powers the /s/{id}
+ * share link. Returns only {id, name, markdown, created_at}. Safe for
+ * unauthenticated classroom sharing.
+ */
+export async function fetchPublicSession(sessionId: string): Promise<{
+  id: string;
+  name: string;
+  markdown: string;
+  created_at: string;
+} | null> {
+  const res = await fetch(`${API_URL}/api/public/session/${sessionId}`);
+  if (!res.ok) return null;
+  return res.json();
+}
+
 export async function fetchProfile(): Promise<Record<string, string> | null> {
   const token = await getToken();
   const res = await fetch(`${API_URL}/api/profile`, {
