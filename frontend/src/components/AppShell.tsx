@@ -94,12 +94,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <div className="h-screen flex flex-col">
       {/* Top bar — glassmorphism */}
       <header
-        className="sticky top-0 z-40 flex items-center justify-between px-4 sm:px-6 py-2.5 h-[56px]"
+        className="sticky top-0 z-[100] flex items-center justify-between px-4 sm:px-6 py-2.5 h-[56px] isolate"
         style={{
           background: "rgba(10, 10, 15, 0.7)",
           backdropFilter: "blur(20px)",
           WebkitBackdropFilter: "blur(20px)",
           borderBottom: "1px solid var(--border)",
+          pointerEvents: "auto",
         }}
       >
         <div className="flex items-center gap-3">
@@ -224,7 +225,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               </button>
               {avatarMenuOpen && (
                 <div
-                  className="absolute right-0 top-full mt-2 w-44 rounded-xl overflow-hidden z-50"
+                  className="absolute right-0 top-full mt-2 w-44 rounded-xl overflow-hidden z-[110]"
                   style={{
                     background: "rgba(20, 20, 25, 0.95)",
                     backdropFilter: "blur(20px)",
