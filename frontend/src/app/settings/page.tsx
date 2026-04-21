@@ -220,22 +220,43 @@ function SettingsContent() {
                   Current Plan
                 </span>
                 <span
-                  className="text-xs px-2.5 py-1 rounded-full font-medium"
+                  className="text-xs px-2.5 py-1 rounded-full font-medium capitalize"
                   style={{ background: "var(--accent-dim)", color: "var(--accent)" }}
                 >
-                  Free
+                  {usage?.tier || "Free"}
                 </span>
               </div>
               <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>
-                2 free lectures
+                {usage?.limit === -1
+                  ? "Unlimited lectures"
+                  : `${usage?.limit ?? 2} lectures per month`}
               </p>
-              <button
-                onClick={() => setShowPlanSelector(!showPlanSelector)}
-                className="text-sm font-medium"
-                style={{ color: "var(--accent)" }}
-              >
-                {showPlanSelector ? "Hide plans" : "Adjust Plan"}
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowPlanSelector(!showPlanSelector)}
+                  className="text-sm font-medium"
+                  style={{ color: "var(--accent)" }}
+                >
+                  {showPlanSelector ? "Hide plans" : (usage?.tier && usage.tier !== "free" ? "Change Plan" : "Adjust Plan")}
+                </button>
+                {usage?.tier && usage.tier !== "free" && usage.tier !== "unlimited" && (
+                  <button
+                    onClick={async () => {
+                      const { openBillingPortal } = await import("@/lib/api");
+                      const url = await openBillingPortal();
+                      if (url) {
+                        window.location.href = url;
+                      } else {
+                        toast("Could not open billing portal. Please try again.");
+                      }
+                    }}
+                    className="text-sm font-medium"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    Manage Subscription
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Plan selector */}
@@ -317,7 +338,7 @@ function SettingsContent() {
                     <p className="text-2xl font-bold mb-1" style={{ color: "var(--text-primary)" }}>
                       {billingPeriod === "yearly" ? "$5.83" : "$12.99"}
                       <span className="text-sm font-normal" style={{ color: "var(--text-muted)" }}>
-                        /mo
+                        {" "}AUD/mo
                       </span>
                     </p>
                     <p className="text-xs mb-3" style={{ color: "var(--text-muted)", minHeight: "1rem" }}>
@@ -370,7 +391,7 @@ function SettingsContent() {
                     <p className="text-2xl font-bold mb-1" style={{ color: "var(--text-primary)" }}>
                       {billingPeriod === "yearly" ? "$13.33" : "$29.99"}
                       <span className="text-sm font-normal" style={{ color: "var(--text-muted)" }}>
-                        /mo
+                        {" "}AUD/mo
                       </span>
                     </p>
                     <p className="text-xs mb-3" style={{ color: "var(--text-muted)", minHeight: "1rem" }}>

@@ -209,6 +209,17 @@ export async function createCheckoutSession(
   return data.url;
 }
 
+export async function openBillingPortal(): Promise<string | null> {
+  const token = await getToken();
+  const res = await fetch(`${API_URL}/api/billing-portal`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.url;
+}
+
 export async function createSession(name: string = "New Lecture"): Promise<{ id: string; name: string } | null> {
   const token = await getToken();
   const res = await fetch(`${API_URL}/api/sessions`, {

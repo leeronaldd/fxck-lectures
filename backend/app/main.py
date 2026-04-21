@@ -1161,6 +1161,43 @@ async def create_checkout_session(
         raise HTTPException(status_code=500, detail=f"Stripe error: {e}")
 
 
+@app.post("/api/billing-portal")
+async def create_billing_portal_session(
+    request: Request,
+    user: dict = Depends(get_current_user),
+):
+    """Create a Stripe Customer Portal session so the user can self-serve:
+    cancel, update card, download invoices. Returns the hosted portal URL.
+    """
+    if not stripe.api_key:
+        raise HTTPException(503, "Payments temporarily unavailable.")
+
+    # Look up the user's stripe_customer_id from user_profiles
+    if not SUPABASE_SERVICE_KEY:
+        raise HTTPException(500, "Backend misconfigured.")
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(
+            f"{SUPABASE_URL}/rest/v1/user_profiles",
+            params={"user_id": f"eq.{user['id']}", "select": "stripe_customer_id"},
+            headers=_service_headers(),
+        )
+        rows = resp.json() if resp.status_code == 200 else []
+        customer_id = (rows[0].get("stripe_customer_id") if rows else None)
+
+    if not customer_id:
+        raise HTTPException(400, "No active subscription found.")
+
+    try:
+        session = stripe.billing_portal.Session.create(
+            customer=customer_id,
+            return_url=f"{FRONTEND_URL}/settings?tab=Billing",
+        )
+        return {"url": session.url}
+    except Exception as e:
+        print(f"  [billing-portal] error: {e}")
+        raise HTTPException(500, f"Could not open billing portal: {e}")
+
+
 # ─── Stripe webhook ─────────────────────────────────────────────────────────
 
 def _tier_from_subscription(sub: dict) -> str | None:
@@ -1168,14 +1205,13 @@ def _tier_from_subscription(sub: dict) -> str | None:
     item's price.id and looking it up in PRICE_TO_TIER. Returns None if the
     price isn't recognised — keeps the existing tier or defaults to 'pro'.
     """
+    # StripeObject doesn't implement dict.get(), so use subscript access
+    # (which works on both StripeObject and plain dict) with try/except.
     try:
-        items = (sub.get("items") or {}).get("data") or []
-        if items:
-            price = items[0].get("price") or {}
-            price_id = price.get("id")
-            if price_id and price_id in PRICE_TO_TIER:
-                return PRICE_TO_TIER[price_id]
-    except Exception as e:
+        price_id = sub["items"]["data"][0]["price"]["id"]
+        if price_id in PRICE_TO_TIER:
+            return PRICE_TO_TIER[price_id]
+    except (KeyError, IndexError, TypeError) as e:
         print(f"  [stripe-webhook] tier lookup failed: {e}")
     return None
 
@@ -1313,31 +1349,49 @@ async def stripe_webhook(request: Request):
     except stripe.error.SignatureVerificationError as e:
         raise HTTPException(400, f"Invalid signature: {e}")
 
-    event_type = event["type"]
-    obj = event["data"]["object"]
-    print(f"  [stripe-webhook] event={event_type} id={event.get('id')}")
+    # StripeObject doesn't behave like dict in this SDK version (no .get(),
+    # dict() constructor fails with KeyError). Since we've already verified
+    # the signature via construct_event, re-parse the payload as plain JSON
+    # so the rest of the handler works with a standard dict.
+    import json as _json
+    event_dict = _json.loads(payload)
+    event_type = event_dict["type"]
+    obj = event_dict["data"]["object"]
+    print(f"  [stripe-webhook] event={event_type} id={event_dict['id']}")
 
     try:
         if event_type == "checkout.session.completed":
             # User finished paying. session.metadata carries user_id (set in
             # /api/checkout); session.customer + session.subscription are the
             # Stripe IDs we want to persist.
-            user_id = (obj.get("metadata") or {}).get("user_id") \
-                      or obj.get("client_reference_id")
+            metadata = obj.get("metadata") or {}
+            user_id = metadata.get("user_id") or obj.get("client_reference_id")
             customer_id = obj.get("customer")
             subscription_id = obj.get("subscription")
             if not user_id:
                 print("  [stripe-webhook] no user_id on checkout session — skipping")
                 return {"received": True}
 
-            # Fetch the subscription to get period dates + status + tier
+            # Fetch the subscription to get period dates + status + tier.
+            # Re-serialise via JSON to convert StripeObject → plain dict.
             period_start = period_end = status = tier = None
             if subscription_id:
                 try:
-                    sub = stripe.Subscription.retrieve(subscription_id)
+                    sub_obj = stripe.Subscription.retrieve(subscription_id)
+                    # StripeObject.__str__ returns JSON — cleanest way to get plain dict
+                    sub = _json.loads(str(sub_obj))
                     status = sub.get("status")
-                    period_start = _iso_from_stripe_ts(sub.get("current_period_start"))
-                    period_end = _iso_from_stripe_ts(sub.get("current_period_end"))
+                    # API 2026-03-25.dahlia moved period dates from subscription
+                    # root to the subscription item. Read from the first item
+                    # (we only ever have one-item subscriptions).
+                    first_item = (sub.get("items") or {}).get("data") or [{}]
+                    first_item = first_item[0] if first_item else {}
+                    period_start = _iso_from_stripe_ts(
+                        sub.get("current_period_start") or first_item.get("current_period_start")
+                    )
+                    period_end = _iso_from_stripe_ts(
+                        sub.get("current_period_end") or first_item.get("current_period_end")
+                    )
                     tier = _tier_from_subscription(sub)
                 except Exception as e:
                     print(f"  [stripe-webhook] subscription fetch failed: {e}")
@@ -1357,7 +1411,8 @@ async def stripe_webhook(request: Request):
             # active), or cancel-at-period-end flag flips. Locate the user
             # via metadata first (set via subscription_data on checkout),
             # then fall back to stripe_customer_id lookup.
-            user_id = (obj.get("metadata") or {}).get("user_id")
+            metadata = obj.get("metadata") or {}
+            user_id = metadata.get("user_id")
             customer_id = obj.get("customer")
             if not user_id and customer_id:
                 user_id = await _lookup_user_by_customer(customer_id)
@@ -1368,21 +1423,29 @@ async def stripe_webhook(request: Request):
             # subscription.updated carries the full subscription object
             # including items[].price.id, so we can detect tier changes
             # (e.g. user upgraded Pro → Max).
+            # API 2026-03-25.dahlia moved period dates to subscription items.
+            sub_items = (obj.get("items") or {}).get("data") or [{}]
+            first_item = sub_items[0] if sub_items else {}
             await _upsert_subscription_by_user(
                 user_id,
                 stripe_customer_id=customer_id,
                 stripe_subscription_id=obj.get("id"),
                 subscription_status=obj.get("status"),
                 subscription_tier=_tier_from_subscription(obj),
-                period_start=_iso_from_stripe_ts(obj.get("current_period_start")),
-                period_end=_iso_from_stripe_ts(obj.get("current_period_end")),
+                period_start=_iso_from_stripe_ts(
+                    obj.get("current_period_start") or first_item.get("current_period_start")
+                ),
+                period_end=_iso_from_stripe_ts(
+                    obj.get("current_period_end") or first_item.get("current_period_end")
+                ),
             )
 
         elif event_type == "customer.subscription.deleted":
             # Subscription terminated (either immediate cancel or period-end
             # cancel firing). Flip status to 'canceled' so the user drops
             # back to free-tier limits on the next reserve attempt.
-            user_id = (obj.get("metadata") or {}).get("user_id")
+            metadata = obj.get("metadata") or {}
+            user_id = metadata.get("user_id")
             customer_id = obj.get("customer")
             if not user_id and customer_id:
                 user_id = await _lookup_user_by_customer(customer_id)
