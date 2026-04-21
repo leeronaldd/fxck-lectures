@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 import { toast } from "sonner";
 import { ConceptGroup, VerificationClaim, TrustStats } from "./types";
 import { computeTrustStats } from "./data";
@@ -180,7 +181,7 @@ function syncLegacyFields(runs: Record<string, PipelineRun>, activeId: string | 
   };
 }
 
-export const useAppStore = create<AppState>((set, get) => {
+export const useAppStore = create<AppState>()(persist((set, get) => {
   if (typeof window !== "undefined") {
     (window as unknown as Record<string, unknown>).__store = { getState: () => get(), setState: set };
   }
@@ -566,7 +567,37 @@ export const useAppStore = create<AppState>((set, get) => {
       trustStats: { totalClaims: 0, correctClaims: 0, verifiedPercent: 0 },
     });
   },
-})});
+  });
+}, {
+  name: "klare-pipeline-state",
+  storage: createJSONStorage(() => localStorage),
+  // Only persist pipeline progress so F5 mid-run keeps the stepper visible.
+  // Anything derived (user, sessions, upload File objects) is re-fetched or re-uploaded.
+  partialize: (state) => ({
+    pipelineRuns: state.pipelineRuns,
+    activePipelineId: state.activePipelineId,
+  }),
+  // Strip any stale upload-in-progress state when rehydrating — a reloaded tab
+  // has no active XHR, so showing "Uploading 87%" would be a lie. Anything
+  // that was mid-upload is treated as cancelled on refresh.
+  onRehydrateStorage: () => (state) => {
+    if (!state) return;
+    const runs = { ...state.pipelineRuns };
+    let changed = false;
+    for (const [id, run] of Object.entries(runs)) {
+      if (run.isUploading) {
+        delete runs[id];
+        changed = true;
+      }
+    }
+    if (changed) {
+      state.pipelineRuns = runs;
+      if (state.activePipelineId && !runs[state.activePipelineId]) {
+        state.activePipelineId = null;
+      }
+    }
+  },
+}));
 
 // Auto-sync legacy pipeline fields whenever pipelineRuns or activePipelineId changes
 useAppStore.subscribe((state, prev) => {
