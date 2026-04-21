@@ -372,6 +372,18 @@ function SettingsContent() {
                     <button
                       onClick={async () => {
                         const { trackEvent } = await import("@/lib/analytics");
+                        const isPaid = usage?.tier && usage.tier !== "free" && usage.tier !== "unlimited";
+                        // Existing subscribers must go through the Customer
+                        // Portal so Stripe can prorate the plan change.
+                        // Otherwise we'd create a duplicate subscription.
+                        if (isPaid) {
+                          trackEvent("plan_change_start", { from: usage?.tier, to: "pro", period: billingPeriod });
+                          const { openBillingPortal } = await import("@/lib/api");
+                          const url = await openBillingPortal();
+                          if (url) window.location.href = url;
+                          else toast("Could not open billing portal. Please try again.");
+                          return;
+                        }
                         trackEvent("checkout_start", { tier: "pro", period: billingPeriod });
                         const { createCheckoutSession } = await import("@/lib/api");
                         const url = await createCheckoutSession(billingPeriod, "pro");
@@ -387,7 +399,11 @@ function SettingsContent() {
                         color: "#fff",
                       }}
                     >
-                      Upgrade to Pro
+                      {usage?.tier === "pro"
+                        ? (billingPeriod === "yearly" ? "Switch to Pro Yearly" : "Current Plan")
+                        : usage?.tier === "max"
+                          ? "Downgrade to Pro"
+                          : "Upgrade to Pro"}
                     </button>
                   </div>
 
@@ -427,6 +443,15 @@ function SettingsContent() {
                     <button
                       onClick={async () => {
                         const { trackEvent } = await import("@/lib/analytics");
+                        const isPaid = usage?.tier && usage.tier !== "free" && usage.tier !== "unlimited";
+                        if (isPaid) {
+                          trackEvent("plan_change_start", { from: usage?.tier, to: "max", period: billingPeriod });
+                          const { openBillingPortal } = await import("@/lib/api");
+                          const url = await openBillingPortal();
+                          if (url) window.location.href = url;
+                          else toast("Could not open billing portal. Please try again.");
+                          return;
+                        }
                         trackEvent("checkout_start", { tier: "max", period: billingPeriod });
                         const { createCheckoutSession } = await import("@/lib/api");
                         const url = await createCheckoutSession(billingPeriod, "max");
@@ -442,7 +467,9 @@ function SettingsContent() {
                         color: "#fff",
                       }}
                     >
-                      Upgrade to Max
+                      {usage?.tier === "max"
+                        ? (billingPeriod === "yearly" ? "Switch to Max Yearly" : "Current Plan")
+                        : "Upgrade to Max"}
                     </button>
                   </div>
                 </div>
