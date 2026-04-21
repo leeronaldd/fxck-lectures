@@ -2,7 +2,25 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Reverse-proxy PostHog through our own domain so browser-side requests
+  // look like same-origin (klareai.com/ingest/*) instead of us.i.posthog.com.
+  // Sidesteps CORS blocks from privacy extensions/Brave Shield/strict
+  // tracking prevention that would otherwise silently drop our analytics.
+  async rewrites() {
+    return [
+      {
+        source: "/ingest/static/:path*",
+        destination: "https://us-assets.i.posthog.com/static/:path*",
+      },
+      {
+        source: "/ingest/:path*",
+        destination: "https://us.i.posthog.com/:path*",
+      },
+    ];
+  },
+  // PostHog SDK is loaded via /ingest/static, so trailing slash must not be
+  // auto-added to the proxy path.
+  skipTrailingSlashRedirect: true,
 };
 
 // Wrap with Sentry so sentry.client.config.ts gets injected into the client

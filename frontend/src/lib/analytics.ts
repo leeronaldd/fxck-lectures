@@ -11,7 +11,11 @@ function boot() {
   const key = process.env.NEXT_PUBLIC_POSTHOG_KEY;
   if (!key) return;
   posthog.init(key, {
-    api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com",
+    // Route through our Next.js reverse proxy (see next.config.ts rewrites)
+    // so browser-side requests are same-origin and don't get killed by
+    // privacy extensions / Brave / strict tracking prevention.
+    api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || "/ingest",
+    ui_host: "https://us.posthog.com",
     person_profiles: "identified_only",
     capture_pageview: true,
     capture_pageleave: true,

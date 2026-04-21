@@ -514,4 +514,16 @@ def run_pipeline(
     except Exception as e:
         import traceback
         traceback.print_exc()
-        yield {"status": "error", "stage": "Pipeline error", "progress": 0, "error": str(e)}
+        # Map common technical failures to user-friendly messages so we don't
+        # leak raw stack traces (ffmpeg stderr, Python exceptions, etc.)
+        # into the UI. Full error is still in Cloud Run logs for debugging.
+        raw = str(e).lower()
+        if "ffmpeg" in raw or "moov atom" in raw or "invalid data" in raw:
+            friendly = "Your file looks damaged or isn't a supported video/audio format. Try re-downloading or re-exporting it."
+        elif "transcrib" in raw or "whisper" in raw:
+            friendly = "We couldn't transcribe your audio. Make sure the file isn't silent or corrupted, and try again."
+        elif "quota" in raw or "rate limit" in raw or "resource_exhausted" in raw:
+            friendly = "Our AI service is temporarily overloaded. Please wait a minute and try again — your run has been refunded."
+        else:
+            friendly = "Something went wrong processing your lecture. Your run has been refunded — please try again."
+        yield {"status": "error", "stage": "Pipeline error", "progress": 0, "error": friendly}
