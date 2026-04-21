@@ -7,7 +7,7 @@ import { SlideCardGroup } from "@/components/SlideCard";
 import NarrativeSection from "@/components/NarrativeSection";
 import ImageLightbox from "@/components/ImageLightbox";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
-import ProfessorScoreCard from "@/components/ProfessorScoreCard";
+import LectureScoreCard from "@/components/LectureScoreCard";
 import type { SlideCard, TranscriptSection } from "@/lib/types";
 import { downloadSlidesPDF, downloadTranscriptPDF } from "@/lib/pdf";
 
@@ -504,10 +504,17 @@ export default function ReaderPage() {
           </div>
         ))}
 
-        {/* Professor Score Card — shown once the full run is complete */}
+        {/* Lecture Score Card — shown once the full run is complete.
+            lectureScore comes from Flash via the completeness checker; it's
+            null for older sessions reloaded from the DB (we only stored it
+            in-memory for this iteration — persistence is a future task). */}
         {store.markdown && transcript.length > 0 && (
           <div className="mt-8 mb-4">
-            <ProfessorScoreCard transcript={transcript} sessionName={sessionName} />
+            <LectureScoreCard
+              lectureScore={store.lectureScore}
+              transcript={transcript}
+              sessionName={sessionName}
+            />
           </div>
         )}
 

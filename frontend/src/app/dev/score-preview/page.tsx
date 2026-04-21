@@ -1,126 +1,110 @@
 "use client";
 
-// Dev-only preview of ProfessorScoreCard without needing to sign in or run
+// Dev-only preview of LectureScoreCard without needing to sign in or run
 // a real pipeline. Open http://localhost:PORT/dev/score-preview to see the
-// card with mock transcript data.
+// card with mock data. Use the tier buttons to swap between label colours.
 
-import ProfessorScoreCard from "@/components/ProfessorScoreCard";
-import type { TranscriptSection } from "@/lib/types";
+import { useState } from "react";
+import LectureScoreCard from "@/components/LectureScoreCard";
+import type { LectureScore, LectureScoreLabel, TranscriptSection } from "@/lib/types";
 
-// Mock transcript tuned to produce a ~31/100 overall score (bad professor).
-// The ProfessorScoreCard computes scores from:
-//   - ei_percent variance (clarity)
-//   - section count (focus)
-//   - narrative length (efficiency)
+// Minimal mock transcript — only used by the fallback scorer if Flash's
+// lecture_score is null. When we pass a real lectureScore below, this is
+// largely ignored.
 const mockTranscript: TranscriptSection[] = [
   {
     slide_number: 1,
-    title: "Introduction to Bacteria",
-    narrative:
-      "Bacteria are single-celled prokaryotic organisms. They lack membrane-bound organelles and a true nucleus. " +
-      "Before getting into the structure, it's worth noting that the professor spent almost 15 minutes on the history of microbiology, including a detailed anecdote about Leeuwenhoek's homemade lens. " +
-      "We've re-explained the actual material from scratch below. ".repeat(10),
-    ei_percent: 85,
-    ei_reasoning: "Core exam content",
-  },
-  {
-    slide_number: 2,
-    title: "Cell Wall Basics",
-    narrative:
-      "The cell wall surrounds the cell membrane and provides structural integrity. " +
-      "Think of it like a suit of armour. ".repeat(8),
-    ei_percent: 92,
-    ei_reasoning: "High exam importance",
-  },
-  {
-    slide_number: 3,
-    title: "Gram Staining (tangent)",
-    narrative:
-      "Your professor spent a while on the history of Hans Christian Gram. " +
-      "The actual mechanism: crystal violet enters both gram-positive and gram-negative cells... ".repeat(6),
-    ei_percent: 22,
-    ei_reasoning: "Mostly historical tangent",
-  },
-  {
-    slide_number: 4,
-    title: "Peptidoglycan Structure",
-    narrative:
-      "Peptidoglycan is a mesh-like polymer of sugars and amino acids. Key exam fact: NAM-NAG-NAM-NAG alternating chains. ".repeat(7),
-    ei_percent: 95,
-    ei_reasoning: "Critical exam content",
-  },
-  {
-    slide_number: 5,
-    title: "Random aside on antibiotics discovery",
-    narrative:
-      "The professor went on about Fleming's penicillin discovery for a while. We condensed this. ".repeat(3),
-    ei_percent: 15,
-    ei_reasoning: "Low exam value — historical story",
-  },
-  {
-    slide_number: 6,
-    title: "Bacterial Capsules",
-    narrative:
-      "Capsules are slippery outer layers that help bacteria evade the immune system. Think: Teflon coating on a pan — your immune cells can't grab on. ".repeat(6),
-    ei_percent: 78,
-    ei_reasoning: "Exam-important",
-  },
-  {
-    slide_number: 7,
-    title: "Flagella and motility",
-    narrative:
-      "Some bacteria swim using a rotating tail called a flagellum. It's powered by a proton gradient and acts like a propeller. ".repeat(5),
-    ei_percent: 60,
-    ei_reasoning: "Moderate importance",
-  },
-  {
-    slide_number: 8,
-    title: "Fimbriae vs Pili (confused slide)",
-    narrative:
-      "The professor kept switching between the terms 'fimbriae' and 'pili' as if they were the same. They're not quite. We clarified below. ".repeat(7),
-    ei_percent: 45,
-    ei_reasoning: "Needs clarification",
-  },
-  {
-    slide_number: 9,
-    title: "Endospores",
-    narrative:
-      "Some bacteria (Bacillus, Clostridium) form endospores — dormant survival forms that resist heat, dehydration, and chemicals. ".repeat(6),
-    ei_percent: 88,
-    ei_reasoning: "High exam value",
-  },
-  {
-    slide_number: 10,
-    title: "Bacterial genetics recap",
-    narrative:
-      "Bacteria have a single circular chromosome plus optional plasmids. Plasmids carry extra genes — often antibiotic resistance. ".repeat(5),
-    ei_percent: 72,
-    ei_reasoning: "Core exam topic",
+    title: "Intro",
+    narrative: "Placeholder narrative. ".repeat(40),
+    ei_percent: 70,
+    ei_reasoning: "",
   },
 ];
 
+const MOCKS: Record<LectureScoreLabel, LectureScore> = {
+  rough: {
+    overall: 16,
+    clarity: 12,
+    focus: 18,
+    efficiency: 18,
+    label: "rough",
+    comment: "Read definitions off the slide, no examples, one student laughed out of confusion.",
+    time_saved_min: 92,
+  },
+  ok: {
+    overall: 31,
+    clarity: 24,
+    focus: 35,
+    efficiency: 34,
+    label: "ok",
+    comment: "Spent 12 minutes on the history of penicillin before touching peptidoglycan structure.",
+    time_saved_min: 78,
+  },
+  good: {
+    overall: 52,
+    clarity: 55,
+    focus: 48,
+    efficiency: 53,
+    label: "good",
+    comment: "Solid middle-of-the-road — explained most concepts clearly, lost time on one long tangent.",
+    time_saved_min: 45,
+  },
+  great: {
+    overall: 71,
+    clarity: 74,
+    focus: 68,
+    efficiency: 71,
+    label: "great",
+    comment: "Used the Timmy-buys-oranges framing before naming the function — nice one.",
+    time_saved_min: 22,
+  },
+  excellent: {
+    overall: 89,
+    clarity: 92,
+    focus: 88,
+    efficiency: 87,
+    label: "excellent",
+    comment: "Every concept built from a concrete example. Watch this lecture twice.",
+    time_saved_min: 8,
+  },
+};
+
 export default function ScorePreviewPage() {
+  const [label, setLabel] = useState<LectureScoreLabel>("ok");
+  const score = MOCKS[label];
+
   return (
-    <div
-      className="min-h-screen py-12 px-4"
-      style={{ background: "var(--bg)" }}
-    >
+    <div className="min-h-screen py-12 px-4" style={{ background: "var(--bg)" }}>
       <div className="max-w-2xl mx-auto">
         <div className="mb-8 text-center">
-          <h1
-            className="text-2xl font-bold mb-2"
-            style={{ color: "var(--text-primary)" }}
-          >
-            Professor Score Card — dev preview
+          <h1 className="text-2xl font-bold mb-2" style={{ color: "var(--text-primary)" }}>
+            Lecture Score — dev preview
           </h1>
-          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+          <p className="text-sm mb-4" style={{ color: "var(--text-secondary)" }}>
             Click <strong>Preview</strong> to open the shareable PNG, or{" "}
             <strong>Share</strong> to trigger Web Share API / clipboard fallback.
           </p>
+          <div className="flex items-center justify-center gap-2 flex-wrap">
+            {(Object.keys(MOCKS) as LectureScoreLabel[]).map((k) => (
+              <button
+                key={k}
+                onClick={() => setLabel(k)}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-all"
+                style={{
+                  background: label === k ? "var(--accent-dim)" : "transparent",
+                  color: label === k ? "var(--accent)" : "var(--text-muted)",
+                  border: "1px solid var(--border)",
+                }}
+              >
+                {k} ({MOCKS[k].overall})
+              </button>
+            ))}
+          </div>
         </div>
-        <ProfessorScoreCard
+        <LectureScoreCard
+          lectureScore={score}
           transcript={mockTranscript}
-          sessionName="Microbiology Lecture 3"
+          sessionName={`Microbiology Lecture 3 · ${label}`}
         />
       </div>
     </div>

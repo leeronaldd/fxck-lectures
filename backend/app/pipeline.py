@@ -405,11 +405,15 @@ def run_pipeline(
         # are appended to sections, no regeneration. Skipped silently on any
         # error so a failed check never kills the user's run.
         yield {"status": "running", "stage": "Verifying coverage", "progress": 85}
+        lecture_score_dict: dict | None = None
         try:
             from src.completeness_checker import check_completeness
-            sections, _missed = check_completeness(
+            sections, _missed, lecture_score = check_completeness(
                 sections, text, apply_patches=True
             )
+            if lecture_score is not None:
+                from dataclasses import asdict
+                lecture_score_dict = asdict(lecture_score)
         except Exception as e:
             print(f"  [completeness] Skipped due to error: {e}")
 
@@ -505,6 +509,7 @@ def run_pipeline(
                 "concept_groups": [],
                 "verification_report": [],
                 "cost_report": cost_report,
+                "lecture_score": lecture_score_dict,
             },
         }
 

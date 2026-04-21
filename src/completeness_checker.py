@@ -1,492 +1,494 @@
-"""Completeness Checker: grep-based coverage check for Stage 2 output.
+"""Completeness checker — final pipeline stage (V3 architecture).
 
-Checks that key terms from Stage 1 chunks appear in the generated explanations.
-Misses are categorized by CI% and either:
-- High CI%: patched via targeted LLM follow-up (insert missing term)
-- Low CI%: inline skip-line inserted at end of relevant section
+After the generator produces a document, this checker compares the full
+transcript against the generated output and identifies content that didn't
+make it into the document. For each missed item it judges exam relevance
+(high/medium/low) and produces a short markdown patch that gets appended
+to the relevant section.
+
+Strategy A only: patches are appended to existing sections, never
+regenerated. This preserves the carefully-written narrative and only
+adds the missed facts as small follow-ups (sentences, callout boxes).
+Only HIGH-severity misses are patched — medium/low are logged for the
+dev log but not auto-applied.
+
+Why this exists: even with Agent 2's structured extraction (named_examples,
+professor_emphasis, tangents_to_skip) and the coordinator's director notes,
+some content gets dropped during Pro generation. The checker is the safety
+net that catches the remaining 15-20%.
+
+Architecture:
+    Generated sections + raw transcript
+        ↓ (one Flash call, ~$0.02, ~15s)
+    List of missed items with severity + patch markdown
+        ↓ (HIGH-severity patches applied in-place)
+    Updated sections with critical content restored
+
+NOTE: This file replaces the old V1 grep-based completeness_checker that
+operated on Stage 2 chunks. The V1 logic was based on key-term extraction
+from regex chunks; V3 uses LLM comparison against the full transcript,
+which catches semantic omissions (named pathogens, MCQs, exam signals)
+that grep can't see.
 """
+
+from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass, asdict
+import time
+from dataclasses import dataclass
 
-from src.config import GCP_PROJECT_ID, GCP_LOCATION, CHUNKER_FALLBACK_MODEL, GENERATOR_MODEL
-
-
-# ---------------------------------------------------------------------------
-# General-purpose noise term filter
-# Works across any lecture transcript, not just microbiology
-# ---------------------------------------------------------------------------
-
-# Filler words that start sentence fragments from auto-captions
-_NOISE_PREFIXES = (
-    "so ", "but ", "um ", "uh ", "the ", "and ", "although ",
-    "okay ", "now ", "well ", "like ", "just ", "yeah ", "right ",
-    "basically ", "obviously ", "actually ", "did ", "does ", "do ",
-    "if ", "when ", "where ", "what ", "how ", "why ", "are ", "is ",
+from src.config import (
+    CHUNKER_FALLBACK_MODEL as FLASH_MODEL,
+    GCP_PROJECT_ID,
+    GCP_LOCATION,
+    COMPLETENESS_TIMEOUT_S,
+    call_with_timeout,
 )
-
-# Patterns that indicate a term is a transcript fragment, not real vocabulary
-_NOISE_PATTERNS = re.compile(
-    r"which which|"       # stuttered repetition
-    r"has also|"          # sentence fragment
-    r"virus have|"        # garbled grammar
-    r"virus is\b|"        # "noro virus is" — fragment
-    r"classifi |"         # cut-off word
-    r"the the|"           # repeated article
-    r" a virus$|"         # "um a virus" fragment
-    r"^\w+ \w+ \w+ \w+",  # 4+ words = almost always a fragment
-    re.IGNORECASE,
-)
+from src.generator_v2 import GeneratedSection
 
 
-def _is_noise_term(term: str) -> bool:
-    """Detect whether a 'key term' is actually transcript garbage.
-
-    General-purpose: works across any lecture, not hardcoded to specific terms.
-    Real scientific terms are 1-3 word proper vocabulary.
-    Noise terms are sentence fragments, filler, stutters, or garbled auto-captions.
-    """
-    if not term or len(term) < 3:
-        return True
-
-    # Too many words = sentence fragment
-    if len(term.split()) > 3:
-        return True
-
-    # Starts with filler word
-    if any(term.startswith(p) for p in _NOISE_PREFIXES):
-        return True
-
-    # Matches known garbage patterns
-    if _NOISE_PATTERNS.search(term):
-        return True
-
-    # Contains repeated words ("virus virus", "the the")
-    words = term.split()
-    if len(words) >= 2 and len(set(words)) < len(words):
-        return True
-
-    # All lowercase multi-word terms where every word is a common English word
-    # (real terms have at least one technical/scientific word)
-    _COMMON_WORDS = {
-        "a", "an", "the", "is", "are", "was", "were", "be", "been",
-        "have", "has", "had", "do", "does", "did", "will", "would",
-        "can", "could", "may", "might", "shall", "should", "must",
-        "not", "no", "nor", "but", "and", "or", "so", "if", "then",
-        "also", "just", "only", "very", "most", "some", "all", "both",
-        "it", "its", "they", "them", "we", "our", "you", "your",
-        "this", "that", "these", "those", "here", "there", "now",
-        "what", "which", "who", "how", "when", "where", "why",
-    }
-    if len(words) >= 2 and all(w in _COMMON_WORDS for w in words):
-        return True
-
-    return False
+# ═══════════════════════════════════════════════════════════════════════════
+# Data structures
+# ═══════════════════════════════════════════════════════════════════════════
 
 
 @dataclass
-class MissReport:
-    term: str
-    ci_percent: int
-    source_group: str           # which concept group should have covered this
-    action: str                 # "regeneration_target" or "inline_skip"
-    skip_line: str = ""         # the inline skip text to insert
+class MissedItem:
+    """One piece of content the audit found missing from the generated doc."""
+
+    description: str          # What the prof said that didn't land
+    severity: str             # "high", "medium", "low"
+    section_index: int        # Best-fit section to attach the patch to (0-based)
+    patch_markdown: str       # Ready-to-paste markdown to append
+    reason: str               # Why this matters (or doesn't)
 
 
-def extract_slide_terms(screenshots: list[dict]) -> list[dict]:
-    """Extract key scientific terms from slide descriptions using Gemini Flash.
+@dataclass
+class LectureScore:
+    """Flash's honest assessment of how well the lecture was delivered.
 
-    Catches content on slides but not in the spoken transcript.
-    Uses Flash instead of hardcoded patterns — works for ANY medical discipline.
-    Cost: ~200 tokens for one batched call.
+    Shown to the student as a shareable card at the end of the document — the
+    meme-y "your professor scored X/100" moment that drives classroom sharing.
 
-    Returns list of {"term": str, "source_slide": str, "ci_percent": int}.
+    All four score fields are 0-100 integers. The label maps to a 5-tier scale:
+        0-20:   rough
+        20-40:  ok
+        40-60:  good
+        60-80:  great
+        80-100: excellent
+
+    The comment is Flash's one-line observation specific to this lecture
+    (a real tangent, overemphasis, or bright moment it noticed). Not a
+    hardcoded template — every run gets a unique one.
+
+    time_saved_min is Flash's estimate of how many minutes Klare saved the
+    student vs watching the raw lecture. Flash estimates from transcript
+    word count (~150 wpm speech) minus generated doc word count (~200 wpm
+    reading).
     """
-    if not screenshots:
-        return []
 
-    # Batch all slide descriptions into one Flash call
-    slide_descs = []
-    for ss in screenshots:
-        desc = ss.get("description", "").strip()
-        img = ss.get("image_filename", "unknown")
-        if desc and "black screen" not in desc.lower() and "no visible" not in desc.lower():
-            slide_descs.append(f"Slide {img}: {desc[:200]}")
+    overall: int              # 0-100
+    clarity: int              # 0-100 — were concepts explained well?
+    focus: int                # 0-100 — did the lecture stay on topic?
+    efficiency: int           # 0-100 — signal-to-noise ratio
+    label: str                # rough | ok | good | great | excellent
+    comment: str              # One-line personalised observation
+    time_saved_min: int       # Minutes Klare saved the student
 
-    if not slide_descs:
-        return []
 
-    try:
-        from google import genai
-        import json as _json
+# ═══════════════════════════════════════════════════════════════════════════
+# Checker prompt — written as a creative brief, not a checklist
+# ═══════════════════════════════════════════════════════════════════════════
 
-        prompt = (
-            "From these lecture slide descriptions, extract any medical techniques, "
-            "tests, procedures, lab methods, diagnostic tools, or scientific frameworks "
-            "that a student might need to know for an exam.\n\n"
-            "For each term, estimate its exam importance (0-100).\n\n"
-            "Return ONLY a JSON array:\n"
-            '[{"term": "plaque assay", "ci_percent": 40}, {"term": "RT-PCR", "ci_percent": 40}]\n\n'
-            "SLIDE DESCRIPTIONS:\n" + "\n".join(slide_descs)
+
+def _build_checker_prompt(transcript: str, sections_summary: str) -> str:
+    return f"""\
+You're the final quality gate on a lecture-replacement document. The pipeline
+has already done the heavy lifting — Flash agents extracted topics, a Pro
+coordinator wrote the master plan, and parallel Pro writers produced the
+sections you'll read below. The student is going to use this document instead
+of watching the lecture, so anything exam-critical that didn't make it into
+the output is a future MCQ they fail.
+
+Your job: compare what the professor actually said against what we wrote.
+Find what's missing. Decide which omissions matter.
+
+The patterns that matter most are domain-agnostic — they apply equally to
+medical, engineering, physics, business, or any theory-based lecture:
+
+1. Practice questions the prof literally ran during the lecture. T/F
+   rounds, multiple choice, "who thinks it's A, B, or C?", scenarios the
+   prof asked the class to evaluate. These are direct exam previews. Each
+   one should appear as a callout box in the document.
+
+2. Named entities with applied context — a specific organism, drug,
+   theorem, historical example, real-world case, named experiment, named
+   product, or worked example the prof tied to a concrete consequence.
+   "Bacillus cereus in rice" or "the Me 262 fighter jet" or "rolled vs
+   machined threads" or "the Millikan oil drop experiment" all qualify.
+   These are the concrete hooks students remember and exams test.
+
+3. Memory hooks and exam signals — anything the prof flagged with "you'll
+   need to know this", "remember this", "this is on the exam", "saved
+   exam marks", "watch the trap here", "this trips students up". Direct
+   signals from the person writing the exam.
+
+4. Multi-slide teaching moments where the prof spent significant time
+   (more than ~2 minutes) walking through a comparison, contrast, or
+   worked example with class engagement. If the prof asked the class to
+   pick between two options or vote on a question, that's a sign the
+   topic mattered enough to test.
+
+For each missed item, decide severity:
+
+HIGH — content the prof literally tested in lecture (T/F, MCQ, class poll),
+content the prof spent significant time on with engagement, named entities
+the prof tied to applied context, items the prof verbally flagged as exam
+material. These get patched.
+
+MEDIUM — useful background, prof spent time on it, but not direct exam
+material. These get logged for human review but not auto-patched.
+
+LOW — trivia, asides, prof's personal anecdotes, things he himself said
+were out of scope. Not patched.
+
+For each HIGH-severity item, write a TIGHT markdown patch — 1-2 sentences
+max for facts, or a single blockquote callout for MCQs. No preamble, no
+"it's worth noting that" wind-ups. Match the document's voice: colloquial,
+tutoring, no "the professor said" meta-commentary. Just teach the missed
+fact in the fewest words that work.
+
+For MEDIUM and LOW items, leave patch_markdown as an empty string — they
+won't be applied, no need to write them. Only HIGH items need a patch.
+
+Patch format examples:
+
+For a missed named example:
+"Worth knowing: *Bacillus cereus* is the classic culprit for food poisoning
+in cooked rice and grains. Cooking kills competing bacteria but the
+endospores survive — when the food cools, the spores germinate and the
+bacterium grows uncontested."
+
+For a missed MCQ (use a blockquote callout):
+"> **Quick check.** Which is the only group of prokaryotes that contains
+> N-acetyltalosaminuronic acid in their cell wall?
+> Answer: **Archaea** — it's the defining sugar of pseudomurein."
+
+For a missed mechanism detail:
+"One subtle mechanism worth flagging: when the tetrapeptide chain is first
+synthesized, it's actually a *pentapeptide* with an extra terminal D-alanine.
+That fifth amino acid gets cleaved off during cross-linking — it's the
+chemical lever the cross-link reaction uses."
+
+GENERATED DOCUMENT (what we wrote):
+
+{sections_summary}
+
+PROFESSOR'S RAW TRANSCRIPT:
+
+{transcript}
+
+ALONGSIDE the missed-item audit, give the student a short Lecture Score.
+This is the meme-y summary card students share with classmates at the end
+of the document. It needs to feel honest, specific, and a little funny —
+not clinical.
+
+Score the lecture on three dimensions, each 0-100:
+
+- clarity: were concepts actually explained or just named? Does the prof
+  build from concrete to abstract, or define-first then hope you catch up?
+  Deduct for jargon without setup, mumbled key terms, contradictory
+  statements ("you don't need to memorise this but you need to understand").
+
+- focus: did the lecture stay on topic? Deduct heavily for long history
+  digressions, personal anecdotes unrelated to the concept, tangents that
+  don't loop back. A lecture that spends 12 minutes on the history of
+  penicillin before touching peptidoglycan is a focus score in the 20s.
+
+- efficiency: signal-to-noise ratio — per minute of lecture, how much
+  exam-useful content got delivered? A prof who rambles for an hour to
+  teach what could be said in 20 minutes is ~30 on efficiency.
+
+Compute overall as the simple average of the three, rounded to integer.
+
+Map overall to a label (be honest, most professors land in ok/good):
+  0-20   → "rough"      (genuine train wreck)
+  20-40  → "ok"         (below average, the common case for 'bad prof')
+  40-60  → "good"       (middle of the pack, most lectures)
+  60-80  → "great"      (solid lecturer who builds concepts)
+  80-100 → "excellent"  (rare, watch-this-twice quality)
+
+Write a ONE-LINE comment that's specific to THIS lecture — quote a real
+tangent, overemphasis, or bright moment you noticed. Not "the professor
+rambled" but "spent 12 minutes on the history of penicillin before
+touching peptidoglycan structure." Or "kept switching between 'fimbriae'
+and 'pili' as if they were the same thing." Or on a good lecture:
+"Used the Timmy-buys-oranges framing before naming the function — nice."
+One sentence, under 20 words. No starting with "the professor" — just
+state what happened.
+
+Estimate time_saved_min honestly: transcript word count divided by 150
+(speech pace) minus generated doc word count divided by 200 (reading
+pace), rounded to the nearest integer. If the numbers suggest Klare
+saved negative time (rare — only on very short lectures), return 0.
+
+Output JSON only, this shape:
+{{
+  "missed_items": [
+    {{
+      "description": "Brief description of what was missed",
+      "severity": "high",
+      "section_index": 11,
+      "patch_markdown": "Worth knowing: *Bacillus cereus*...",
+      "reason": "Named pathogen with clinical food-safety context, exam favorite for MCQs"
+    }}
+  ],
+  "lecture_score": {{
+    "overall": 34,
+    "clarity": 28,
+    "focus": 40,
+    "efficiency": 33,
+    "label": "ok",
+    "comment": "Spent 12 minutes on the history of penicillin before touching peptidoglycan structure.",
+    "time_saved_min": 87
+  }}
+}}
+
+Be honest about severity. Patching low-importance trivia bloats the
+document. Missing high-importance content fails the student. Most
+missed items in a typical run will be medium or low — that's expected.
+A typical lecture has 1-4 high-severity misses worth patching.
+
+Be honest about the score too. A "clear" 50-score professor who just
+isn't flashy is more useful signal than scoring everyone 30 for meme
+value. Students compare scores across their subjects."""
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Section summary — what the checker sees of the generated doc
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def _build_sections_summary(sections: list[GeneratedSection]) -> str:
+    """Concatenate sections in a form the checker can scan efficiently.
+
+    We send the full transcript text per section (not a summary) so the
+    checker can verify what's actually covered, not just topic headings.
+    """
+    blocks = []
+    for i, s in enumerate(sections):
+        blocks.append(
+            f"=== Section {i}: {s.group_name} (EI {s.ei_percent}%) ===\n"
+            f"{s.transcript.strip()}"
         )
+    return "\n\n".join(blocks)
 
-        client = genai.Client(
-            vertexai=True, project=GCP_PROJECT_ID, location=GCP_LOCATION
-        )
-        response = client.models.generate_content(
-            model=CHUNKER_FALLBACK_MODEL,
-            contents=prompt,
-            config={"temperature": 0.1, "max_output_tokens": 1024},
-        )
 
-        from src.json_repair import extract_json
-        raw_terms = extract_json(response.text, expect_array=True)
-
-        seen = set()
-        unique = []
-        for t in raw_terms:
-            term = t.get("term", "").strip()
-            key = term.lower()
-            if key and key not in seen and len(term) > 2:
-                seen.add(key)
-                unique.append({
-                    "term": term,
-                    "source_slide": "slides",
-                    "ci_percent": min(100, max(0, int(t.get("ci_percent", 35)))),
-                })
-
-        return unique
-
-    except Exception as e:
-        print(f"  Warning: Flash slide term extraction failed: {e}")
-        return []
+# ═══════════════════════════════════════════════════════════════════════════
+# Main entry point
+# ═══════════════════════════════════════════════════════════════════════════
 
 
 def check_completeness(
-    explanations: list[dict],
-    groups: list,
-    ci_threshold: int = 50,
-    screenshots: list[dict] | None = None,
-) -> list[MissReport]:
-    """Check which key terms from concept groups are missing from output.
+    sections: list[GeneratedSection],
+    transcript: str,
+    apply_patches: bool = True,
+) -> tuple[list[GeneratedSection], list[MissedItem], LectureScore | None]:
+    """Run the completeness check and (optionally) apply HIGH-severity patches.
 
     Args:
-        explanations: list of Explanation dicts (from Stage 2 output)
-        groups: list of ConceptGroup instances
-        ci_threshold: terms with CI% above this → regeneration target, below → inline skip
-        screenshots: optional list of screenshot dicts — extracts slide-only terms
+        sections: The generated document, in reading order.
+        transcript: The full professor transcript.
+        apply_patches: If True, append patch_markdown to matching sections in-place.
 
     Returns:
-        List of MissReport for each missing term.
+        (updated_sections, missed_items, lecture_score)
+        missed_items includes ALL severities for logging — only HIGH ones
+        get patched into the sections.
+        lecture_score is None if Flash failed or skipped the scoring block.
     """
-    # Build the full output text (all explanations concatenated)
-    full_text = " ".join(
-        e.get("explanation_text", "") for e in explanations
-        if not e.get("was_skipped", False)
-    ).lower()
+    if not sections:
+        return sections, [], None
 
-    misses = []
-
-    # --- Check key terms from concept groups ---
-    for group in groups:
-        # Skip groups that were skipped (their terms are intentionally absent)
-        if group.action == "skip":
-            continue
-
-        for term in group.key_terms:
-            term_lower = term.lower().strip()
-            if _is_noise_term(term_lower):
-                continue
-
-            # Check for the term in the output
-            # Use word boundary matching to avoid false positives
-            # But also check without boundaries for compound terms
-            found = False
-
-            # Exact match
-            if term_lower in full_text:
-                found = True
-
-            # Try without hyphens/spaces for compound terms
-            if not found:
-                normalized = re.sub(r'[\s-]+', '', term_lower)
-                if len(normalized) > 4 and normalized in re.sub(r'[\s-]+', '', full_text):
-                    found = True
-
-            if not found:
-                ci = group.ci_percent
-                if ci > ci_threshold:
-                    misses.append(MissReport(
-                        term=term,
-                        ci_percent=ci,
-                        source_group=group.group_name,
-                        action="regeneration_target",
-                    ))
-                else:
-                    skip_line = f"**{term}** — mentioned in lecture, low priority (CI% {ci}%). Expand?"
-                    misses.append(MissReport(
-                        term=term,
-                        ci_percent=ci,
-                        source_group=group.group_name,
-                        action="inline_skip",
-                        skip_line=skip_line,
-                    ))
-
-    # --- Check slide-only terms (content on slides but not in transcript) ---
-    if screenshots:
-        slide_terms = extract_slide_terms(screenshots)
-        for st in slide_terms:
-            term_lower = st["term"].lower()
-            found = term_lower in full_text
-            if not found:
-                normalized = re.sub(r'[\s-]+', '', term_lower)
-                if len(normalized) > 3 and normalized in re.sub(r'[\s-]+', '', full_text):
-                    found = True
-            if not found:
-                ci = st["ci_percent"]
-                skip_line = (
-                    f"**{st['term']}** 🟡 — shown on lecture slide but not covered above. "
-                    f"Low priority (CI% {ci}%). Expand?"
-                )
-                misses.append(MissReport(
-                    term=st["term"],
-                    ci_percent=ci,
-                    source_group=f"Slide: {st['source_slide']}",
-                    action="inline_skip",
-                    skip_line=skip_line,
-                ))
-
-    return misses
-
-
-def format_report(misses: list[MissReport]) -> str:
-    """Format the miss report as human-readable text."""
-    if not misses:
-        return "All key terms covered. No misses detected."
-
-    regen = [m for m in misses if m.action == "regeneration_target"]
-    skips = [m for m in misses if m.action == "inline_skip"]
-
-    lines = [f"Completeness Check: {len(misses)} terms missing\n"]
-
-    if regen:
-        lines.append(f"REGENERATION TARGETS ({len(regen)} high-priority misses):")
-        for m in sorted(regen, key=lambda x: -x.ci_percent):
-            lines.append(f"  - {m.term} (CI% {m.ci_percent}%) — should be in: {m.source_group}")
-
-    if skips:
-        lines.append(f"\nINLINE SKIPS ({len(skips)} low-priority misses):")
-        for m in sorted(skips, key=lambda x: -x.ci_percent):
-            lines.append(f"  - {m.skip_line}")
-
-    return "\n".join(lines)
-
-
-def save_report(misses: list[MissReport], output_path: str):
-    """Save miss report to JSON."""
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump([asdict(m) for m in misses], f, indent=2, ensure_ascii=False)
-    print(f"Saved completeness report ({len(misses)} misses) to {output_path}")
-
-
-# ---------------------------------------------------------------------------
-# Auto-fix: patch high-CI% misses via targeted LLM follow-up
-# ---------------------------------------------------------------------------
-
-PATCH_PROMPT = """The following exam-testable terms were described conceptually in a student explanation but the actual scientific vocabulary was never used. The student needs these exact terms for their exam.
-
-MISSING TERMS: {terms}
-
-CURRENT EXPLANATION TEXT:
-\"\"\"
-{explanation_text}
-\"\"\"
-
-For each missing term, find the sentence where the concept is already described and insert the bolded term naturally. For example, if "budding" is missing and the text says "it pushes its way out, wrapping itself in host membrane," change it to "it pushes its way out in a process called **budding**, wrapping itself in host membrane." Or if "depolarization" is missing and the text says "sodium rushes into the cell and the voltage shoots up," change it to "sodium rushes into the cell, causing **depolarization** — the voltage shoots up."
-
-Return ONLY the updated explanation text. Do not add new content — just insert the missing term names at the right points. Keep everything else identical."""
-
-
-def patch_regeneration_targets(
-    explanations: list[dict],
-    misses: list[MissReport],
-    groups: list,
-) -> list[dict]:
-    """Patch high-CI% missing terms into explanations via targeted LLM calls.
-
-    Groups regeneration targets by their source group, then sends one
-    targeted follow-up prompt per affected explanation.
-
-    Returns updated explanations list.
-    """
-    regen_misses = [m for m in misses if m.action == "regeneration_target"]
-    if not regen_misses:
-        return explanations
-
-    # Group misses by source_group
-    by_group: dict[str, list[str]] = {}
-    for m in regen_misses:
-        by_group.setdefault(m.source_group, []).append(m.term)
-
-    # Filter to real terms (skip transcript garbage)
-    # Use general-purpose noise filter
+    print(f"  [completeness] Checking {len(sections)} sections "
+          f"against {len(transcript.split())}w transcript...")
+    t0 = time.time()
 
     from google import genai
-    client = genai.Client(vertexai=True, project=GCP_PROJECT_ID, location=GCP_LOCATION)
+    client = genai.Client(
+        vertexai=True, project=GCP_PROJECT_ID, location=GCP_LOCATION
+    )
+    sections_summary = _build_sections_summary(sections)
+    prompt = _build_checker_prompt(transcript, sections_summary)
 
-    for group_name, terms in by_group.items():
-        # Filter noise
-        real_terms = [t for t in terms if not _is_noise_term(t.lower())]
-        if not real_terms:
-            continue
-
-        # Find the matching explanation
-        expl = None
-        for e in explanations:
-            if e.get("topic_name") == group_name and not e.get("was_skipped"):
-                expl = e
-                break
-
-        if not expl or not expl.get("explanation_text"):
-            continue
-
-        print(f"  Patching {len(real_terms)} terms into: {group_name}")
-        print(f"    Terms: {', '.join(real_terms)}")
-
-        prompt = PATCH_PROMPT.format(
-            terms=", ".join(real_terms),
-            explanation_text=expl["explanation_text"],
-        )
-
-        try:
-            response = client.models.generate_content(
-                model=CHUNKER_FALLBACK_MODEL,
+    try:
+        from google.genai import types as genai_types
+        response = call_with_timeout(
+            lambda: client.models.generate_content(
+                model=FLASH_MODEL,
                 contents=prompt,
-                config={"temperature": 0.2, "max_output_tokens": 8192},
-            )
-            patched_text = response.text.strip()
+                config={
+                    "temperature": 0.2,
+                    # 8k output gives room for 4-8 patches even when thinking
+                    # tokens (which count separately on Gemini 3 Flash) eat
+                    # into the budget. Real-world cost still under $0.05.
+                    "max_output_tokens": 8192,
+                    # Cap thinking so output has room. Without this cap,
+                    # Flash sometimes burns 5k+ thinking tokens and only
+                    # has 3k left for the actual JSON, hitting MAX_TOKENS
+                    # mid-array.
+                    "thinking_config": genai_types.ThinkingConfig(thinking_budget=2048),
+                },
+            ),
+            timeout=COMPLETENESS_TIMEOUT_S,
+            label="completeness.check",
+        )
+        raw = (response.text or "").strip()
+        if not raw:
+            # Empty response — Flash returned no content (rate limit, content
+            # filter, or the model returned no candidates). Skip cleanly.
+            print(f"  [completeness] Empty response from Flash — skipping check")
+            return sections, [], None
+    except Exception as e:
+        print(f"  [completeness] Flash call failed: {e} — skipping check")
+        return sections, [], None
 
-            # Verify the patch actually contains the terms
-            patched_lower = patched_text.lower()
-            terms_found = sum(1 for t in real_terms if t.lower() in patched_lower)
-            if terms_found >= len(real_terms) * 0.5:  # at least half the terms made it
-                expl["explanation_text"] = patched_text
-                expl["word_count"] = len(patched_text.split())
-                print(f"    Patched: {terms_found}/{len(real_terms)} terms inserted")
-            else:
-                print(f"    Patch rejected: only {terms_found}/{len(real_terms)} terms found in output")
-        except Exception as e:
-            print(f"    Patch failed: {e}")
+    # Parse JSON (handle markdown wrappers + trailing commas + truncation)
+    cleaned = re.sub(r"```(?:json)?\s*", "", raw).strip()
+    cleaned = re.sub(r"```\s*$", "", cleaned).strip()
+    try:
+        data = json.loads(cleaned)
+    except json.JSONDecodeError:
+        # Try lenient regex + trailing-comma fix
+        match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+        if match:
+            try:
+                data = json.loads(re.sub(r",\s*([}\]])", r"\1", match.group(0)))
+            except json.JSONDecodeError:
+                data = None
+        else:
+            data = None
 
-    return explanations
+        # Last-resort fallback: json_repair handles truncation + bad escapes
+        if data is None:
+            try:
+                from src.json_repair import extract_json
+                data = extract_json(cleaned, expect_array=False)
+                if not data:
+                    print(f"  [completeness] All JSON parsers failed — skipping check")
+                    print(f"  [completeness] Raw (first 300): {raw[:300]}")
+                    return sections, [], None
+            except Exception as e:
+                print(f"  [completeness] JSON repair failed: {e} — skipping check")
+                return sections, [], None
 
-
-# ---------------------------------------------------------------------------
-# Auto-fix: insert inline skip-lines for low-CI% misses
-# ---------------------------------------------------------------------------
-
-def insert_inline_skips(
-    explanations: list[dict],
-    misses: list[MissReport],
-    groups: list,
-) -> list[dict]:
-    """Insert inline skip-lines for low-CI% missing terms.
-
-    Appends skip-lines at the end of the relevant explanation section.
-
-    Returns updated explanations list.
-    """
-    skip_misses = [m for m in misses if m.action == "inline_skip"]
-    if not skip_misses:
-        return explanations
-
-    # Filter noise
-    noise_patterns = ("which which", "has also", "virus have", "virus is",
-                      "classifi ", "the the", "a virus", "so generally")
-    real_skips = [m for m in skip_misses
-                  if not any(n in m.term.lower() for n in noise_patterns)
-                  and len(m.term.split()) <= 3
-                  and len(m.term) >= 3]
-
-    if not real_skips:
-        return explanations
-
-    # Group by source_group
-    by_group: dict[str, list[MissReport]] = {}
-    for m in real_skips:
-        by_group.setdefault(m.source_group, []).append(m)
-
-    for group_name, group_misses in by_group.items():
-        # Find the matching explanation
-        expl = None
-        for e in explanations:
-            if e.get("topic_name") == group_name and not e.get("was_skipped"):
-                expl = e
-                break
-
-        if not expl or not expl.get("explanation_text"):
+    raw_items = data.get("missed_items", [])
+    missed: list[MissedItem] = []
+    for item in raw_items:
+        try:
+            missed.append(MissedItem(
+                description=item.get("description", "").strip(),
+                severity=item.get("severity", "low").strip().lower(),
+                section_index=int(item.get("section_index", 0)),
+                patch_markdown=item.get("patch_markdown", "").strip(),
+                reason=item.get("reason", "").strip(),
+            ))
+        except (TypeError, ValueError):
             continue
 
-        # Build skip-lines block
-        skip_lines = []
-        for m in group_misses:
-            skip_lines.append(f"🟡 **{m.term}** — mentioned in lecture, low priority (CI% {m.ci_percent}%). Expand?")
+    high = [m for m in missed if m.severity == "high"]
+    med = [m for m in missed if m.severity == "medium"]
+    low = [m for m in missed if m.severity == "low"]
 
-        skip_block = "\n\n> **Also mentioned in this lecture section:**\n> " + "\n> ".join(skip_lines)
+    elapsed = time.time() - t0
+    print(f"  [completeness] {len(missed)} items found in {elapsed:.0f}s "
+          f"({len(high)} high, {len(med)} medium, {len(low)} low)")
 
-        expl["explanation_text"] = expl["explanation_text"].rstrip() + skip_block
-        expl["word_count"] = len(expl["explanation_text"].split())
-        print(f"  Inserted {len(group_misses)} inline skip-lines into: {group_name}")
+    # Apply HIGH-severity patches only (Strategy A)
+    if apply_patches and high:
+        for m in high:
+            if 0 <= m.section_index < len(sections) and m.patch_markdown:
+                target = sections[m.section_index]
+                target.transcript = (
+                    target.transcript.rstrip()
+                    + "\n\n"
+                    + m.patch_markdown.strip()
+                    + "\n"
+                )
+                print(f"  [completeness] patched section {m.section_index} "
+                      f"({target.group_name[:40]}): {m.description[:60]}")
 
-    # Handle slide-sourced misses (content on slides but not in transcript)
-    slide_skips = [m for m in real_skips if m.source_group.startswith("Slide:")]
-    if slide_skips:
-        # Append to the LAST non-skipped explanation
-        last_expl = None
-        for e in reversed(explanations):
-            if not e.get("was_skipped") and e.get("explanation_text"):
-                last_expl = e
-                break
+    # Log medium/low for human review (don't auto-apply)
+    if med:
+        print(f"  [completeness] {len(med)} medium-severity items NOT patched "
+              f"(logged for review):")
+        for m in med[:5]:
+            print(f"    - section {m.section_index}: {m.description[:80]}")
 
-        if last_expl:
-            slide_lines = [m.skip_line for m in slide_skips]
-            slide_block = "\n\n> **Also shown on lecture slides:**\n> " + "\n> ".join(slide_lines)
-            last_expl["explanation_text"] = last_expl["explanation_text"].rstrip() + slide_block
-            last_expl["word_count"] = len(last_expl["explanation_text"].split())
-            print(f"  Inserted {len(slide_skips)} slide-term skip-lines at end")
+    # Parse lecture_score (optional — Flash might skip it if prompt truncated)
+    lecture_score: LectureScore | None = None
+    raw_score = data.get("lecture_score")
+    if isinstance(raw_score, dict):
+        try:
+            overall = int(raw_score.get("overall", 0))
+            # Derive label from overall if Flash didn't return one or returned
+            # something outside our 5-tier scale (trust the number over the word)
+            valid_labels = {"rough", "ok", "good", "great", "excellent"}
+            flash_label = str(raw_score.get("label", "")).strip().lower()
+            if flash_label not in valid_labels:
+                if overall < 20:
+                    flash_label = "rough"
+                elif overall < 40:
+                    flash_label = "ok"
+                elif overall < 60:
+                    flash_label = "good"
+                elif overall < 80:
+                    flash_label = "great"
+                else:
+                    flash_label = "excellent"
 
-    return explanations
+            lecture_score = LectureScore(
+                overall=max(0, min(100, overall)),
+                clarity=max(0, min(100, int(raw_score.get("clarity", 0)))),
+                focus=max(0, min(100, int(raw_score.get("focus", 0)))),
+                efficiency=max(0, min(100, int(raw_score.get("efficiency", 0)))),
+                label=flash_label,
+                comment=str(raw_score.get("comment", "")).strip()[:200],
+                time_saved_min=max(0, int(raw_score.get("time_saved_min", 0))),
+            )
+            print(f"  [completeness] lecture_score: {lecture_score.overall}/100 "
+                  f"({lecture_score.label}) — {lecture_score.comment[:60]}")
+        except (TypeError, ValueError) as e:
+            print(f"  [completeness] lecture_score parse failed: {e} — skipping score")
+
+    return sections, missed, lecture_score
 
 
-def auto_fix(
-    explanations: list[dict],
-    groups: list,
-    ci_threshold: int = 50,
-    screenshots: list[dict] | None = None,
-) -> tuple[list[dict], list[MissReport]]:
-    """Run completeness check and auto-fix both high and low CI% misses.
+# ═══════════════════════════════════════════════════════════════════════════
+# Debug helper — save full audit to disk
+# ═══════════════════════════════════════════════════════════════════════════
 
-    Returns (updated_explanations, miss_report).
-    """
-    misses = check_completeness(explanations, groups, ci_threshold,
-                                screenshots=screenshots)
-    if not misses:
-        print("Completeness check: all terms covered.")
-        return explanations, misses
 
-    print(format_report(misses))
-
-    # Report high-CI% misses (patching disabled — too destructive, fixes should be in the prompt)
-    regen = [m for m in misses if m.action == "regeneration_target"]
-    if regen:
-        print(f"\n{len(regen)} high-CI% terms missing (will be caught by Stage 3 evaluator):"
-              f"\n  " + ", ".join(m.term for m in regen))
-
-    # Insert inline skips for low-CI% misses
-    skips = [m for m in misses if m.action == "inline_skip"]
-    if skips:
-        print(f"\nInserting {len(skips)} inline skip-lines...")
-        explanations = insert_inline_skips(explanations, misses, groups)
-
-    return explanations, misses
+def save_audit_log(missed: list[MissedItem], output_path) -> None:
+    """Persist the full audit (all severities) to disk for the dev log."""
+    payload = {
+        "summary": {
+            "total": len(missed),
+            "high": sum(1 for m in missed if m.severity == "high"),
+            "medium": sum(1 for m in missed if m.severity == "medium"),
+            "low": sum(1 for m in missed if m.severity == "low"),
+        },
+        "items": [
+            {
+                "severity": m.severity,
+                "section_index": m.section_index,
+                "description": m.description,
+                "reason": m.reason,
+                "patch_markdown": m.patch_markdown,
+            }
+            for m in missed
+        ],
+    }
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2, ensure_ascii=False)

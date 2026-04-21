@@ -116,6 +116,7 @@ export interface PipelineEvent {
     transcript: { slide_number: number; title: string; narrative: string; ei_percent: number; ei_reasoning: string }[];
     concept_groups: unknown[];
     verification_report: unknown[];
+    lecture_score?: import("./types").LectureScore | null;
   } | null;
   section?: StreamedSection | null;
 }

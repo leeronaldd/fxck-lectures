@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { toast } from "sonner";
-import { ConceptGroup, VerificationClaim, TrustStats } from "./types";
+import { ConceptGroup, VerificationClaim, TrustStats, LectureScore } from "./types";
 import { computeTrustStats } from "./data";
 import { uploadFile, uploadSlides, runPipeline, fetchSessions, fetchSession, createSession as apiCreateSession } from "./api";
 import type { PipelineEvent, StreamedSection } from "./api";
@@ -117,7 +117,9 @@ interface AppState {
   markdown: string;
   groups: ConceptGroup[];
   trustStats: TrustStats;
+  lectureScore: LectureScore | null;
   setOutput: (md: string, groups: ConceptGroup[], claims: VerificationClaim[]) => void;
+  setLectureScore: (score: LectureScore | null) => void;
 
   // Settings
   settings: AppSettings;
@@ -216,6 +218,10 @@ export const useAppStore = create<AppState>()(persist((set, get) => {
   },
   loadSession: async (sessionId: string) => {
     set({ activeSessionId: sessionId });
+    // Clear any stale lecture score from the previously-viewed session.
+    // Scores aren't persisted server-side yet, so they only exist in-memory
+    // for runs completed in the current browser tab.
+    get().setLectureScore(null);
     const data = await fetchSession(sessionId);
     if (data) {
       get().setOutput(
@@ -457,6 +463,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => {
                 (output.concept_groups || []) as ConceptGroup[],
                 (output.verification_report || []) as VerificationClaim[],
               );
+              get().setLectureScore((output.lecture_score ?? null) as LectureScore | null);
             }
 
             await get().loadSessions();
@@ -547,12 +554,14 @@ export const useAppStore = create<AppState>()(persist((set, get) => {
   markdown: "",
   groups: [],
   trustStats: { totalClaims: 0, correctClaims: 0, verifiedPercent: 0 },
+  lectureScore: null,
   setOutput: (md, groups, claims) =>
     set({
       markdown: md,
       groups,
       trustStats: computeTrustStats(claims),
     }),
+  setLectureScore: (score) => set({ lectureScore: score }),
 
   // Settings
   settings: { ...DEFAULT_SETTINGS },
@@ -571,6 +580,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => {
       markdown: "",
       groups: [],
       trustStats: { totalClaims: 0, correctClaims: 0, verifiedPercent: 0 },
+      lectureScore: null,
     });
   },
   });

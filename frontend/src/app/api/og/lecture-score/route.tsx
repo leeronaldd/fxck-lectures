@@ -7,9 +7,30 @@ function clamp(n: number, min = 0, max = 100) {
   return Math.max(min, Math.min(max, n));
 }
 
-function barColor(value: number) {
+// 5-tier colour scale — must match LectureScoreCard.LABEL_COLORS
+const LABEL_COLORS = {
+  rough: "#ef4444",
+  ok: "#f97316",
+  good: "#eab308",
+  great: "#84cc16",
+  excellent: "#22c55e",
+} as const;
+
+type Label = keyof typeof LABEL_COLORS;
+
+function labelForScore(overall: number): Label {
+  if (overall < 20) return "rough";
+  if (overall < 40) return "ok";
+  if (overall < 60) return "good";
+  if (overall < 80) return "great";
+  return "excellent";
+}
+
+function barColor(value: number): string {
   if (value < 30) return "#ef4444";
   if (value < 50) return "#f97316";
+  if (value < 70) return "#eab308";
+  if (value < 85) return "#84cc16";
   return "#22c55e";
 }
 
@@ -20,24 +41,21 @@ export async function GET(req: NextRequest) {
   const clarity = clamp(parseInt(searchParams.get("clarity") || "30"));
   const focus = clamp(parseInt(searchParams.get("focus") || "40"));
   const efficiency = clamp(parseInt(searchParams.get("efficiency") || "28"));
-  const roast =
-    searchParams.get("roast") ||
+  const comment =
+    searchParams.get("comment") ||
+    searchParams.get("roast") || // legacy param name
     "Spent 20 minutes on a concept worth 2 sentences.";
-  const sessionName =
-    searchParams.get("name") || "Microbiology Lecture 3";
+  const sessionName = searchParams.get("name") || "Lecture 3";
+  const timeSaved = parseInt(searchParams.get("time_saved") || "0");
 
-  const label =
-    overall < 25
-      ? "Train wreck"
-      : overall < 40
-      ? "Rough"
-      : overall < 55
-      ? "Needs work"
-      : "Passable";
+  // Trust URL label if valid, else derive from overall
+  const rawLabel = (searchParams.get("label") || "").toLowerCase() as Label;
+  const label: Label =
+    rawLabel in LABEL_COLORS ? rawLabel : labelForScore(overall);
 
-  const overallColor = overall < 40 ? "#ef4444" : "#f97316";
+  const overallColor = LABEL_COLORS[label];
 
-  const Bar = ({ label, value }: { label: string; value: number }) => (
+  const Bar = ({ name, value }: { name: string; value: number }) => (
     <div
       style={{
         display: "flex",
@@ -47,7 +65,7 @@ export async function GET(req: NextRequest) {
       }}
     >
       <div style={{ display: "flex", fontSize: 22, color: "#9ca3af", width: 150 }}>
-        {label}
+        {name}
       </div>
       <div
         style={{
@@ -117,15 +135,9 @@ export async function GET(req: NextRequest) {
                 marginBottom: 2,
               }}
             >
-              Professor Clarity Score
+              Lecture Score
             </div>
-            <div
-              style={{
-                display: "flex",
-                fontSize: 16,
-                color: "#6b7280",
-              }}
-            >
+            <div style={{ display: "flex", fontSize: 16, color: "#6b7280" }}>
               {sessionName}
             </div>
           </div>
@@ -148,7 +160,14 @@ export async function GET(req: NextRequest) {
                 background: "#ff6b35",
               }}
             />
-            <div style={{ display: "flex", fontSize: 18, color: "#ff6b35", fontWeight: 600 }}>
+            <div
+              style={{
+                display: "flex",
+                fontSize: 18,
+                color: "#ff6b35",
+                fontWeight: 600,
+              }}
+            >
               Klare
             </div>
           </div>
@@ -183,10 +202,11 @@ export async function GET(req: NextRequest) {
           <div
             style={{
               display: "flex",
-              fontSize: 22,
-              color: "#9ca3af",
+              fontSize: 24,
+              color: overallColor,
               marginTop: 6,
-              fontStyle: "italic",
+              textTransform: "capitalize",
+              fontWeight: 600,
             }}
           >
             {label}
@@ -202,12 +222,12 @@ export async function GET(req: NextRequest) {
             marginBottom: 22,
           }}
         >
-          <Bar label="Clarity" value={clarity} />
-          <Bar label="Focus" value={focus} />
-          <Bar label="Efficiency" value={efficiency} />
+          <Bar name="Clarity" value={clarity} />
+          <Bar name="Focus" value={focus} />
+          <Bar name="Efficiency" value={efficiency} />
         </div>
 
-        {/* Roast line */}
+        {/* Comment */}
         <div
           style={{
             display: "flex",
@@ -216,12 +236,12 @@ export async function GET(req: NextRequest) {
             fontStyle: "italic",
             padding: "16px 22px",
             background: "rgba(0, 0, 0, 0.3)",
-            borderLeft: "4px solid rgba(239, 68, 68, 0.6)",
+            borderLeft: `4px solid ${overallColor}99`,
             borderRadius: "0 10px 10px 0",
             lineHeight: 1.3,
           }}
         >
-          {`“${roast}”`}
+          {`“${comment}”`}
         </div>
 
         {/* Footer */}
@@ -235,7 +255,7 @@ export async function GET(req: NextRequest) {
           }}
         >
           <div style={{ display: "flex", fontSize: 20, color: "#6b7280" }}>
-            Survived with Klare
+            {timeSaved > 0 ? `Klare saved ~${timeSaved} min` : "Survived with Klare"}
           </div>
           <div
             style={{

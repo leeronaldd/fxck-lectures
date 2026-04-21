@@ -48,3 +48,19 @@ export interface TranscriptSection {
   ei_percent: number;
   ei_reasoning: string;
 }
+
+// Flash's honest assessment of the lecture — shown as a shareable card at
+// the end of the reader. Produced by the completeness checker (one Flash
+// call does both missed-item audit + score). null when Flash failed or
+// when an older session's payload doesn't have the field.
+export type LectureScoreLabel = "rough" | "ok" | "good" | "great" | "excellent";
+
+export interface LectureScore {
+  overall: number;           // 0-100
+  clarity: number;           // 0-100
+  focus: number;             // 0-100
+  efficiency: number;        // 0-100
+  label: LectureScoreLabel;
+  comment: string;           // One-line personalised observation
+  time_saved_min: number;    // Minutes Klare saved the student
+}
