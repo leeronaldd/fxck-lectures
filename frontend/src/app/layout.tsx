@@ -16,8 +16,24 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Klare — Transform Your Lectures",
-  description: "Replace a 2 hour lecture with a 15 minute read",
+  title: "Fxck Lectures — Replace Bad Professors with a 20-Min Read",
+  description:
+    "Turns that one bad professor's 2-hour lecture into a 20-minute read that actually makes sense. Textbook-verified, exam-aware, and free to try.",
+  metadataBase: new URL("https://klareai.com"),
+  openGraph: {
+    title: "Fxck Lectures — Replace Bad Professors with a 20-Min Read",
+    description:
+      "Turns that one bad professor's 2-hour lecture into a 20-minute read that actually makes sense. Textbook-verified, exam-aware, and free to try.",
+    url: "https://klareai.com",
+    siteName: "Klare",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Fxck Lectures — Replace Bad Professors with a 20-Min Read",
+    description:
+      "Turns that one bad professor's 2-hour lecture into a 20-minute read that actually makes sense. Free to try.",
+  },
 };
 
 export default function RootLayout({
