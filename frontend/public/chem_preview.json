@@ -1,0 +1,570 @@
+{
+  "slides": [
+    {
+      "slide_id": "2",
+      "title": "Continuous vs. Line Spectra",
+      "card_type": "professor_slide",
+      "image_ref": "/preview-screenshots/screenshot_002.png",
+      "bullet_points": [
+        "White light separates into a continuous rainbow of colors.",
+        "Heated elements emit light only at specific, discrete wavelengths.",
+        "Each element has a unique 'fingerprint' of light."
+      ],
+      "exam_tip": "Remember that white light is continuous, but atomic emission spectra are discrete lines.",
+      "ei_percent": 80
+    },
+    {
+      "slide_id": "3",
+      "title": "Atomic Fingerprints",
+      "card_type": "professor_slide",
+      "image_ref": "/preview-screenshots/screenshot_003.png",
+      "bullet_points": [
+        "Hydrogen gas emits four distinct visible bands of light.",
+        "Helium emits a completely different pattern.",
+        "Discrete emission implies electrons operate in restricted energy states."
+      ],
+      "exam_tip": "If an exam asks how we identify gases in space, it's by reading these unique emission spectra.",
+      "ei_percent": 85
+    },
+    {
+      "slide_id": "4",
+      "title": "The Speed of Light",
+      "card_type": "professor_slide",
+      "image_ref": "/preview-screenshots/screenshot_004.png",
+      "bullet_points": [
+        "Light travels as an electromagnetic wave.",
+        "Speed of light ($c$) in a vacuum is a constant $3.0 \\times 10^8$ m/s.",
+        "Speed = wavelength ($\\lambda$) $\\times$ frequency ($\\nu$)."
+      ],
+      "exam_tip": "If you know wavelength, you can always calculate frequency using $c = \\lambda\\nu$.",
+      "ei_percent": 90
+    },
+    {
+      "slide_id": "5",
+      "title": "The Electromagnetic Spectrum",
+      "card_type": "professor_slide",
+      "image_ref": "/preview-screenshots/screenshot_005.png",
+      "bullet_points": [
+        "Visible light is a tiny fraction of the electromagnetic spectrum.",
+        "Long wavelength means low frequency.",
+        "Short wavelength means high frequency."
+      ],
+      "exam_tip": "Wavelength and frequency are inversely proportional—as one goes up, the other goes down.",
+      "ei_percent": 80
+    },
+    {
+      "slide_id": "6",
+      "title": "Energy in Quanta",
+      "card_type": "professor_slide",
+      "image_ref": "/preview-screenshots/screenshot_006.png",
+      "bullet_points": [
+        "Matter absorbs and emits energy in discrete chunks called quanta.",
+        "Energy ($E$) is directly proportional to frequency ($\\nu$).",
+        "Planck's constant ($h$) links the two: $E = h\\nu$."
+      ],
+      "exam_tip": "High frequency light (like UV) inherently carries more energy per photon than low frequency light (like red).",
+      "ei_percent": 95
+    },
+    {
+      "slide_id": "7",
+      "title": "The Photoelectric Effect",
+      "card_type": "professor_slide",
+      "image_ref": "/preview-screenshots/screenshot_007.png",
+      "bullet_points": [
+        "Light behaves as both a wave and a particle (photon).",
+        "Low frequency light (red, IR) has low energy.",
+        "High frequency light (blue, UV, X-ray) has high energy."
+      ],
+      "exam_tip": "Einstein proved that light energy comes in indivisible packets; you can't have half a photon.",
+      "ei_percent": 85
+    },
+    {
+      "slide_id": "8",
+      "title": "Bohr's Discretized Atom",
+      "card_type": "professor_slide",
+      "image_ref": "/preview-screenshots/screenshot_008.png",
+      "bullet_points": [
+        "Electrons occupy discrete, allowed orbitals around the nucleus.",
+        "Energy is not radiated continuously while an electron stays in its orbit.",
+        "Energy is only absorbed or emitted when moving between orbits."
+      ],
+      "exam_tip": "Bohr's model explains why we see line spectra instead of a continuous rainbow from heated atoms.",
+      "ei_percent": 90
+    },
+    {
+      "slide_id": "9",
+      "title": "Concentric Shells",
+      "card_type": "professor_slide",
+      "image_ref": "/preview-screenshots/screenshot_009.png",
+      "bullet_points": [
+        "Each orbit (shell) represents a specific energy level.",
+        "Shells further from the nucleus have higher potential energy.",
+        "Electrons cannot exist in the space between shells."
+      ],
+      "exam_tip": "Think of shells like stairs—you can stand on step 1 or step 2, but not step 1.5.",
+      "ei_percent": 85
+    },
+    {
+      "slide_id": "14",
+      "title": "Excitation and Emission",
+      "card_type": "professor_slide",
+      "image_ref": "/preview-screenshots/screenshot_014.png",
+      "bullet_points": [
+        "Incoming energy promotes an electron to a higher shell.",
+        "The excited state is temporary and unstable.",
+        "When the electron falls back, it emits a specific wavelength of light."
+      ],
+      "exam_tip": "The energy of the emitted photon perfectly matches the energy gap between the two shells.",
+      "ei_percent": 85
+    },
+    {
+      "slide_id": "16",
+      "title": "Quantized Energy Jumps",
+      "card_type": "professor_slide",
+      "image_ref": "/preview-screenshots/screenshot_016.png",
+      "bullet_points": [
+        "The ground state is the lowest possible energy level ($n=1$).",
+        "Jumping from $n=1$ to $n=4$ absorbs a large photon.",
+        "Falling from $n=4$ to $n=2$ emits a smaller photon."
+      ],
+      "exam_tip": "Energy in must exactly equal energy out, even if the electron falls back in multiple smaller steps.",
+      "ei_percent": 90
+    },
+    {
+      "slide_id": "17",
+      "title": "The Limits of Bohr",
+      "card_type": "professor_slide",
+      "image_ref": "/preview-screenshots/screenshot_017.png",
+      "bullet_points": [
+        "Bohr's math perfectly predicted the hydrogen line spectrum.",
+        "It failed for any element with more than one electron.",
+        "Electrons repel each other, breaking the simple concentric circle model."
+      ],
+      "exam_tip": "If a question asks for the main flaw of the Bohr model, it's that it only accurately describes single-electron systems.",
+      "ei_percent": 80
+    },
+    {
+      "slide_id": "18",
+      "title": "Matter Waves",
+      "card_type": "professor_slide",
+      "image_ref": "/preview-screenshots/screenshot_018.png",
+      "bullet_points": [
+        "De Broglie proposed that electrons behave as waves, not just particles.",
+        "All matter has a wavelength, depending on its mass and velocity.",
+        "This helps explain how multiple electrons avoid crashing into each other."
+      ],
+      "exam_tip": "You don't need to calculate De Broglie's equation, just know that electrons exhibit wave-particle duality.",
+      "ei_percent": 75
+    },
+    {
+      "slide_id": "19",
+      "title": "The Uncertainty Principle",
+      "card_type": "professor_slide",
+      "image_ref": "/preview-screenshots/screenshot_019.png",
+      "bullet_points": [
+        "We cannot simultaneously know an electron's exact location and momentum.",
+        "Because electrons are constantly moving waves, pinning them down is impossible.",
+        "We must rely on probabilities, not fixed tracks."
+      ],
+      "exam_tip": "Heisenberg means we talk about where an electron is *likely* to be, rather than exactly where it is.",
+      "ei_percent": 80
+    },
+    {
+      "slide_id": "22",
+      "title": "Electrons as Standing Waves",
+      "card_type": "professor_slide",
+      "image_ref": "/preview-screenshots/screenshot_022.png",
+      "bullet_points": [
+        "Electrons don't orbit like planets; they vibrate like guitar strings.",
+        "They form 3D standing waves around the nucleus.",
+        "These waves occupy discrete, quantized energy levels."
+      ],
+      "exam_tip": "The standing wave model allows multiple negative electrons to share space around a nucleus without catastrophic repulsion.",
+      "ei_percent": 85
+    },
+    {
+      "slide_id": "27",
+      "title": "Visualizing the Wave",
+      "card_type": "professor_slide",
+      "image_ref": "/preview-screenshots/screenshot_027.png",
+      "bullet_points": [
+        "A standing wave must connect back on itself perfectly.",
+        "Different electrons form different wave patterns in 3D space.",
+        "These distinct patterns are what we call atomic orbitals."
+      ],
+      "exam_tip": "Orbitals aren't physical boxes; they are 3D regions where an electron's wave is allowed to exist.",
+      "ei_percent": 75
+    },
+    {
+      "slide_id": "29",
+      "title": "Schrödinger's Equation",
+      "card_type": "professor_slide",
+      "image_ref": "/preview-screenshots/screenshot_029.png",
+      "bullet_points": [
+        "Schrödinger wrote the mathematical equation defining these 3D standing waves.",
+        "Solving it gives a probability density map.",
+        "The solutions provide the 'quantum numbers' that describe an electron's address."
+      ],
+      "exam_tip": "You don't need to solve the math. Just know that Schrödinger's equation gives us the shapes and energies of atomic orbitals.",
+      "ei_percent": 80
+    },
+    {
+      "slide_id": "30",
+      "title": "Principal Quantum Number ($n$)",
+      "card_type": "professor_slide",
+      "image_ref": "/preview-screenshots/screenshot_030.png",
+      "bullet_points": [
+        "The first quantum number ($n$) defines the main energy shell.",
+        "Higher $n$ means the electron is further from the nucleus and has higher energy.",
+        "Matches the row (period) on the periodic table."
+      ],
+      "exam_tip": "If an element is in row 3 of the periodic table, its outermost electrons are in the $n=3$ shell.",
+      "ei_percent": 95
+    },
+    {
+      "slide_id": "32",
+      "title": "Angular Momentum Quantum Number ($l$)",
+      "card_type": "professor_slide",
+      "image_ref": "/preview-screenshots/screenshot_032.png",
+      "bullet_points": [
+        "Defines the shape of the subshell within the main energy level.",
+        "Given letter designations: $s, p, d, f$.",
+        "Allows multiple electrons to exist in the same shell without occupying the same physical space."
+      ],
+      "exam_tip": "The shell is the neighborhood; the subshell is the specific street the electron lives on.",
+      "ei_percent": 90
+    },
+    {
+      "slide_id": "34",
+      "title": "Orbital Shapes",
+      "card_type": "professor_slide",
+      "image_ref": "/preview-screenshots/screenshot_034.png",
+      "bullet_points": [
+        "An $s$ orbital is a sphere.",
+        "A $p$ orbital is shaped like a dumbbell.",
+        "$d$ and $f$ orbitals have complex, multi-lobed shapes.",
+        "The nucleus sits at the dead center of all these shapes."
+      ],
+      "exam_tip": "Be able to recognize that $s$ is spherical and $p$ is dumbbell-shaped. They slot together like a 3D puzzle.",
+      "ei_percent": 90
+    },
+    {
+      "slide_id": "33",
+      "title": "Periodic Table Blocks",
+      "card_type": "professor_slide",
+      "image_ref": "/preview-screenshots/screenshot_033.png",
+      "bullet_points": [
+        "The left two columns are the $s$-block.",
+        "The right six columns are the $p$-block.",
+        "The middle transition metals are the $d$-block.",
+        "The bottom rows are the $f$-block."
+      ],
+      "exam_tip": "The periodic table is a literal map of quantum numbers. Use it to write electron configurations without memorizing complex charts.",
+      "ei_percent": 100
+    },
+    {
+      "slide_id": "35",
+      "title": "Magnetic Quantum Number ($m_l$)",
+      "card_type": "professor_slide",
+      "image_ref": "/preview-screenshots/screenshot_035.png",
+      "bullet_points": [
+        "Defines how many orientations a shape can have in 3D space.",
+        "A sphere ($s$) only has 1 orientation.",
+        "A dumbbell ($p$) can point along the x, y, or z axis, meaning 3 orientations."
+      ],
+      "exam_tip": "Every individual orientation can hold exactly 2 electrons. That's why the $p$-block is 6 elements wide (3 orientations $\\times$ 2 electrons).",
+      "ei_percent": 90
+    },
+    {
+      "slide_id": "36",
+      "title": "Counting Orbitals",
+      "card_type": "professor_slide",
+      "image_ref": "/preview-screenshots/screenshot_036.png",
+      "bullet_points": [
+        "$s$ subshells have 1 orbital.",
+        "$p$ subshells have 3 orbitals.",
+        "$d$ subshells have 5 orbitals.",
+        "$f$ subshells have 7 orbitals."
+      ],
+      "exam_tip": "Multiply the number of orbitals by 2 to get the maximum number of electrons that subshell can hold.",
+      "ei_percent": 95
+    },
+    {
+      "slide_id": "37",
+      "title": "Orbital Energy Levels",
+      "card_type": "professor_slide",
+      "image_ref": "/preview-screenshots/screenshot_037.png",
+      "bullet_points": [
+        "Electrons always fill the lowest available energy orbital first.",
+        "Because shapes overlap, energy levels get slightly jumbled as you move out.",
+        "The $4s$ orbital fills before the $3d$ orbital because it sits at a slightly lower potential energy."
+      ],
+      "exam_tip": "Always fill $4s$ before $3d$. The periodic table naturally forces you to do this if you read it left to right.",
+      "ei_percent": 95
+    },
+    {
+      "slide_id": "38",
+      "title": "Spin Quantum Number ($m_s$)",
+      "card_type": "professor_slide",
+      "image_ref": "/preview-screenshots/screenshot_038.png",
+      "bullet_points": [
+        "Two negatively charged electrons can share one orbital space.",
+        "They manage this by having opposing spins: +1/2 (up) and -1/2 (down).",
+        "This is the fourth and final quantum number."
+      ],
+      "exam_tip": "When drawing orbital diagrams, always draw one arrow pointing up and the paired arrow pointing down.",
+      "ei_percent": 90
+    },
+    {
+      "slide_id": "41",
+      "title": "Pauli Exclusion Principle",
+      "card_type": "professor_slide",
+      "image_ref": "/preview-screenshots/screenshot_041.png",
+      "bullet_points": [
+        "No two electrons in an atom can have the exact same four quantum numbers.",
+        "They can share the same shell, shape, and orientation.",
+        "If they share those three, their spin must be opposite."
+      ],
+      "exam_tip": "Pauli is the reason an orbital maxes out at two electrons. A third electron would have to repeat a spin, which is forbidden.",
+      "ei_percent": 95
+    },
+    {
+      "slide_id": "42",
+      "title": "Drawing Configurations",
+      "card_type": "professor_slide",
+      "image_ref": "/preview-screenshots/screenshot_042.png",
+      "bullet_points": [
+        "We draw an orbital as a flat line.",
+        "We draw electrons as half-arrows.",
+        "We write the configuration as $1s^2 2s^2 2p^1$ (e.g., Boron)."
+      ],
+      "exam_tip": "The superscript number tells you exactly how many electrons are sitting in that specific subshell.",
+      "ei_percent": 90
+    },
+    {
+      "slide_id": "43",
+      "title": "Hund's Rule",
+      "card_type": "professor_slide",
+      "image_ref": "/preview-screenshots/screenshot_043.png",
+      "bullet_points": [
+        "Electrons will occupy equal-energy orbitals singly before pairing up.",
+        "Known colloquially as the 'bus seat rule'.",
+        "They only pair up when all available equal-energy orbitals have one electron."
+      ],
+      "exam_tip": "For carbon ($2p^2$), draw two up-arrows in separate $p$ orbitals. Do not pair them in the first orbital.",
+      "ei_percent": 95
+    },
+    {
+      "slide_id": "44",
+      "title": "Charged Atoms (Ions)",
+      "card_type": "professor_slide",
+      "image_ref": "/preview-screenshots/screenshot_044.png",
+      "bullet_points": [
+        "Atoms gain or lose electrons to achieve a full valence shell.",
+        "Sodium loses its $3s^1$ electron to match Neon's perfectly full configuration.",
+        "Chlorine gains an electron to finish its $3p$ subshell and match Argon."
+      ],
+      "exam_tip": "A completely full set of orbitals (the noble gas configuration) is the ultimate goal of chemical bonding.",
+      "ei_percent": 95
+    }
+  ],
+  "transcript": [
+    {
+      "slide_number": 2,
+      "title": "Continuous vs. Line Spectra",
+      "narrative": "![Continuous vs. Line Spectra](/preview-screenshots/screenshot_002.png)\n\nIf you shine the white light from a torch through a glass prism, you get a rainbow. That rainbow is a continuous spectrum—every single wavelength of visible light is present, bleeding smoothly from red all the way to violet. We are surrounded by this continuous white light every day. But scientifically, things get interesting when we stop looking at white light and start looking at the light emitted by specific, heated elements. If you take an iron hot plate and crank up the heat, it glows orange. It never glows green, and it never glows blue. It only emits specific colors. If you take a tube of pure hydrogen gas and pump energy into it, the light it gives off doesn't form a continuous rainbow when passed through a prism. Instead, it forms distinct, sharp bands of color against a black background. We call this a **line spectrum**.",
+      "ei_percent": 80,
+      "ei_reasoning": "Establishes the foundational mystery: why do elements only emit specific colors instead of a continuous rainbow?"
+    },
+    {
+      "slide_number": 3,
+      "title": "Atomic Fingerprints",
+      "narrative": "![Atomic Fingerprints](/preview-screenshots/screenshot_003.png)\n\nHydrogen gives us exactly four visible bands of light. If we swap the hydrogen gas for helium, we get a completely different set of lines. Swap it for sodium, and we get another entirely unique pattern. Every element on the periodic table has its own specific line spectrum. This is a massive clue about how atoms are built. The fact that hydrogen only ever emits four specific colors tells us that its interaction with light is not continuous; it's strictly limited. Something inside the atom is restricted to specific, discrete states, and to figure out what that is, we need to understand the light itself.",
+      "ei_percent": 85,
+      "ei_reasoning": "Connects the physical observation (line spectra) to the theoretical concept (discrete atomic states)."
+    },
+    {
+      "slide_number": 4,
+      "title": "The Speed of Light",
+      "narrative": "![The Speed of Light](/preview-screenshots/screenshot_004.png)\n\nTo understand why elements emit specific colors, we need to measure the light. In the mid-1800s, James Clerk Maxwell proved that light travels as an electromagnetic wave. If you put light in a vacuum where nothing can interfere with it, it travels at a perfectly fixed speed: $3.0 \\times 10^8$ meters per second. We call this the speed of light, or $c$. Because light is a wave, it has a physical length from peak to peak (its **wavelength**, $\\lambda$) and a rate at which those peaks pass a fixed point (its **frequency**, $\\nu$). These three properties are permanently locked together. The frequency is equal to the speed of light divided by the wavelength ($c = \\lambda\\nu$). If you know one, you can always calculate the other.",
+      "ei_percent": 90,
+      "ei_reasoning": "Introduces the foundational wave equation for light, which is heavily tested."
+    },
+    {
+      "slide_number": 5,
+      "title": "The Electromagnetic Spectrum",
+      "narrative": "![The Electromagnetic Spectrum](/preview-screenshots/screenshot_005.png)\n\nBecause the speed of light is constant, wavelength and frequency are locked in a seesaw relationship. If you stretch the wavelength out, the frequency drops. If you squish the wavelength down, the frequency spikes. The visible light we see is just a tiny slice of a massive electromagnetic spectrum. Radio waves have massive wavelengths and very low frequencies. On the other end, X-rays and gamma rays have tiny wavelengths and incredibly high frequencies. When we see different colors in our hydrogen line spectrum, we are actually seeing different specific frequencies of electromagnetic waves being emitted by the atom.",
+      "ei_percent": 80,
+      "ei_reasoning": "Contextualizes visible light within the broader spectrum and reinforces the inverse relationship between wavelength and frequency."
+    },
+    {
+      "slide_number": 6,
+      "title": "Energy in Quanta",
+      "narrative": "![Energy in Quanta](/preview-screenshots/screenshot_006.png)\n\nKnowing that light has a frequency is great, but it doesn't explain why atoms only emit certain frequencies. Enter Max Planck. Planck realized that matter doesn't absorb or emit energy in a smooth, continuous flow. Instead, it absorbs and emits energy in specific, indivisible chunks. He called these chunks **quanta**. Even more importantly, he proved that the amount of energy in a quantum is directly tied to the frequency of the light. He wrote the equation $E = h\\nu$, where $E$ is energy, $\\nu$ is frequency, and $h$ is his own Planck's constant. This means high-frequency light inherently carries more energy in its packets than low-frequency light.",
+      "ei_percent": 95,
+      "ei_reasoning": "Introduces quantization of energy and Planck's equation, which is the cornerstone of quantum chemistry."
+    },
+    {
+      "slide_number": 7,
+      "title": "The Photoelectric Effect",
+      "narrative": "![The Photoelectric Effect](/preview-screenshots/screenshot_007.png)\n\nEinstein took Planck's mathematical idea of energy chunks and made it physical. He proved that light doesn't just travel as a wave; it also behaves as a stream of actual particles, which we call **photons**. This is **wave-particle duality**. Because of $E = h\\nu$, a photon of red light (low frequency) carries very little energy. A photon of ultraviolet light (high frequency) carries a lot of energy. When scientists pumped heat energy into an atom, they saw light energy coming out. And because that light was coming out at specific frequencies, it meant the atom was spitting out photons of very specific, fixed energies. The nucleus of the atom is too heavy and dense to be doing this. The energy exchange had to be happening with the electrons.",
+      "ei_percent": 85,
+      "ei_reasoning": "Bridges light physics to electron behavior via the photon concept."
+    },
+    {
+      "slide_number": 8,
+      "title": "Bohr's Discretized Atom",
+      "narrative": "![Bohr's Discretized Atom](/preview-screenshots/screenshot_008.png)\n\nA Danish physicist named Niels Bohr looked at hydrogen's four distinct lines of light and proposed a radical new model of the atom to explain them. He suggested that the electron in a hydrogen atom doesn't just float randomly. Instead, it lives on a fixed, circular track around the nucleus, much like a planet orbiting the sun. He called these tracks **orbitals**. The rule of Bohr's model is strict: the electron can exist on track 1, or track 2, or track 3, but it can never exist in the space between the tracks. It cannot be at track 1.5. As long as the electron stays on its track, it doesn't radiate any energy. It just coasts.",
+      "ei_percent": 90,
+      "ei_reasoning": "Introduces the Bohr model's core premise: quantized orbitals."
+    },
+    {
+      "slide_number": 9,
+      "title": "Concentric Shells",
+      "narrative": "![Concentric Shells](/preview-screenshots/screenshot_009.png)\n\nWhy do these tracks matter? Because each track represents a specific amount of potential energy. The track closest to the positively charged nucleus is the lowest energy state, because the negative electron is highly attracted to it. We call this lowest track the **ground state**. If you want to pull the electron further away from the nucleus to a higher track, you have to fight that magnetic attraction. You have to put energy into the system. Bohr imagined an infinite number of these concentric shells radiating outward, each one representing a higher energy level than the last.",
+      "ei_percent": 85,
+      "ei_reasoning": "Explains the energy gradient of orbitals, setting up the mechanism for excitation."
+    },
+    {
+      "slide_number": 14,
+      "title": "Excitation and Emission",
+      "narrative": "![Excitation and Emission](/preview-screenshots/screenshot_014.png)\n\nLet's use a hydrogen atom as our example. It sits in its ground state, with its one electron on the innermost track. We hit the atom with a blast of heat energy. The electron absorbs that energy and jumps outward to a higher track—say, track 3. The atom is now in an **excited state**. But things cannot stay excited forever. The electron is unstable out there, and eventually, it falls back down to its ground state. As it drops from track 3 back to track 1, it has to dump the exact amount of energy it originally absorbed. It dumps this energy by spitting out a photon of light.",
+      "ei_percent": 85,
+      "ei_reasoning": "Describes the physical mechanism of photon emission."
+    },
+    {
+      "slide_number": 16,
+      "title": "Quantized Energy Jumps",
+      "narrative": "![Quantized Energy Jumps](/preview-screenshots/screenshot_016.png)\n\nBecause the tracks are at fixed distances, the energy gap between them is fixed. An electron falling from track 3 to track 1 always releases the exact same amount of energy. Because $E = h\\nu$, that specific amount of energy creates a photon with a specific frequency, which our eyes see as a specific color. This is why hydrogen produces a line spectrum instead of a rainbow. The four lines of light we see correspond perfectly to the electron falling between the specific, fixed tracks in Bohr's model. The energy going in must exactly equal the energy coming out, even if the electron falls in steps (like track 3 to 2, then 2 to 1).",
+      "ei_percent": 90,
+      "ei_reasoning": "Closes the loop on the initial mystery: line spectra are the visual evidence of electrons falling between fixed energy tracks."
+    },
+    {
+      "slide_number": 17,
+      "title": "The Limits of Bohr",
+      "narrative": "![The Limits of Bohr](/preview-screenshots/screenshot_017.png)\n\nBohr won a Nobel Prize for this, and his math perfectly predicted the exact wavelengths of light hydrogen would emit. But there was a massive flaw. Bohr's model only worked for hydrogen. Hydrogen has exactly one electron. The moment you look at helium, which has two electrons, Bohr's math completely falls apart. If you try to put two negatively charged electrons on the same circular track, they repel each other. They won't just politely follow each other in a circle; their repulsion destroys the neat concentric tracks. We needed a new set of physical laws to explain atoms with more than one electron.",
+      "ei_percent": 80,
+      "ei_reasoning": "Transitions from the classical Bohr model to the necessity of quantum mechanics."
+    },
+    {
+      "slide_number": 18,
+      "title": "Matter Waves",
+      "narrative": "![Matter Waves](/preview-screenshots/screenshot_018.png)\n\nThe solution came by rethinking what an electron actually is. Louis de Broglie looked at Einstein's proof that light waves can act like particles, and asked the reverse question: what if particles can act like waves? He proposed that an electron isn't a solid, tiny dot orbiting a planet. Instead, it behaves as a wave. He wrote an equation showing that any particle's wavelength depends on its mass and velocity. You don't need to solve his equation for the exam, but you must understand the concept: in multi-electron atoms, electrons act as waves of negative charge.",
+      "ei_percent": 75,
+      "ei_reasoning": "Introduces De Broglie and the concept of matter waves."
+    },
+    {
+      "slide_number": 19,
+      "title": "The Uncertainty Principle",
+      "narrative": "![The Uncertainty Principle](/preview-screenshots/screenshot_019.png)\n\nIf an electron is a wave, a new problem emerges: you can't pinpoint exactly where a wave is. Werner Heisenberg formalized this with his **Uncertainty Principle**. He proved mathematically that it is impossible to precisely know both the exact location and the exact momentum (speed and direction) of an electron at the same time. The more accurately you measure how fast it's moving, the less you know about where it is. This completely kills Bohr's idea of neat, predictable circular tracks. We can't draw a line and say 'the electron is exactly here.'",
+      "ei_percent": 80,
+      "ei_reasoning": "Introduces Heisenberg and the shift from deterministic orbits to probabilistic models."
+    },
+    {
+      "slide_number": 22,
+      "title": "Electrons as Standing Waves",
+      "narrative": "![Electrons as Standing Waves](/preview-screenshots/screenshot_022.png)\n\nSo if they aren't on tracks, how do electrons behave around the nucleus? Einstein and others suggested they act as **standing waves**. Imagine a guitar string tied tightly at both ends. When you pluck it, the string vibrates up and down in the middle, but the ends don't move. It's a wave, but it doesn't travel anywhere; it just oscillates in a fixed space. Electrons behave exactly like this in three dimensions. They are standing waves of negative charge wrapped around the nucleus. They still occupy discrete energy levels—just like Bohr said—but they do it as vibrating clouds, not as orbiting dots.",
+      "ei_percent": 85,
+      "ei_reasoning": "Explains the standing wave concept, which is crucial for understanding orbital shapes."
+    },
+    {
+      "slide_number": 27,
+      "title": "Visualizing the Wave",
+      "narrative": "![Visualizing the Wave](/preview-screenshots/screenshot_027.png)\n\nA standing wave around a nucleus must perfectly connect back on itself. If the peaks and troughs don't align when the wave wraps around the atom, the wave cancels itself out and destroys itself. Because of this strict geometric requirement, only certain specific wave patterns are mathematically possible. When we add more electrons to an atom, they adopt different, increasingly complex 3D wave patterns so they can share the space around the nucleus without their negative charges repelling each other into chaos. These allowed 3D wave patterns are what modern chemists mean when they say **orbital**.",
+      "ei_percent": 75,
+      "ei_reasoning": "Connects the physical requirement of a standing wave to the discrete nature of modern orbitals."
+    },
+    {
+      "slide_number": 29,
+      "title": "Schrödinger's Equation",
+      "narrative": "![Schrödinger's Equation](/preview-screenshots/screenshot_029.png)\n\nTo figure out what these 3D wave patterns actually look like, Erwin Schrödinger wrote a massive mathematical equation. It takes into account the total energy, potential energy, and Planck's constant, mapping the electron across x, y, and z coordinates. All you need to know is that we don't solve this equation by hand. Computers solve it for us. When we square the result of Schrödinger's wave function, it gives us a probability density map. It doesn't tell us exactly where the electron is (thanks to Heisenberg), but it gives us a 3D shape showing where the electron is 90% likely to be found. The solutions to this equation give us a set of 'quantum numbers'—an address system for every electron.",
+      "ei_percent": 80,
+      "ei_reasoning": "Sets the scope for Schrödinger (don't solve it, just know it gives probability maps and quantum numbers)."
+    },
+    {
+      "slide_number": 30,
+      "title": "Principal Quantum Number ($n$)",
+      "narrative": "![Principal Quantum Number ($n$)](/preview-screenshots/screenshot_030.png)\n\nThe first solution to Schrödinger's equation gives us the **Principal Quantum Number**, designated by the letter $n$. This tells us which main energy shell the electron lives in. It is exactly the same concept as Bohr's concentric circles. When $n=1$, the electron is in the shell closest to the nucleus, meaning it has the lowest potential energy and is tightly held. When $n=4$, the electron is much further away and much easier to strip off. You don't have to guess what $n$ is; it directly matches the rows (periods) on the periodic table. Row 1 (Hydrogen, Helium) is $n=1$. Row 2 is $n=2$, and so on.",
+      "ei_percent": 95,
+      "ei_reasoning": "Introduces the first quantum number and anchors it to the periodic table."
+    },
+    {
+      "slide_number": 32,
+      "title": "Angular Momentum Quantum Number ($l$)",
+      "narrative": "![Angular Momentum Quantum Number ($l$)](/preview-screenshots/screenshot_032.png)\n\nIf the principal quantum number $n$ is the electron's neighborhood, the second quantum number is its specific street. This is the **Angular Momentum Quantum Number**, designated by $l$. It tells us the physical shape of the 3D standing wave—the subshell. Instead of using numbers for the shapes, we use letters: $s$, $p$, $d$, and $f$. Every main shell contains subshells. Shell 1 only has room for an $s$ subshell ($1s$). Shell 2 is bigger, so it has room for an $s$ and a $p$ subshell ($2s, 2p$). Shell 3 has $s$, $p$, and $d$ subshells. These shapes allow multiple electrons to exist in the same main shell without occupying the exact same physical space.",
+      "ei_percent": 90,
+      "ei_reasoning": "Introduces subshells and the spdf nomenclature."
+    },
+    {
+      "slide_number": 34,
+      "title": "Orbital Shapes",
+      "narrative": "![Orbital Shapes](/preview-screenshots/screenshot_034.png)\n\nWhat do these subshells actually look like? An $s$ orbital is a simple sphere with the nucleus dead in the center. A $1s$ sphere is small; a $2s$ sphere is just a larger sphere wrapped around it. A $p$ orbital looks like a dumbbell, pinched in the middle at the nucleus with two large lobes on either side. Because the electron doesn't exist in the pinched center, it avoids the $s$ electrons completely. The $d$ and $f$ orbitals look like complex balloon animals—four-lobed clovers and donuts. You don't need to draw the complex ones, but you must know that $s$ is a sphere and $p$ is a dumbbell. By stacking these different shapes inside one another, the atom organizes its electrons safely.",
+      "ei_percent": 90,
+      "ei_reasoning": "Provides the concrete visual shapes of the orbitals."
+    },
+    {
+      "slide_number": 33,
+      "title": "Periodic Table Blocks",
+      "narrative": "![Periodic Table Blocks](/preview-screenshots/screenshot_033.png)\n\nJust like the rows tell us the main shell ($n$), the columns of the periodic table are grouped perfectly by these shapes ($l$). The first two columns on the left are the $s$-block. The block of six columns on the far right is the $p$-block. The transition metals in the middle make up the $d$-block, and the two floating rows at the bottom are the $f$-block. The periodic table is literally a map of Schrödinger's quantum numbers. If you know where an element sits on the table, you immediately know the shape of the orbital its outermost electrons live in.",
+      "ei_percent": 100,
+      "ei_reasoning": "Massive conceptual anchor: maps the abstract spdf shapes directly to the physical layout of the periodic table."
+    },
+    {
+      "slide_number": 35,
+      "title": "Magnetic Quantum Number ($m_l$)",
+      "narrative": "![Magnetic Quantum Number ($m_l$)](/preview-screenshots/screenshot_035.png)\n\nThe third quantum number is the **Magnetic Quantum Number**, $m_l$. It tells us how many different ways a specific shape can be oriented in 3D space. Think about an $s$ orbital (a sphere). No matter how you rotate a perfect sphere, it looks exactly the same. So, an $s$ subshell only has 1 orientation—it contains exactly one orbital. But a $p$ orbital (a dumbbell) can be pointed up and down along the y-axis, left and right along the x-axis, or forward and backward along the z-axis. Because it has three distinct orientations, a $p$ subshell contains exactly three $p$ orbitals. They all have the same energy, they just point in different directions.",
+      "ei_percent": 90,
+      "ei_reasoning": "Explains orientations and why subshells contain multiple orbitals."
+    },
+    {
+      "slide_number": 36,
+      "title": "Counting Orbitals",
+      "narrative": "![Counting Orbitals](/preview-screenshots/screenshot_036.png)\n\nThis pattern scales up as the shapes get more complex. An $s$ subshell has 1 orbital. A $p$ subshell has 3 orbitals. A $d$ subshell has 5 different orientations, so it contains 5 orbitals. An $f$ subshell has 7 orbitals. Because every single individual orbital can hold a maximum of two electrons, the math maps perfectly to our periodic table blocks. The $p$-block is exactly 6 elements wide because 3 orbitals $\\times$ 2 electrons = 6. The $d$-block is exactly 10 elements wide because 5 orbitals $\\times$ 2 electrons = 10. The structure of the periodic table is dictated by the 3D geometry of standing waves.",
+      "ei_percent": 95,
+      "ei_reasoning": "Connects the number of orbitals to the width of the periodic table blocks."
+    },
+    {
+      "slide_number": 37,
+      "title": "Orbital Energy Levels",
+      "narrative": "![Orbital Energy Levels](/preview-screenshots/screenshot_037.png)\n\nWhen building an atom, electrons follow the **Aufbau principle**—a German word meaning 'building up'. Electrons are lazy; they will always drop into the lowest available energy orbital closest to the nucleus. They fill $1s$, then $2s$, then the three $2p$ orbitals, then $3s$, then $3p$. But here, the geometric overlap causes a traffic jam. The spherical $4s$ orbital actually penetrates closer to the nucleus than the complex $3d$ orbitals do. Because it gets closer, the $4s$ orbital sits at a slightly lower potential energy than the $3d$ orbital. Therefore, electrons will fill the $4s$ orbital *before* they start filling the $3d$ orbital. You don't need to memorize an energy chart to know this—just read the periodic table left to right. After Argon ($3p$), the next row starts with Potassium in the $4s$ block, and only after you cross Calcium do you hit the $3d$ transition metals.",
+      "ei_percent": 95,
+      "ei_reasoning": "Explains the Aufbau filling order and the specific 4s/3d energy crossover, anchored to the periodic table."
+    },
+    {
+      "slide_number": 38,
+      "title": "Spin Quantum Number ($m_s$)",
+      "narrative": "![Spin Quantum Number ($m_s$)](/preview-screenshots/screenshot_038.png)\n\nWe've established that every orbital can hold exactly two electrons. But how do two negatively charged particles occupy the exact same 3D space without their magnetic repulsion blowing the atom apart? They do it by spinning. The fourth and final quantum number is the **Spin Quantum Number**, $m_s$. An electron can spin on its axis in one of two directions: clockwise or counter-clockwise. We designate these mathematically as +1/2 (spin up) and -1/2 (spin down). This spin generates a tiny magnetic field. If one electron spins up and the other spins down, their opposing magnetic fields cancel out their electrical repulsion, allowing them to share the orbital peacefully.",
+      "ei_percent": 90,
+      "ei_reasoning": "Explains how two electrons can share an orbital via spin."
+    },
+    {
+      "slide_number": 41,
+      "title": "Pauli Exclusion Principle",
+      "narrative": "![Pauli Exclusion Principle](/preview-screenshots/screenshot_041.png)\n\nThis brings us to a hard limit in chemistry: the **Pauli Exclusion Principle**. Wolfgang Pauli proved that no two electrons in the entire universe can share the exact same four quantum numbers. Two electrons in an atom can share the same shell ($n$), the same shape ($l$), and the exact same orientation ($m_l$)—meaning they are sitting in the exact same orbital. But if they share those first three numbers, their fourth number (spin) *must* be different. One must be +1/2 and the other must be -1/2. Because there are only two possible spin states, an orbital is strictly capped at two electrons. A third electron would have to duplicate a spin state, which Pauli's rule forbids.",
+      "ei_percent": 95,
+      "ei_reasoning": "Formalizes the Pauli rule and explains why orbitals max out at two electrons."
+    },
+    {
+      "slide_number": 42,
+      "title": "Drawing Configurations",
+      "narrative": "![Drawing Configurations](/preview-screenshots/screenshot_042.png)\n\nTo show how electrons fill these orbitals, we write an **electron configuration**. We write the shell number, the subshell letter, and a superscript number showing how many electrons are inside. For Boron, the 5th element, we have 5 electrons to place. We fill the lowest energy first: two go into $1s$ (written $1s^2$), two go into $2s$ ($2s^2$), and the final one drops into the $2p$ subshell ($2p^1$). When we draw this visually, we represent each orbital as a flat horizontal line. The $1s$ and $2s$ subshells get one line each. The $2p$ subshell gets three lines grouped together, because it has three orientations. We draw the electrons as half-arrows sitting on the lines—one pointing up, one pointing down.",
+      "ei_percent": 90,
+      "ei_reasoning": "Translates the abstract rules into the concrete notation students must write on exams."
+    },
+    {
+      "slide_number": 43,
+      "title": "Hund's Rule",
+      "narrative": "![Hund's Rule](/preview-screenshots/screenshot_043.png)\n\nWhat happens when we get to Carbon, which has six electrons ($1s^2 2s^2 2p^2$)? We have two electrons to place into the three available $2p$ orbitals. Do they pair up in the first line, or spread out? **Hund's Rule** dictates that electrons will always occupy equal-energy orbitals singly before they pair up. Think of it as the 'bus seat rule'. When you get on an empty bus, you don't sit right next to a stranger; you take your own empty row. Electrons are equally antisocial. They will take their own empty $p$ orbital, spinning parallel to each other, to minimize repulsion. They will only start pairing up (with opposite spins) when all three $p$ orbitals have at least one electron in them.",
+      "ei_percent": 95,
+      "ei_reasoning": "Explains Hund's rule clearly with the domain-standard bus seat analogy."
+    },
+    {
+      "slide_number": 44,
+      "title": "Charged Atoms (Ions)",
+      "narrative": "![Charged Atoms (Ions)](/preview-screenshots/screenshot_044.png)\n\nUnderstanding these electron configurations explains exactly why atoms form ions. Look at Sodium (Na). Its configuration ends in $3s^1$. It has one lonely electron sitting in its outermost shell. If we put in enough energy to strip that single electron away, Sodium becomes an Na$^+$ cation. Its new configuration ends at $2p^6$. This perfectly matches the configuration of Neon, a noble gas. Every single orbital is fully paired and stable. Conversely, Chlorine ends in $3p^5$. It is exactly one electron short of filling its $p$ subshell. If it steals an electron to become a Cl$^-$ anion, it reaches $3p^6$, perfectly matching Argon. Atoms will readily gain or lose their outermost electrons if doing so leaves them with a completely full, perfectly stable set of orbitals.",
+      "ei_percent": 95,
+      "ei_reasoning": "Brings the entire lecture together by showing how quantum numbers and configurations drive actual chemical reactions and ion formation."
+    }
+  ],
+  "name": "CHEM — tuned extraction (45 → 28)"
+}

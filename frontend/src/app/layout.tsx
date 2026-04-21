@@ -4,6 +4,7 @@ import "./globals.css";
 import AppShell from "@/components/AppShell";
 import AuthProvider from "@/components/AuthProvider";
 import { Toaster } from "sonner";
+import { Analytics } from "@vercel/analytics/react";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -62,6 +63,7 @@ export default function RootLayout({
             },
           }}
         />
+        <Analytics />
       </body>
     </html>
   );

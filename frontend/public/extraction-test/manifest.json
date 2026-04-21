@@ -1,0 +1,354 @@
+[
+  {
+    "index": 1,
+    "filename": "slide_001.jpg",
+    "timestamp_seconds": 118.0,
+    "timestamp_display": "1:58",
+    "detection_diff": 143.3,
+    "settled_at": 524.5
+  },
+  {
+    "index": 2,
+    "filename": "slide_002.jpg",
+    "timestamp_seconds": 526.5,
+    "timestamp_display": "8:46",
+    "detection_diff": 43.5,
+    "settled_at": 571.5
+  },
+  {
+    "index": 3,
+    "filename": "slide_003.jpg",
+    "timestamp_seconds": 573.5,
+    "timestamp_display": "9:33",
+    "detection_diff": 48.4,
+    "settled_at": 679.5
+  },
+  {
+    "index": 4,
+    "filename": "slide_004.jpg",
+    "timestamp_seconds": 681.5,
+    "timestamp_display": "11:21",
+    "detection_diff": 19.1,
+    "settled_at": 728.0
+  },
+  {
+    "index": 5,
+    "filename": "slide_005.jpg",
+    "timestamp_seconds": 730.0,
+    "timestamp_display": "12:10",
+    "detection_diff": 26.8,
+    "settled_at": 843.5
+  },
+  {
+    "index": 6,
+    "filename": "slide_006.jpg",
+    "timestamp_seconds": 845.5,
+    "timestamp_display": "14:05",
+    "detection_diff": 28.5,
+    "settled_at": 958.5
+  },
+  {
+    "index": 7,
+    "filename": "slide_007.jpg",
+    "timestamp_seconds": 960.5,
+    "timestamp_display": "16:00",
+    "detection_diff": 19.4,
+    "settled_at": 1220.0
+  },
+  {
+    "index": 8,
+    "filename": "slide_008.jpg",
+    "timestamp_seconds": 1222.0,
+    "timestamp_display": "20:22",
+    "detection_diff": 18.4,
+    "settled_at": 1257.0
+  },
+  {
+    "index": 9,
+    "filename": "slide_009.jpg",
+    "timestamp_seconds": 1309.0,
+    "timestamp_display": "21:49",
+    "detection_diff": 20.0,
+    "settled_at": null
+  },
+  {
+    "index": 10,
+    "filename": "slide_010.jpg",
+    "timestamp_seconds": 1323.5,
+    "timestamp_display": "22:03",
+    "detection_diff": 16.9,
+    "settled_at": 1347.5
+  },
+  {
+    "index": 11,
+    "filename": "slide_011.jpg",
+    "timestamp_seconds": 1383.5,
+    "timestamp_display": "23:03",
+    "detection_diff": 19.8,
+    "settled_at": null
+  },
+  {
+    "index": 12,
+    "filename": "slide_012.jpg",
+    "timestamp_seconds": 1410.0,
+    "timestamp_display": "23:30",
+    "detection_diff": 19.0,
+    "settled_at": 1431.0
+  },
+  {
+    "index": 13,
+    "filename": "slide_013.jpg",
+    "timestamp_seconds": 1433.0,
+    "timestamp_display": "23:53",
+    "detection_diff": 39.5,
+    "settled_at": 1436.0
+  },
+  {
+    "index": 14,
+    "filename": "slide_014.jpg",
+    "timestamp_seconds": 1441.0,
+    "timestamp_display": "24:01",
+    "detection_diff": 99.2,
+    "settled_at": 1770.0
+  },
+  {
+    "index": 15,
+    "filename": "slide_015.jpg",
+    "timestamp_seconds": 1772.0,
+    "timestamp_display": "29:32",
+    "detection_diff": 15.9,
+    "settled_at": 1921.0
+  },
+  {
+    "index": 16,
+    "filename": "slide_016.jpg",
+    "timestamp_seconds": 1923.0,
+    "timestamp_display": "32:03",
+    "detection_diff": 15.5,
+    "settled_at": 2176.5
+  },
+  {
+    "index": 17,
+    "filename": "slide_017.jpg",
+    "timestamp_seconds": 2178.5,
+    "timestamp_display": "36:18",
+    "detection_diff": 23.0,
+    "settled_at": 2312.0
+  },
+  {
+    "index": 18,
+    "filename": "slide_018.jpg",
+    "timestamp_seconds": 2314.0,
+    "timestamp_display": "38:34",
+    "detection_diff": 18.3,
+    "settled_at": 2368.5
+  },
+  {
+    "index": 19,
+    "filename": "slide_019.jpg",
+    "timestamp_seconds": 2370.5,
+    "timestamp_display": "39:30",
+    "detection_diff": 20.1,
+    "settled_at": 2387.0
+  },
+  {
+    "index": 20,
+    "filename": "slide_020.jpg",
+    "timestamp_seconds": 2389.0,
+    "timestamp_display": "39:49",
+    "detection_diff": 182.1,
+    "settled_at": 2392.0
+  },
+  {
+    "index": 21,
+    "filename": "slide_021.jpg",
+    "timestamp_seconds": 2390.5,
+    "timestamp_display": "39:50",
+    "detection_diff": 182.1,
+    "settled_at": 2501.0
+  },
+  {
+    "index": 22,
+    "filename": "slide_022.jpg",
+    "timestamp_seconds": 2510.5,
+    "timestamp_display": "41:50",
+    "detection_diff": 22.7,
+    "settled_at": 2513.5
+  },
+  {
+    "index": 23,
+    "filename": "slide_023.jpg",
+    "timestamp_seconds": 2537.0,
+    "timestamp_display": "42:17",
+    "detection_diff": 27.4,
+    "settled_at": null
+  },
+  {
+    "index": 24,
+    "filename": "slide_024.jpg",
+    "timestamp_seconds": 2561.5,
+    "timestamp_display": "42:41",
+    "detection_diff": 38.9,
+    "settled_at": 2592.5
+  },
+  {
+    "index": 25,
+    "filename": "slide_025.jpg",
+    "timestamp_seconds": 2596.5,
+    "timestamp_display": "43:16",
+    "detection_diff": 23.8,
+    "settled_at": 2606.5
+  },
+  {
+    "index": 26,
+    "filename": "slide_026.jpg",
+    "timestamp_seconds": 2608.5,
+    "timestamp_display": "43:28",
+    "detection_diff": 27.7,
+    "settled_at": 2705.5
+  },
+  {
+    "index": 27,
+    "filename": "slide_027.jpg",
+    "timestamp_seconds": 2707.5,
+    "timestamp_display": "45:07",
+    "detection_diff": 100.4,
+    "settled_at": 2768.0
+  },
+  {
+    "index": 28,
+    "filename": "slide_028.jpg",
+    "timestamp_seconds": 2770.0,
+    "timestamp_display": "46:10",
+    "detection_diff": 21.7,
+    "settled_at": 2826.0
+  },
+  {
+    "index": 29,
+    "filename": "slide_029.jpg",
+    "timestamp_seconds": 2828.0,
+    "timestamp_display": "47:08",
+    "detection_diff": 19.1,
+    "settled_at": 3551.0
+  },
+  {
+    "index": 30,
+    "filename": "slide_030.jpg",
+    "timestamp_seconds": 3554.5,
+    "timestamp_display": "59:14",
+    "detection_diff": 15.0,
+    "settled_at": 3583.0
+  },
+  {
+    "index": 31,
+    "filename": "slide_031.jpg",
+    "timestamp_seconds": 3585.0,
+    "timestamp_display": "59:45",
+    "detection_diff": 15.1,
+    "settled_at": 3689.5
+  },
+  {
+    "index": 32,
+    "filename": "slide_032.jpg",
+    "timestamp_seconds": 3691.5,
+    "timestamp_display": "1:01:31",
+    "detection_diff": 15.1,
+    "settled_at": 3708.5
+  },
+  {
+    "index": 33,
+    "filename": "slide_033.jpg",
+    "timestamp_seconds": 3710.5,
+    "timestamp_display": "1:01:50",
+    "detection_diff": 15.1,
+    "settled_at": 3928.5
+  },
+  {
+    "index": 34,
+    "filename": "slide_034.jpg",
+    "timestamp_seconds": 3930.5,
+    "timestamp_display": "1:05:30",
+    "detection_diff": 15.6,
+    "settled_at": 4039.5
+  },
+  {
+    "index": 35,
+    "filename": "slide_035.jpg",
+    "timestamp_seconds": 4041.5,
+    "timestamp_display": "1:07:21",
+    "detection_diff": 19.1,
+    "settled_at": 4081.0
+  },
+  {
+    "index": 36,
+    "filename": "slide_036.jpg",
+    "timestamp_seconds": 4083.0,
+    "timestamp_display": "1:08:03",
+    "detection_diff": 15.2,
+    "settled_at": 4804.5
+  },
+  {
+    "index": 37,
+    "filename": "slide_037.jpg",
+    "timestamp_seconds": 4806.5,
+    "timestamp_display": "1:20:06",
+    "detection_diff": 15.4,
+    "settled_at": 5192.5
+  },
+  {
+    "index": 38,
+    "filename": "slide_038.jpg",
+    "timestamp_seconds": 5194.5,
+    "timestamp_display": "1:26:34",
+    "detection_diff": 180.2,
+    "settled_at": 5197.5
+  },
+  {
+    "index": 39,
+    "filename": "slide_039.jpg",
+    "timestamp_seconds": 5195.0,
+    "timestamp_display": "1:26:35",
+    "detection_diff": 180.3,
+    "settled_at": 5316.5
+  },
+  {
+    "index": 40,
+    "filename": "slide_040.jpg",
+    "timestamp_seconds": 5318.5,
+    "timestamp_display": "1:28:38",
+    "detection_diff": 27.9,
+    "settled_at": 5359.0
+  },
+  {
+    "index": 41,
+    "filename": "slide_041.jpg",
+    "timestamp_seconds": 5361.0,
+    "timestamp_display": "1:29:21",
+    "detection_diff": 30.8,
+    "settled_at": 5724.5
+  },
+  {
+    "index": 42,
+    "filename": "slide_042.jpg",
+    "timestamp_seconds": 5726.5,
+    "timestamp_display": "1:35:26",
+    "detection_diff": 33.5,
+    "settled_at": 5740.0
+  },
+  {
+    "index": 43,
+    "filename": "slide_043.jpg",
+    "timestamp_seconds": 5742.0,
+    "timestamp_display": "1:35:42",
+    "detection_diff": 31.9,
+    "settled_at": 6318.5
+  },
+  {
+    "index": 44,
+    "filename": "slide_044.jpg",
+    "timestamp_seconds": 6320.5,
+    "timestamp_display": "1:45:20",
+    "detection_diff": 15.7,
+    "settled_at": 6402.7
+  }
+]

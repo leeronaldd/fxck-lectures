@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Klare Logo Concepts — Medical Direction</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: #0A0A0F;
+    color: #F5F5F7;
+    padding: 48px 32px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .subtitle {
+    color: #A1A1AA;
+    font-size: 14px;
+    margin-bottom: 40px;
+  }
+
+  h2 {
+    font-size: 11px;
+    color: #A1A1AA;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 20px;
+    margin-top: 40px;
+  }
+
+  .concepts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 20px;
+  }
+
+  .card {
+    border: 1px solid #262626;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #0F0F12;
+  }
+
+  .hero {
+    padding: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background:
+      radial-gradient(ellipse at 50% 0%, rgba(255, 107, 53, 0.08), transparent 70%),
+      #0A0A0F;
+    min-height: 180px;
+  }
+
+  .sizes {
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    background: #0F0F12;
+    border-top: 1px solid #1A1A1A;
+  }
+
+  .sizes > div {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .sizes span {
+    font-size: 9px;
+    color: #52525B;
+  }
+
+  .label-row {
+    padding: 14px 20px;
+    border-top: 1px solid #1A1A1A;
+    background: #09090B;
+  }
+  .label-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #F5F5F7;
+    margin-bottom: 4px;
+  }
+  .label-desc {
+    font-size: 12px;
+    color: #A1A1AA;
+    line-height: 1.5;
+  }
+
+  .light-row {
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #FFFFFF;
+    border-top: 1px solid #1A1A1A;
+  }
+
+  .footnote {
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 1px solid #262626;
+    font-size: 12px;
+    color: #52525B;
+    line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+
+<h1>Klare logo — medical direction</h1>
+<p class="subtitle">Same orange, same K. Medical signal added through iconography, not color.</p>
+
+<h2>Concepts</h2>
+<div class="concepts">
+
+  <!-- Concept 0: Current baseline -->
+  <div class="card">
+    <div class="hero">
+      <svg width="88" height="88" viewBox="0 0 40 40">
+        <rect width="40" height="40" rx="10" fill="#FF6B35"/>
+        <path d="M12 10 L12 30 M12 20 L28 10 M12 20 L28 30" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+    </div>
+    <div class="sizes">
+      <div>
+        <svg width="48" height="48" viewBox="0 0 40 40">
+          <rect width="40" height="40" rx="10" fill="#FF6B35"/>
+          <path d="M12 10 L12 30 M12 20 L28 10 M12 20 L28 30" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+        <span>48px</span>
+      </div>
+      <div>
+        <svg width="24" height="24" viewBox="0 0 40 40">
+          <rect width="40" height="40" rx="10" fill="#FF6B35"/>
+          <path d="M12 10 L12 30 M12 20 L28 10 M12 20 L28 30" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+        <span>24px</span>
+      </div>
+      <div>
+        <svg width="16" height="16" viewBox="0 0 40 40">
+          <rect width="40" height="40" rx="10" fill="#FF6B35"/>
+          <path d="M12 10 L12 30 M12 20 L28 10 M12 20 L28 30" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+        <span>16px</span>
+      </div>
+    </div>
+    <div class="label-row">
+      <div class="label-name">0 — Current</div>
+      <div class="label-desc">Baseline. Generic K, no medical cue.</div>
+    </div>
+  </div>
+
+  <!-- Concept 1: Pulse K (heartbeat replaces lower diagonal) -->
+  <div class="card">
+    <div class="hero">
+      <svg width="88" height="88" viewBox="0 0 40 40">
+        <rect width="40" height="40" rx="10" fill="#FF6B35"/>
+        <!-- vertical -->
+        <path d="M12 10 L12 30" stroke="#fff" stroke-width="3" stroke-linecap="round" fill="none"/>
+        <!-- upper diagonal -->
+        <path d="M12 20 L28 10" stroke="#fff" stroke-width="3" stroke-linecap="round" fill="none"/>
+        <!-- lower arm: heartbeat -->
+        <path d="M12 20 L16 20 L18 17 L20 24 L22 20 L28 20 L28 30" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+    </div>
+    <div class="sizes">
+      <div>
+        <svg width="48" height="48" viewBox="0 0 40 40">
+          <rect width="40" height="40" rx="10" fill="#FF6B35"/>
+          <path d="M12 10 L12 30" stroke="#fff" stroke-width="3" stroke-linecap="round" fill="none"/>
+          <path d="M12 20 L28 10" stroke="#fff" stroke-width="3" stroke-linecap="round" fill="none"/>
+          <path d="M12 20 L16 20 L18 17 L20 24 L22 20 L28 20 L28 30" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+        <span>48px</span>
+      </div>
+      <div>
+        <svg width="24" height="24" viewBox="0 0 40 40">
+          <rect width="40" height="40" rx="10" fill="#FF6B35"/>
+          <path d="M12 10 L12 30" stroke="#fff" stroke-width="3" stroke-linecap="round" fill="none"/>
+          <path d="M12 20 L28 10" stroke="#fff" stroke-width="3" stroke-linecap="round" fill="none"/>
+          <path d="M12 20 L16 20 L18 17 L20 24 L22 20 L28 20 L28 30" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+        <span>24px</span>
+      </div>
+      <div>
+        <svg width="16" height="16" viewBox="0 0 40 40">
+          <rect width="40" height="40" rx="10" fill="#FF6B35"/>
+          <path d="M12 10 L12 30" stroke="#fff" stroke-width="3" stroke-linecap="round" fill="none"/>
+          <path d="M12 20 L28 10" stroke="#fff" stroke-width="3" stroke-linecap="round" fill="none"/>
+          <path d="M12 20 L16 20 L18 17 L20 24 L22 20 L28 20 L28 30" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+        <span>16px</span>
+      </div>
+    </div>
+    <div class="label-row">
+      <div class="label-name">1 — Pulse K</div>
+      <div class="label-desc">Lower arm becomes an ECG waveform. Most integrated. Readable at 24px+; 16px favicon loses the spike.</div>
+    </div>
+  </div>
+
+  <!-- Concept 2: Cross accent K -->
+  <div class="card">
+    <div class="hero">
+      <svg width="88" height="88" viewBox="0 0 40 40">
+        <rect width="40" height="40" rx="10" fill="#FF6B35"/>
+        <path d="M10 12 L10 28 M10 20 L24 12 M10 20 L24 28" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <!-- medical cross accent, top right -->
+        <path d="M32 8 L32 14 M29 11 L35 11" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div class="sizes">
+      <div>
+        <svg width="48" height="48" viewBox="0 0 40 40">
+          <rect width="40" height="40" rx="10" fill="#FF6B35"/>
+          <path d="M10 12 L10 28 M10 20 L24 12 M10 20 L24 28" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <path d="M32 8 L32 14 M29 11 L35 11" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span>48px</span>
+      </div>
+      <div>
+        <svg width="24" height="24" viewBox="0 0 40 40">
+          <rect width="40" height="40" rx="10" fill="#FF6B35"/>
+          <path d="M10 12 L10 28 M10 20 L24 12 M10 20 L24 28" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <path d="M32 8 L32 14 M29 11 L35 11" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span>24px</span>
+      </div>
+      <div>
+        <svg width="16" height="16" viewBox="0 0 40 40">
+          <rect width="40" height="40" rx="10" fill="#FF6B35"/>
+          <path d="M10 12 L10 28 M10 20 L24 12 M10 20 L24 28" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <path d="M32 8 L32 14 M29 11 L35 11" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span>16px</span>
+      </div>
+    </div>
+    <div class="label-row">
+      <div class="label-name">2 — Cross badge</div>
+      <div class="label-desc">K shifted left; small medical cross as a badge top-right. Most obvious medical cue. Holds at 16px.</div>
+    </div>
+  </div>
+
+  <!-- Concept 3: Pulse signature -->
+  <div class="card">
+    <div class="hero">
+      <svg width="88" height="88" viewBox="0 0 40 40">
+        <rect width="40" height="40" rx="10" fill="#FF6B35"/>
+        <path d="M12 8 L12 26 M12 17 L26 8 M12 17 L26 26" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <!-- pulse line signature at bottom -->
+        <path d="M9 33 L14 33 L16 30 L18 36 L20 28 L22 33 L31 33" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.9"/>
+      </svg>
+    </div>
+    <div class="sizes">
+      <div>
+        <svg width="48" height="48" viewBox="0 0 40 40">
+          <rect width="40" height="40" rx="10" fill="#FF6B35"/>
+          <path d="M12 8 L12 26 M12 17 L26 8 M12 17 L26 26" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <path d="M9 33 L14 33 L16 30 L18 36 L20 28 L22 33 L31 33" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.9"/>
+        </svg>
+        <span>48px</span>
+      </div>
+      <div>
+        <svg width="24" height="24" viewBox="0 0 40 40">
+          <rect width="40" height="40" rx="10" fill="#FF6B35"/>
+          <path d="M12 8 L12 26 M12 17 L26 8 M12 17 L26 26" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <path d="M9 33 L14 33 L16 30 L18 36 L20 28 L22 33 L31 33" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.9"/>
+        </svg>
+        <span>24px</span>
+      </div>
+      <div>
+        <svg width="16" height="16" viewBox="0 0 40 40">
+          <rect width="40" height="40" rx="10" fill="#FF6B35"/>
+          <path d="M12 8 L12 26 M12 17 L26 8 M12 17 L26 26" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <path d="M9 33 L14 33 L16 30 L18 36 L20 28 L22 33 L31 33" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.9"/>
+        </svg>
+        <span>16px</span>
+      </div>
+    </div>
+    <div class="label-row">
+      <div class="label-name">3 — Pulse signature</div>
+      <div class="label-desc">K sits on top; heartbeat line along the bottom like an ECG readout. Two tiers, reads like a tag.</div>
+    </div>
+  </div>
+
+  <!-- Concept 4: Caduceus serif — K where vertical doubles as a staff -->
+  <div class="card">
+    <div class="hero">
+      <svg width="88" height="88" viewBox="0 0 40 40">
+        <rect width="40" height="40" rx="10" fill="#FF6B35"/>
+        <!-- serif top & bottom on vertical (staff feel) -->
+        <path d="M9 10 L15 10 M9 30 L15 30 M12 10 L12 30" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <!-- diagonals -->
+        <path d="M12 20 L28 10 M12 20 L28 30" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+    </div>
+    <div class="sizes">
+      <div>
+        <svg width="48" height="48" viewBox="0 0 40 40">
+          <rect width="40" height="40" rx="10" fill="#FF6B35"/>
+          <path d="M9 10 L15 10 M9 30 L15 30 M12 10 L12 30" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <path d="M12 20 L28 10 M12 20 L28 30" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+        <span>48px</span>
+      </div>
+      <div>
+        <svg width="24" height="24" viewBox="0 0 40 40">
+          <rect width="40" height="40" rx="10" fill="#FF6B35"/>
+          <path d="M9 10 L15 10 M9 30 L15 30 M12 10 L12 30" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <path d="M12 20 L28 10 M12 20 L28 30" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+        <span>24px</span>
+      </div>
+      <div>
+        <svg width="16" height="16" viewBox="0 0 40 40">
+          <rect width="40" height="40" rx="10" fill="#FF6B35"/>
+          <path d="M9 10 L15 10 M9 30 L15 30 M12 10 L12 30" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <path d="M12 20 L28 10 M12 20 L28 30" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+        <span>16px</span>
+      </div>
+    </div>
+    <div class="label-row">
+      <div class="label-name">4 — Serif staff</div>
+      <div class="label-desc">Classic serif caps on the vertical. Feels more editorial / academic — not explicitly medical but signals &ldquo;institution.&rdquo;</div>
+    </div>
+  </div>
+
+</div>
+
+<h2>On white (wordmark pairing)</h2>
+<div class="concepts">
+  <div class="card">
+    <div class="light-row">
+      <svg width="220" height="44" viewBox="0 0 220 44">
+        <rect x="0" y="2" width="40" height="40" rx="10" fill="#FF6B35"/>
+        <path d="M12 12 L12 32 M12 22 L28 12 M12 22 L28 32" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <text x="52" y="32" font-family="Inter, system-ui, sans-serif" font-weight="500" font-size="32" fill="#0D0D0D" letter-spacing="1">Klare</text>
+      </svg>
+    </div>
+    <div class="label-row">
+      <div class="label-name">0 — Current baseline</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="light-row">
+      <svg width="220" height="44" viewBox="0 0 220 44">
+        <rect x="0" y="2" width="40" height="40" rx="10" fill="#FF6B35"/>
+        <path d="M12 12 L12 32" stroke="#fff" stroke-width="3" stroke-linecap="round" fill="none"/>
+        <path d="M12 22 L28 12" stroke="#fff" stroke-width="3" stroke-linecap="round" fill="none"/>
+        <path d="M12 22 L16 22 L18 19 L20 26 L22 22 L28 22 L28 32" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <text x="52" y="32" font-family="Inter, system-ui, sans-serif" font-weight="500" font-size="32" fill="#0D0D0D" letter-spacing="1">Klare</text>
+      </svg>
+    </div>
+    <div class="label-row">
+      <div class="label-name">1 — Pulse K</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="light-row">
+      <svg width="220" height="44" viewBox="0 0 220 44">
+        <rect x="0" y="2" width="40" height="40" rx="10" fill="#FF6B35"/>
+        <path d="M10 14 L10 30 M10 22 L24 14 M10 22 L24 30" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <path d="M32 10 L32 16 M29 13 L35 13" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+        <text x="52" y="32" font-family="Inter, system-ui, sans-serif" font-weight="500" font-size="32" fill="#0D0D0D" letter-spacing="1">Klare</text>
+      </svg>
+    </div>
+    <div class="label-row">
+      <div class="label-name">2 — Cross badge</div>
+    </div>
+  </div>
+</div>
+
+<div class="footnote">
+  <strong>Research basis:</strong> 85% of healthcare brands lean on letterform-plus-medical-symbol integration (stethoscope-in-e, cross-in-letter) rather than full palette shifts. Keeping the orange and adding a single iconographic cue is the cleaner move — brand consistency preserved, medical signal added.<br><br>
+  <strong>My pick:</strong> Concept 1 (Pulse K) for the integrated feel — but it loses the pulse spike at 16px favicon size. Concept 2 (Cross badge) is more legible at all sizes and more obviously medical. Tell me which direction and I'll wire it through all 6 logo files (full-dark, full-light, icon, icon-dark, round, favicon).
+</div>
+
+</body>
+</html>

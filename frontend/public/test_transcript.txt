@@ -1,0 +1,13 @@
+OK so today we're going to talk about virus structure and how we classify them.
+
+So first thing, viruses are NOT alive. They're obligate intracellular parasites. What does that mean? It means they absolutely NEED a host cell to replicate. They can't do it on their own. No metabolism, no energy production, nothing.
+
+Every virus has two basic components. First is the nucleic acid, the genome. This can be DNA or RNA, single stranded or double stranded. Second is the protein coat called the capsid. The capsid protects the genome and helps the virus attach to host cells.
+
+Some viruses also have a lipid envelope. This is a membrane they steal from the host cell when they bud out. Enveloped viruses include influenza, HIV, and coronaviruses. Non-enveloped viruses like norovirus are generally more resistant to disinfectants because they don't have that fragile lipid layer.
+
+Now let's talk about capsid symmetry. There are three main types. Icosahedral is like a soccer ball, 20 triangular faces, very efficient structure. Examples include adenovirus and poliovirus. Helical capsids are rod-shaped, like tobacco mosaic virus. And complex capsids don't fit either category, like bacteriophages which look like little lunar landers.
+
+The Baltimore classification system is how we organize viruses by their genome type and replication strategy. David Baltimore proposed this in 1971. There are seven groups. Group 1 double stranded DNA like herpes. Group 2 single stranded DNA like parvoviruses. Group 3 double stranded RNA like rotavirus. Group 4 positive sense single stranded RNA like coronaviruses and flaviviruses. Group 5 negative sense ssRNA like influenza and Ebola. Group 6 retroviruses like HIV that use reverse transcriptase. And Group 7 pararetroviruses like hepatitis B.
+
+Finally, viral replication follows these basic steps. Attachment to the host cell receptor. Entry into the cell. Uncoating where the capsid is removed. Replication of the genome. Assembly of new virus particles. And release, either by budding or lysis. Each of these steps is a potential target for antiviral drugs.
