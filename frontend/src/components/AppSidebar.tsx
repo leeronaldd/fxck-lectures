@@ -270,8 +270,8 @@ export default function AppSidebar() {
             >
               {user.isLoggedIn ? (
                 <>
-                  <MenuItem label="Settings" icon="gear" onClick={() => { setAccountMenuOpen(false); router.push("/settings"); }} />
-                  <MenuItem label="Upgrade Plan" icon="star" onClick={() => { setAccountMenuOpen(false); router.push("/settings?tab=Billing"); }} />
+                  <MenuItem label="Settings" icon="gear" href="/settings" onClick={() => setAccountMenuOpen(false)} />
+                  <MenuItem label="Upgrade Plan" icon="star" href="/settings?tab=Billing" onClick={() => setAccountMenuOpen(false)} />
                   <div style={{ borderTop: "1px solid var(--border)" }} />
                   <MenuItem
                     label="Log Out"
@@ -285,15 +285,13 @@ export default function AppSidebar() {
                 </>
               ) : (
                 <>
-                  <MenuItem label="Settings" icon="gear" onClick={() => { setAccountMenuOpen(false); router.push("/settings"); }} />
+                  <MenuItem label="Settings" icon="gear" href="/settings" onClick={() => setAccountMenuOpen(false)} />
                   <div style={{ borderTop: "1px solid var(--border)" }} />
                   <MenuItem
                     label="Sign In"
                     icon="login"
-                    onClick={() => {
-                      setAccountMenuOpen(false);
-                      router.push("/signin");
-                    }}
+                    href="/signin"
+                    onClick={() => setAccountMenuOpen(false)}
                   />
                 </>
               )}
@@ -345,15 +343,18 @@ export default function AppSidebar() {
   );
 }
 
-function MenuItem({ label, icon, onClick }: { label: string; icon: string; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className="w-full text-left px-3 py-2.5 text-sm transition-all flex items-center gap-2.5"
-      style={{ color: "var(--text-primary)" }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-elevated)")}
-      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-    >
+function MenuItem({ label, icon, onClick, href }: { label: string; icon: string; onClick?: () => void; href?: string }) {
+  // When href is provided, render a real anchor so browser-native
+  // navigation takes over. Next's client-side router was getting stuck
+  // during reader polling re-renders, eating the click silently.
+  const sharedClass = "w-full text-left px-3 py-2.5 text-sm transition-all flex items-center gap-2.5";
+  const sharedStyle = { color: "var(--text-primary)" };
+  const innerHover = {
+    onMouseEnter: (e: React.MouseEvent<HTMLElement>) => ((e.currentTarget as HTMLElement).style.background = "var(--bg-elevated)"),
+    onMouseLeave: (e: React.MouseEvent<HTMLElement>) => ((e.currentTarget as HTMLElement).style.background = "transparent"),
+  };
+  const content = (
+    <>
       <span className="w-4 h-4 flex items-center justify-center" style={{ color: "var(--text-muted)" }}>
         {icon === "gear" && (
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -372,6 +373,18 @@ function MenuItem({ label, icon, onClick }: { label: string; icon: string; onCli
         )}
       </span>
       {label}
+    </>
+  );
+  if (href) {
+    return (
+      <a href={href} onClick={onClick} className={sharedClass} style={sharedStyle} {...innerHover}>
+        {content}
+      </a>
+    );
+  }
+  return (
+    <button onClick={onClick} className={sharedClass} style={sharedStyle} {...innerHover}>
+      {content}
     </button>
   );
 }
