@@ -9,7 +9,7 @@ import { TCA_DEMO_SLIDES, TCA_DEMO_TRANSCRIPT } from "@/lib/tca-demo";
 type Phase = "idle" | "upload" | "processing" | "result";
 
 const UPLOAD_MS = 12000;
-const PROCESSING_MS = 10000;
+const PROCESSING_MS = 3000;
 const FRAME_HEIGHT_MOBILE = 520;
 const FRAME_HEIGHT_DESKTOP = 640;
 
@@ -324,7 +324,7 @@ function FileExplorerPopup({
 }) {
   return (
     <div
-      className="file-explorer absolute z-10"
+      className="absolute z-10"
       style={{
         top: "20%",
         right: "6%",
@@ -334,6 +334,7 @@ function FileExplorerPopup({
         borderRadius: "10px",
         boxShadow: "0 20px 50px rgba(0, 0, 0, 0.45)",
         overflow: "hidden",
+        opacity: 1,
       }}
     >
       {/* Finder header */}
@@ -399,16 +400,6 @@ function FileExplorerPopup({
         </div>
       </div>
 
-      <style jsx>{`
-        .file-explorer {
-          opacity: 0;
-          transform: translateX(40px) scale(0.95);
-          animation: finder-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) 400ms forwards;
-        }
-        @keyframes finder-in {
-          to { opacity: 1; transform: translateX(0) scale(1); }
-        }
-      `}</style>
     </div>
   );
 }
@@ -531,12 +522,12 @@ interface Step {
 }
 
 const STEPS: Step[] = [
-  { label: "Transcribing audio",      detail: "2,955 words",       startMs: 0,    completeMs: 1800 },
-  { label: "Extracting slide frames", detail: "14 unique slides",  startMs: 1800, completeMs: 3400 },
-  { label: "Mapping topics",          detail: "8-step mechanism",  startMs: 3400, completeMs: 4900 },
-  { label: "Writing explanations",    detail: "14 sections",       startMs: 4900, completeMs: 7400 },
-  { label: "Fact-checking claims",    detail: "OpenStax + NCBI",   startMs: 7400, completeMs: 9200 },
-  { label: "Done",                    detail: "",                  startMs: 9200, completeMs: 9800 },
+  { label: "Transcribing audio",      detail: "2,955 words",       startMs: 0,    completeMs: 500  },
+  { label: "Extracting slide frames", detail: "14 unique slides",  startMs: 500,  completeMs: 1000 },
+  { label: "Mapping topics",          detail: "8-step mechanism",  startMs: 1000, completeMs: 1500 },
+  { label: "Writing explanations",    detail: "14 sections",       startMs: 1500, completeMs: 2200 },
+  { label: "Fact-checking claims",    detail: "OpenStax + NCBI",   startMs: 2200, completeMs: 2700 },
+  { label: "Done",                    detail: "",                  startMs: 2700, completeMs: 2900 },
 ];
 
 function ProcessingPhase() {

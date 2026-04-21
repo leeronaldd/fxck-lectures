@@ -9,12 +9,25 @@ const FEATURES = [
   {
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+        <polyline points="14,2 14,8 20,8" />
+        <line x1="16" y1="13" x2="8" y2="13" />
+        <line x1="16" y1="17" x2="8" y2="17" />
+        <polyline points="10,9 9,9 8,9" />
+      </svg>
+    ),
+    title: "Organic Chemistry Tutor Quality Explanation",
+    desc: "Klare AI is trained to match Organic Chemistry Tutor quality explanation. Build each concept from scratch like a real tutor would.",
+  },
+  {
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 20h9" />
         <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
       </svg>
     ),
     title: "Textbook-verified",
-    desc: "Every claim fact-checked against OpenStax. Not scraped from blogs and Reddit threads.",
+    desc: "Every claim fact-checked against OpenStax, NCBI, or PubMed.",
   },
   {
     icon: (
@@ -24,20 +37,7 @@ const FEATURES = [
       </svg>
     ),
     title: "Smart pacing",
-    desc: "Hard concepts get more depth. Professor yap gets skipped. Your time goes where it matters.",
-  },
-  {
-    icon: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-        <polyline points="14,2 14,8 20,8" />
-        <line x1="16" y1="13" x2="8" y2="13" />
-        <line x1="16" y1="17" x2="8" y2="17" />
-        <polyline points="10,9 9,9 8,9" />
-      </svg>
-    ),
-    title: "Actually explains",
-    desc: "Doesn't assume you already get it. Builds each concept from scratch like a real tutor would.",
+    desc: "Hard concepts get more depth. Easy concepts go straight to point. Professor yap gets one sentence.",
   },
   {
     icon: (
@@ -47,6 +47,17 @@ const FEATURES = [
     ),
     title: "Exam-aware",
     desc: "Flags what's likely tested, what's safe to skip, and what your professor skimmed but you still need to know.",
+  },
+  {
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 11l3 3L22 4" />
+        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+      </svg>
+    ),
+    title: "Nothing left behind",
+    desc: "After writing, a second AI reads your raw lecture and cross-checks the output. Anything that didn't make it in gets patched automatically — so the final output covers the lecture, not just the highlights.",
+    span2: true,
   },
 ];
 
@@ -178,6 +189,40 @@ export default function LandingPage() {
           }
         `}</style>
 
+        {/* ───── Features Grid ───── */}
+        <section className="pb-20">
+          <div className="text-center mb-12">
+            <h2 className="text-2xl sm:text-3xl font-bold mb-3" style={{ color: "var(--text-primary)" }}>
+              Other tools make bad lectures prettier. We fix them.
+            </h2>
+            <p className="text-sm sm:text-base max-w-lg mx-auto" style={{ color: "var(--text-secondary)" }}>
+              They summarise. We re-teach.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {FEATURES.map((f, i) => (
+              <div
+                key={f.title}
+                className={`animate-fade-in-up animation-delay-${(i + 1) * 100} glass card-hover rounded-xl p-6${"span2" in f && f.span2 ? " sm:col-span-2" : ""}`}
+              >
+                <div
+                  className="w-10 h-10 rounded-lg flex items-center justify-center mb-4"
+                  style={{ background: "var(--accent-dim)", color: "var(--accent)" }}
+                >
+                  {f.icon}
+                </div>
+                <h3 className="text-sm font-semibold mb-1.5" style={{ color: "var(--text-primary)" }}>
+                  {f.title}
+                </h3>
+                <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                  {f.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
         {/* ───── How does Klare work? ───── */}
         <HowKlareWorks />
 
@@ -225,40 +270,6 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
-          </div>
-        </section>
-
-        {/* ───── Features Grid ───── */}
-        <section className="pb-20">
-          <div className="text-center mb-12">
-            <h2 className="text-2xl sm:text-3xl font-bold mb-3" style={{ color: "var(--text-primary)" }}>
-              Other tools make bad lectures prettier. We fix them.
-            </h2>
-            <p className="text-sm sm:text-base max-w-lg mx-auto" style={{ color: "var(--text-secondary)" }}>
-              They summarise. We re-teach.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {FEATURES.map((f, i) => (
-              <div
-                key={f.title}
-                className={`animate-fade-in-up animation-delay-${(i + 1) * 100} glass card-hover rounded-xl p-6`}
-              >
-                <div
-                  className="w-10 h-10 rounded-lg flex items-center justify-center mb-4"
-                  style={{ background: "var(--accent-dim)", color: "var(--accent)" }}
-                >
-                  {f.icon}
-                </div>
-                <h3 className="text-sm font-semibold mb-1.5" style={{ color: "var(--text-primary)" }}>
-                  {f.title}
-                </h3>
-                <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                  {f.desc}
-                </p>
-              </div>
-            ))}
           </div>
         </section>
 
