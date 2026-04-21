@@ -1117,6 +1117,13 @@ async def create_checkout_session(
 
     email = user.get("email", "")
 
+    if not stripe.api_key:
+        print("  [checkout] STRIPE_SECRET_KEY not configured")
+        raise HTTPException(
+            status_code=503,
+            detail="Payments temporarily unavailable. Please try again in a few minutes.",
+        )
+
     try:
         session = stripe.checkout.Session.create(
             mode="subscription",
@@ -1136,7 +1143,21 @@ async def create_checkout_session(
             subscription_data={"metadata": {"user_id": user["id"]}},
         )
         return {"url": session.url}
+    except stripe.error.InvalidRequestError as e:
+        # Almost always a stale price_id or test/live mode mismatch.
+        print(f"  [checkout] InvalidRequest: price={price_id} tier={tier} period={period} err={e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Checkout misconfigured (price: {price_id}). Contact support.",
+        )
+    except stripe.error.AuthenticationError as e:
+        print(f"  [checkout] Stripe auth failed: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Payment provider authentication failed. Our team has been notified.",
+        )
     except Exception as e:
+        print(f"  [checkout] Stripe error: type={type(e).__name__} err={e}")
         raise HTTPException(status_code=500, detail=f"Stripe error: {e}")
 
 
@@ -1622,12 +1643,21 @@ async def run_pipeline_stream(
             except Exception as e:
                 print(f"  [worker] failed to set final status: {e}")
 
-        # Refund the usage slot we reserved up-front if the pipeline failed.
-        # On success we leave the slot taken — that's how the 2-lifetime cap
-        # holds even when the client disconnected before the 'done' event.
-        if pipeline_error is not None:
+        # Refund the usage slot we reserved up-front unless the run fully
+        # succeeded. "Fully succeeded" means: a 'done' event fired, it carried
+        # a non-empty output, and nothing crashed along the way. Anything else
+        # — explicit error, silent exit, partial content, worker hang — gets
+        # refunded so users only spend runs on lectures they can actually use.
+        fully_successful = (
+            last_progress
+            and last_progress.get("status") == "done"
+            and last_progress.get("output")
+            and pipeline_error is None
+        )
+        if not fully_successful:
             try:
                 _run_async(_refund_usage_slot(auth_token, usage_id))
+                print(f"  [worker] refunded slot for non-successful run {file_id}")
             except Exception as e:
                 print(f"  [worker] refund raised: {e}")
 
