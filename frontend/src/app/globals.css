@@ -495,3 +495,56 @@ body {
 .demo-reveal-12 { animation-delay: 8.2s; }
 .demo-reveal-13 { animation-delay: 8.9s; }
 .demo-reveal-14 { animation-delay: 9.6s; }
+
+/* InteractiveDemo click-cursor keyframes (must be global so inline animation:
+   shorthand can reference them — styled-jsx scoping prevented this). */
+@keyframes click-cursor-pop {
+  0% { opacity: 0; transform: scale(0.6); }
+  18% { opacity: 1; transform: scale(1); }
+  35% { transform: scale(0.78); }
+  55% { transform: scale(1); }
+  75% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.9); }
+}
+@keyframes click-cursor-hold {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  40% { transform: scale(0.82); }
+  60% { transform: scale(1); }
+}
+
+/* InteractiveDemo static cursor hint pulse (used during upload phase). */
+@keyframes click-cursor-hint-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.18); opacity: 0.85; }
+}
+
+/* Finder row "next action" pulse. */
+@keyframes finder-row-pulse {
+  0%, 100% { background-color: var(--accent-dim); }
+  50% { background-color: rgba(255, 107, 53, 0.28); }
+}
+
+/* File chip slide-in (used when user clicks a Finder row). */
+@keyframes file-chip-in {
+  from { opacity: 0; transform: translate(30px, -20px) scale(0.9); }
+  to { opacity: 1; transform: translate(0, 0) scale(1); }
+}
+
+/* Static (non-clickable) comment callout tail — mirrors the button-based one
+   used in CommentCallout. */
+.static-callout > div {
+  position: relative;
+}
+.static-callout > div::after {
+  content: "";
+  position: absolute;
+  bottom: -9px;
+  left: 22px;
+  width: 14px;
+  height: 14px;
+  background: var(--bg-surface);
+  border-left: 1.5px solid var(--accent);
+  border-bottom: 1.5px solid var(--accent);
+  transform: rotate(-45deg);
+  pointer-events: none;
+}

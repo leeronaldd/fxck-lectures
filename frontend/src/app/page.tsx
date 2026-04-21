@@ -1,116 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
-import { SlideCardGroup } from "@/components/SlideCard";
-import ImageLightbox from "@/components/ImageLightbox";
-import type { SlideCard, TranscriptSection } from "@/lib/types";
-
-// ── Demo data from V3.1 pipeline ──────────────────────────────────────
-
-interface DemoSection {
-  label: string;
-  slides: SlideCard[];
-  transcript: TranscriptSection;
-}
-
-const DEMO_SECTIONS: DemoSection[] = [
-  {
-    label: "Baltimore Classification",
-    slides: [
-      {
-        slide_id: "3a",
-        title: "The Baltimore Classification System",
-        card_type: "professor_slide",
-        image_ref: "/screenshots/screenshot_005.jpg",
-        bullet_points: [],
-        exam_tip:
-          "All 7 Baltimore classes must produce +sense mRNA. Positive-sense RNA viruses (Class IV) skip straight to translation. Negative-sense (Class V) and retroviruses (Class VI) need extra enzymatic steps first.",
-        ei_percent: 90,
-      },
-      {
-        slide_id: "3b",
-        title: "Animal Virus Families by Baltimore Class",
-        card_type: "professor_slide",
-        image_ref: "/screenshots/screenshot_009.jpg",
-        bullet_points: [],
-        exam_tip:
-          "DNA viruses generally replicate in the host nucleus using host enzymes, while RNA viruses generally replicate in the host cytoplasm using virally encoded RNA-dependent RNA polymerases.",
-        ei_percent: 90,
-      },
-    ],
-    transcript: {
-      slide_number: 3,
-      title: "Baltimore Classification System",
-      narrative: `Remember the viral structures we covered earlier\u2014the capsid and the lipid envelope. Those structures protect the viral payload. But what exactly is that payload, and how does it hijack the host cell?
-
-Viruses do not have their own ribosomes. To manufacture their proteins, they have to borrow the host cell\u2019s machinery. The host ribosome only reads one language: messenger RNA (mRNA). So no matter what kind of genome a virus carries\u2014DNA or RNA, single or double-stranded\u2014it has to end up at the same destination: a positive-sense mRNA strand the host ribosome can translate.
-
-This \u201Call roads lead to mRNA\u201D principle is the foundation of the **Baltimore Classification System**. It sorts every virus into one of seven classes based on the route its genome takes to reach that mRNA finish line. Look at the diagram on the slide\u2014notice how the arrows from all seven classes converge on the central golden strand labeled \u201CmRNA (+)\u201D. That\u2019s the mandatory destination.
-
-Let\u2019s walk through how each class gets there.
-
-**Class I \u2014 dsDNA.** Double-stranded DNA viruses like Adenovirus and Herpesvirus. This is the same genomic language our own cells use, so the host\u2019s own enzymes can transcribe it straight into mRNA. No special viral machinery required.
-
-**Class II \u2014 ssDNA.** Single-stranded DNA, like Parvovirus. The virus first builds a complementary strand to form a dsDNA intermediate, then follows the Class I pathway. One extra step.
-
-**Class III \u2014 dsRNA.** Double-stranded RNA, like Rotavirus. The host has no enzyme that reads RNA to make more RNA, so the virus has to bring its own **RNA-dependent RNA polymerase** packaged inside its capsid to transcribe its negative strand into positive-sense mRNA.
-
-**Class IV \u2014 +ssRNA.** Positive-sense single-stranded RNA, like Poliovirus and SARS-CoV-2. A trick to recall this: \u201Cpositive means ready to proceed.\u201D This strand is functionally identical to mRNA. The moment it enters the cell, host ribosomes can translate it directly. No extra enzymes needed.
-
-**Class V \u2014 \u2212ssRNA.** Negative-sense single-stranded RNA, like Influenza and Rabies. This strand is the mirror image of mRNA\u2014if a host ribosome looks at it, it sees gibberish. So the virus has to carry its own RNA-dependent RNA polymerase inside the capsid to transcribe the negative strand into a readable positive strand before translation can begin.
-
-**Class VI \u2014 +ssRNA retrovirus.** This is HIV\u2019s class. The genome looks like Class IV (+ssRNA) but the strategy is completely different. Instead of translating directly, the virus uses an enzyme called **reverse transcriptase** to convert its RNA backwards into double-stranded DNA. That viral DNA then physically integrates into the host\u2019s own chromosome\u2014the genome becomes part of the cell, hidden indefinitely.
-
-**Class VII \u2014 dsDNA reverse-transcribing.** The mirror of Class VI. Hepatitis B is the example. The virus starts with dsDNA but uses an RNA intermediate and reverse transcription to replicate. Genome shape says DNA, replication mechanism says retrovirus.
-
-The genome dictates the pathway, and the pathway dictates which specific enzymes the virus has to bring with it. That\u2019s why Class V viruses like Influenza must pack a polymerase, and why Class VI retroviruses are the only ones we treat with reverse-transcriptase inhibitors\u2014other classes don\u2019t use that enzyme.`,
-      ei_percent: 90,
-      ei_reasoning: "The Baltimore classification system and the distinction between positive/negative sense RNA are fundamental virology concepts universally tested in medical microbiology curricula.",
-    },
-  },
-  {
-    label: "Bacteriophage Structure",
-    slides: [
-      {
-        slide_id: "4a",
-        title: "Bacteriophage Anatomy",
-        card_type: "professor_slide",
-        image_ref: "/screenshots/screenshot_006.jpg",
-        bullet_points: [],
-        exam_tip:
-          "The protein capsid never enters the bacterial cell. It remains outside as an empty \u201Cghost\u201D once the DNA is injected through the contractile sheath.",
-        ei_percent: 70,
-      },
-      {
-        slide_id: "4b",
-        title: "Receptor Specificity and Genome Entry",
-        card_type: "professor_slide",
-        image_ref: "/screenshots/screenshot_007.jpg",
-        bullet_points: [],
-        exam_tip:
-          "Different phages bind different bacterial surface structures (flagellum, pilus, outer membrane proteins). Receptor specificity determines host range.",
-        ei_percent: 70,
-      },
-    ],
-    transcript: {
-      slide_number: 4,
-      title: "Bacteriophage Anatomy and Infection",
-      narrative: `We\u2019ve previously discussed how viruses are classified by their genomes, but how do they actually get that genetic material inside a host? To understand this, we look at **Bacteriophages**\u2014viruses that specifically infect **Prokaryotes**.
-
-Looking at Slide 4a, notice the complex, almost robotic structure of the T4 phage. It consists of an icosahedral **capsid** (head) containing the DNA, attached to a contractile **sheath**. At the base, you\u2019ll see the **tail fibers**. Think of these fibers as landing gear; they recognize and bind to specific receptors on the bacterial surface.
-
-Once anchored, the real magic happens. The helical sheath contracts\u2014powered by ATP\u2014driving the internal hollow core through the bacterial cell wall like a hypodermic needle. This process, known as **Genome Entry**, is purely mechanical.
-
-On Slide 4b, you can see this receptor specificity in action. Different phages bind to completely different bacterial surface structures\u2014the flagellum, the pilus, outer membrane proteins, even the LPS layer.
-
-A critical distinction for your exams: the protein capsid never enters the cell. It remains outside as an empty \u201Cghost\u201D once the DNA is injected. The virus has now successfully hijacked the host\u2019s machinery, leading us directly into the two pathways it can take: the lytic or lysogenic cycles.`,
-      ei_percent: 70,
-      ei_reasoning: "Bacteriophage structure and the unique injection mechanism are high-yield topics in microbiology.",
-    },
-  },
-];
+import InteractiveDemo from "@/components/InteractiveDemo";
+import HowKlareWorks from "@/components/HowKlareWorks";
 
 const FEATURES = [
   {
@@ -161,9 +54,6 @@ export default function LandingPage() {
   const router = useRouter();
   const { user } = useAppStore();
   const isLoggedIn = user.isLoggedIn;
-  const [activeSection, setActiveSection] = useState(0);
-  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
-  const demo = DEMO_SECTIONS[activeSection];
 
   return (
     <div className="flex-1 relative overflow-hidden">
@@ -230,82 +120,66 @@ export default function LandingPage() {
                 boxShadow: "0 8px 32px var(--accent-glow)",
               }}
             >
-              Try it on your worst lecture
+              Try it for Free
             </button>
             <p className="mt-3 text-xs" style={{ color: "var(--text-muted)" }}>
               Free &middot; no card required
             </p>
+            {/* Secondary low-commitment path — keeps browsers on the page */}
+            <button
+              type="button"
+              onClick={() => {
+                document.getElementById("interactive-demo")?.scrollIntoView({
+                  behavior: "smooth",
+                  block: "start",
+                });
+              }}
+              className="read-sample-link mt-4 inline-flex items-center gap-1.5 text-sm font-medium transition-opacity hover:opacity-100"
+              style={{ color: "var(--accent)", opacity: 0.85 }}
+            >
+              See it in action
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="read-sample-arrow"
+                aria-hidden="true"
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
           </div>
         </section>
 
-        {/* ───── App Demo — Two-Panel Layout ───── */}
-        <section className="pb-20">
-          {lightboxSrc && (
-            <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
-          )}
-
-          <div className="rounded-xl overflow-hidden shadow-2xl" style={{ border: "1px solid var(--border)", background: "var(--bg-elevated)" }}>
-            {/* Browser chrome + section tabs */}
-            <div className="flex items-center gap-2 px-4 py-2.5" style={{ borderBottom: "1px solid var(--border)" }}>
-              <div className="flex gap-1.5">
-                <div className="w-3 h-3 rounded-full" style={{ background: "#ff5f57" }} />
-                <div className="w-3 h-3 rounded-full" style={{ background: "#febc2e" }} />
-                <div className="w-3 h-3 rounded-full" style={{ background: "#28c840" }} />
-              </div>
-              <div className="flex-1 mx-4 flex items-center justify-center gap-2">
-                {DEMO_SECTIONS.map((s, i) => (
-                  <button
-                    key={s.label}
-                    onClick={() => setActiveSection(i)}
-                    className="text-xs px-3 py-1 rounded-md transition-all"
-                    style={{
-                      background: i === activeSection ? "var(--accent-dim)" : "var(--bg-base)",
-                      color: i === activeSection ? "var(--accent)" : "var(--text-muted)",
-                      border: `1px solid ${i === activeSection ? "rgba(255,107,53,0.3)" : "transparent"}`,
-                    }}
-                  >
-                    {s.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* App body — slide card left + transcript right */}
-            <div className="flex" style={{ background: "var(--bg-base)", height: 520 }}>
-              {/* Left: Slide Card */}
-              <div className="hidden sm:flex flex-col w-[45%] shrink-0 p-4 overflow-y-auto" style={{ borderRight: "1px solid var(--border)" }}>
-                <SlideCardGroup cards={demo.slides} onImageClick={setLightboxSrc} />
-              </div>
-
-              {/* Right: Transcript */}
-              <div className="flex-1 overflow-y-auto relative">
-                <div className="px-5 sm:px-8 py-5">
-                  <h2 className="text-lg font-bold mb-4" style={{ color: "var(--text-primary)" }}>
-                    {demo.transcript.title}
-                  </h2>
-                  {demo.transcript.narrative.split("\n\n").map((para, i) => {
-                    const html = para
-                      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-                      .replace(/\*\*([\s\S]+?)\*\*/g, '<strong style="color: var(--accent)">$1</strong>')
-                      .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, "<em>$1</em>");
-                    return (
-                      <p
-                        key={i}
-                        className="text-[13px] mb-4 leading-relaxed"
-                        style={{ color: "var(--text-secondary)" }}
-                        dangerouslySetInnerHTML={{ __html: html }}
-                      />
-                    );
-                  })}
-                </div>
-
-                {/* Fade overlays */}
-                <div className="absolute top-0 left-0 right-0 h-6 pointer-events-none" style={{ background: "linear-gradient(var(--bg-base), transparent)" }} />
-                <div className="absolute bottom-0 left-0 right-0 h-12 pointer-events-none" style={{ background: "linear-gradient(transparent, var(--bg-base))" }} />
-              </div>
-            </div>
-          </div>
+        {/* ───── Interactive Demo ───── */}
+        <section id="interactive-demo" className="pb-20 scroll-mt-20">
+          <InteractiveDemo />
         </section>
+
+        <style jsx>{`
+          .read-sample-arrow {
+            animation: read-sample-bob 1.6s ease-in-out infinite;
+          }
+          @keyframes read-sample-bob {
+            0%, 100% {
+              transform: translateY(0);
+            }
+            50% {
+              transform: translateY(3px);
+            }
+          }
+          .read-sample-link:hover .read-sample-arrow {
+            animation-duration: 0.8s;
+          }
+        `}</style>
+
+        {/* ───── How does Klare work? ───── */}
+        <HowKlareWorks />
 
         {/* ───── Testimonial ───── */}
         <section className="pb-20">
@@ -328,21 +202,25 @@ export default function LandingPage() {
                 className="text-base sm:text-lg leading-relaxed mb-6 pl-10"
                 style={{ color: "var(--text-primary)" }}
               >
-                &ldquo;I went from re-watching a 2-hour microbiology lecture at 2x speed three times, to reading it once in twenty minutes and actually understanding it. I wished I&rsquo;d had this earlier.&rdquo;
+                &ldquo;Btw my brother made this for me &mdash; I used to spend hours just trying to understand what my micro prof was saying. Now it&rsquo;s 20 mins to learn the lecture, 30 to memorise.&rdquo;
               </p>
               <div className="flex items-center gap-3 pl-10">
                 <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm shrink-0"
+                  className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
                   style={{ background: "var(--accent-dim)", color: "var(--accent)" }}
+                  aria-hidden
                 >
-                  RL
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
                 </div>
                 <div>
                   <div className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
-                    Rachael L.
+                    Anonymous
                   </div>
                   <div className="text-xs" style={{ color: "var(--text-muted)" }}>
-                    1st-year MD, Griffith University
+                    1st-year Pre-med student
                   </div>
                 </div>
               </div>
@@ -379,48 +257,6 @@ export default function LandingPage() {
                 <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
                   {f.desc}
                 </p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ───── How It Works ───── */}
-        <section id="how-it-works" className="pb-20">
-          <div className="text-center mb-12">
-            <h2 className="text-2xl sm:text-3xl font-bold mb-3" style={{ color: "var(--text-primary)" }}>
-              How it works
-            </h2>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
-            {[
-              { step: "01", title: "Upload", desc: "Drop your lecture video or transcript" },
-              { step: "02", title: "Process", desc: "AI analyzes, fact-checks, and re-explains" },
-              { step: "03", title: "Read", desc: "Get a tutor-quality document in 15 minutes" },
-            ].map((item, i) => (
-              <div key={item.step} className="flex-1 relative">
-                <div className="glass rounded-xl p-6 text-center">
-                  <div
-                    className="text-3xl font-bold mb-3"
-                    style={{ color: "var(--accent)", opacity: 0.3 }}
-                  >
-                    {item.step}
-                  </div>
-                  <h3 className="text-sm font-semibold mb-1" style={{ color: "var(--text-primary)" }}>
-                    {item.title}
-                  </h3>
-                  <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-                    {item.desc}
-                  </p>
-                </div>
-                {/* Connector arrow (hidden on last item and mobile) */}
-                {i < 2 && (
-                  <div className="hidden sm:block absolute top-1/2 -right-5 -translate-y-1/2 z-10" style={{ color: "var(--text-muted)" }}>
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                      <path d="M6 3l5 5-5 5" />
-                    </svg>
-                  </div>
-                )}
               </div>
             ))}
           </div>
