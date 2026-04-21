@@ -195,12 +195,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </button>
           ) : (
             <>
-              {/* Dedicated Settings button — always one click away, no dropdown
-                  to hunt for. Especially needed on /reader where the sidebar
-                  is force-collapsed. */}
-              <button
-                onClick={() => router.push("/settings")}
-                className="p-2 rounded-lg transition-colors"
+              {/* Dedicated Settings button — uses a plain <a> instead of
+                  router.push so Next's client-side routing can't silently
+                  swallow the click (reader page had that issue — user
+                  had to visit another session first before gear worked). */}
+              <a
+                href="/settings"
+                className="p-2 rounded-lg transition-colors inline-flex items-center justify-center"
                 style={{ color: "var(--text-secondary)" }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-elevated)")}
                 onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
@@ -210,7 +211,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   <circle cx="12" cy="12" r="3" />
                   <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
                 </svg>
-              </button>
+              </a>
             <div ref={avatarMenuRef} className="relative">
               <button
                 onClick={() => setAvatarMenuOpen((v) => !v)}
@@ -234,8 +235,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     boxShadow: "0 12px 32px rgba(0, 0, 0, 0.4)",
                   }}
                 >
-                  <button
-                    onClick={() => { setAvatarMenuOpen(false); router.push("/settings"); }}
+                  <a
+                    href="/settings"
+                    onClick={() => setAvatarMenuOpen(false)}
                     className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-left transition-colors"
                     style={{ color: "var(--text-primary)" }}
                     onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-elevated)")}
@@ -246,7 +248,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
                     </svg>
                     Settings
-                  </button>
+                  </a>
                   <div style={{ borderTop: "1px solid var(--border)" }} />
                   <button
                     onClick={async () => {
