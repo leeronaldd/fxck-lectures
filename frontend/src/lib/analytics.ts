@@ -23,6 +23,17 @@ function boot() {
   booted = true;
 }
 
+/**
+ * Call this once on app mount (AuthProvider) so PostHog initialises for
+ * every visitor — including anonymous users who never fire a trackEvent.
+ * Without this, capture_pageview:true is never honoured because boot()
+ * was only ever called from inside trackEvent/identifyUser, which means
+ * anonymous landing-page visits went unrecorded.
+ */
+export function initAnalytics() {
+  boot();
+}
+
 export function trackEvent(
   event: string,
   properties?: Record<string, unknown>

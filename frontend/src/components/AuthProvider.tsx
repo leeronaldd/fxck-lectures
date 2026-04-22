@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { createClient } from "@/lib/supabase";
 import { useAppStore } from "@/lib/store";
 import { updateProfile } from "@/lib/api";
-import { identifyUser, resetUser, trackEvent } from "@/lib/analytics";
+import { identifyUser, resetUser, trackEvent, initAnalytics } from "@/lib/analytics";
 
 /** Save quiz answers from localStorage to backend after sign-in */
 async function syncQuizToProfile() {
@@ -33,6 +33,11 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const { setUser, clearUser, setAuthLoading, loadSessions } = useAppStore();
 
   useEffect(() => {
+    // Boot PostHog immediately so anonymous pageviews land in analytics.
+    // Previously boot() only ran when a trackEvent fired, which meant
+    // landing-page visitors were invisible to PostHog funnels.
+    initAnalytics();
+
     const supabase = createClient();
 
     // Check for existing session on mount
