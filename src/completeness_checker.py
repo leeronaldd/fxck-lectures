@@ -82,10 +82,10 @@ class LectureScore:
     (a real tangent, overemphasis, or bright moment it noticed). Not a
     hardcoded template — every run gets a unique one.
 
-    time_saved_min is Flash's estimate of how many minutes Klare saved the
-    student vs watching the raw lecture. Flash estimates from transcript
-    word count (~150 wpm speech) minus generated doc word count (~200 wpm
-    reading).
+    time_saved_min is computed deterministically in Python from the actual
+    word counts (transcript_words/150 wpm − doc_words/200 wpm). We don't let
+    Flash do the arithmetic because Flash hallucinates numbers — it returned
+    42 min for a 2-hour lecture where the real answer was ~100 min.
     """
 
     overall: int              # 0-100
@@ -228,10 +228,10 @@ and 'pili' as if they were the same thing." Or on a good lecture:
 One sentence, under 20 words. No starting with "the professor" — just
 state what happened.
 
-Estimate time_saved_min honestly: transcript word count divided by 150
-(speech pace) minus generated doc word count divided by 200 (reading
-pace), rounded to the nearest integer. If the numbers suggest Klare
-saved negative time (rare — only on very short lectures), return 0.
+Don't estimate time_saved_min — return 0 for that field. Python
+computes it deterministically from the actual word counts after you
+return, so whatever you put there gets overwritten. We're just asking
+for it in the schema so the JSON shape stays consistent.
 
 Output JSON only, this shape:
 {{
@@ -251,7 +251,7 @@ Output JSON only, this shape:
     "efficiency": 33,
     "label": "ok",
     "comment": "Spent 12 minutes on the history of penicillin before touching peptidoglycan structure.",
-    "time_saved_min": 87
+    "time_saved_min": 0
   }}
 }}
 
@@ -448,6 +448,16 @@ def check_completeness(
                 else:
                     flash_label = "excellent"
 
+            # Compute time_saved deterministically — Flash hallucinates numbers.
+            # Speech ≈ 150 wpm, comfortable reading ≈ 200 wpm. Use the assembled
+            # doc length (all section transcripts concatenated) as the read-time
+            # denominator so it reflects what the student actually reads.
+            transcript_words = len(transcript.split())
+            doc_words = sum(len(s.transcript.split()) for s in sections)
+            listen_min = transcript_words / 150.0
+            read_min = doc_words / 200.0
+            time_saved_min = max(0, round(listen_min - read_min))
+
             lecture_score = LectureScore(
                 overall=max(0, min(100, overall)),
                 clarity=max(0, min(100, int(raw_score.get("clarity", 0)))),
@@ -455,7 +465,7 @@ def check_completeness(
                 efficiency=max(0, min(100, int(raw_score.get("efficiency", 0)))),
                 label=flash_label,
                 comment=str(raw_score.get("comment", "")).strip()[:200],
-                time_saved_min=max(0, int(raw_score.get("time_saved_min", 0))),
+                time_saved_min=time_saved_min,
             )
             print(f"  [completeness] lecture_score: {lecture_score.overall}/100 "
                   f"({lecture_score.label}) — {lecture_score.comment[:60]}")

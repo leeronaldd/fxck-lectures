@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Fxck Lectures — Replace Bad Professors with a 20-Min Read",
+  title: "Klare — Lectures, taught better",
   description:
     "Turns that one bad professor's 2-hour lecture into a 20-minute read that actually makes sense. Textbook-verified, exam-aware, and free to try. Built for medical, biomed, and nursing students.",
   metadataBase: new URL("https://klareai.com"),
@@ -29,12 +29,12 @@ export const metadata: Metadata = {
     "biomed study app",
     "AI lecture replacement",
     "Klare",
-    "Fxck Lectures",
+    "klareai",
     "NotebookLM alternative",
     "university study AI",
   ],
   openGraph: {
-    title: "Fxck Lectures — Replace Bad Professors with a 20-Min Read",
+    title: "Klare — Lectures, taught better",
     description:
       "Turns that one bad professor's 2-hour lecture into a 20-minute read that actually makes sense. Textbook-verified, exam-aware, and free to try.",
     url: "https://klareai.com",
@@ -43,7 +43,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Fxck Lectures — Replace Bad Professors with a 20-Min Read",
+    title: "Klare — Lectures, taught better",
     description:
       "Turns that one bad professor's 2-hour lecture into a 20-minute read that actually makes sense. Free to try.",
   },
@@ -83,7 +83,6 @@ export default function RootLayout({
               "@context": "https://schema.org",
               "@type": "SoftwareApplication",
               name: "Klare",
-              alternateName: "Fxck Lectures",
               applicationCategory: "EducationalApplication",
               operatingSystem: "Web",
               url: "https://klareai.com",

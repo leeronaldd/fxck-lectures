@@ -161,7 +161,7 @@ export default function LandingPage() {
 
           {/* Headline */}
           <h1 className="animate-fade-in-up animation-delay-200 text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight leading-[1.1] mb-6">
-            <span className="gradient-text">Fxck Lectures</span>
+            Lectures, <span className="gradient-text">taught better.</span>
           </h1>
 
           {/* Subheadline */}

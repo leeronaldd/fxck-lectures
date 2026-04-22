@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
-export const alt = "Fxck Lectures — Replace Bad Professors with a 20-Min Read";
+export const alt = "Klare — Lectures, taught better";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -71,19 +71,22 @@ export default function OGImage() {
           </span>
         </div>
 
-        {/* Headline — solid orange, no gradient text (Satori limitation) */}
+        {/* Headline — mirrors landing H1, stacked to fit 1200px width */}
         <div
           style={{
-            fontSize: 92,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            fontSize: 108,
             fontWeight: 800,
-            letterSpacing: "-2px",
-            color: "#FF6B35",
-            lineHeight: 1.05,
+            letterSpacing: "-3px",
+            lineHeight: 1.02,
             textAlign: "center",
-            marginBottom: 24,
+            marginBottom: 32,
           }}
         >
-          Fxck Lectures
+          <span style={{ color: "#F5F5F7" }}>Lectures,</span>
+          <span style={{ color: "#FF6B35" }}>taught better.</span>
         </div>
 
         {/* Subheadline */}
