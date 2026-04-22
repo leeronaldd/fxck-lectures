@@ -826,10 +826,10 @@ function ResultPhase({ onImageClick }: { onImageClick: (src: string) => void }) 
           50% { transform: translate(-50%, 5px); }
         }
 
-        :global(.animate-fade-in-up) {
-          animation: tag-fade-in 0.25s ease-out;
+        .callout-fade-in {
+          animation: callout-fade-in 0.25s ease-out forwards;
         }
-        @keyframes tag-fade-in {
+        @keyframes callout-fade-in {
           from { opacity: 0; transform: translateY(-4px); }
           to { opacity: 1; transform: translateY(0); }
         }
@@ -870,7 +870,7 @@ function CommentCallout({
       </button>
       {isOpen && (
         <div
-          className="mt-2 p-3.5 rounded-lg text-[12px] leading-relaxed animate-fade-in-up"
+          className="callout-fade-in mt-2 p-3.5 rounded-lg text-[12px] leading-relaxed"
           style={{
             background: "var(--bg-surface)",
             border: "1px solid var(--accent)",
