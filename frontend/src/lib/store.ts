@@ -43,6 +43,11 @@ export interface Session {
   groups: number;
   status?: "pending" | "processing" | "ready" | "failed";
   errorMessage?: string | null;
+  // Current pipeline stage name (e.g. "Transcribing lecture", "Generating
+  // lecture", "Verifying coverage"). Populated by the backend while a run
+  // is in-flight so a reloaded reader can show the user which step the
+  // pipeline is on. Null when the run is done.
+  currentStage?: string | null;
 }
 
 // Per-session pipeline state for concurrent processing
@@ -210,6 +215,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => {
         groups: 0,
         status: (s.status as Session["status"]) ?? "ready",
         errorMessage: s.error_message ?? null,
+        currentStage: s.current_stage ?? null,
       }));
       set({ sessions });
     } catch (e) {
@@ -229,13 +235,15 @@ export const useAppStore = create<AppState>()(persist((set, get) => {
         (data.concept_groups || []) as ConceptGroup[],
         (data.verification_report || []) as VerificationClaim[],
       );
-      // Mirror status into the sessions list so the reader can react to
-      // processing/failed without a second round-trip.
+      // Mirror status + current stage into the sessions list so the reader
+      // can react to processing/failed and show the pipeline stage without
+      // a second round-trip.
       const status = (data.status as Session["status"]) ?? "ready";
       const errorMessage = data.error_message ?? null;
+      const currentStage = data.current_stage ?? null;
       set((s) => ({
         sessions: s.sessions.map((sess) =>
-          sess.id === sessionId ? { ...sess, status, errorMessage } : sess
+          sess.id === sessionId ? { ...sess, status, errorMessage, currentStage } : sess
         ),
       }));
     }

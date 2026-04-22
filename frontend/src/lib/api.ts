@@ -127,7 +127,7 @@ export interface PipelineEvent {
  *
  * Returns a cancel function.
  */
-export async function fetchSessions(): Promise<{ id: string; name: string; created_at: string; status?: string; error_message?: string | null }[]> {
+export async function fetchSessions(): Promise<{ id: string; name: string; created_at: string; status?: string; error_message?: string | null; current_stage?: string | null }[]> {
   const token = await getToken();
   const res = await fetch(`${API_URL}/api/sessions`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -144,6 +144,7 @@ export async function fetchSession(sessionId: string): Promise<{
   verification_report: unknown[];
   status?: string;
   error_message?: string | null;
+  current_stage?: string | null;
 } | null> {
   const token = await getToken();
   const res = await fetch(`${API_URL}/api/sessions/${sessionId}`, {

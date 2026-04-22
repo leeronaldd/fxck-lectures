@@ -256,13 +256,17 @@ export default function ReaderPage() {
             )}
           </div>
           <h2 className="text-xl font-bold mb-2" style={{ color: "var(--text-primary)" }}>
-            {isStale ? "This is taking longer than expected" : isActivelyProcessing ? "Processing in background..." : "No lecture loaded"}
+            {isStale
+              ? "This is taking longer than expected"
+              : isActivelyProcessing
+              ? (activeSession?.currentStage || "Processing in background...")
+              : "No lecture loaded"}
           </h2>
           <p className="text-sm mb-6" style={{ color: "var(--text-secondary)" }}>
             {isStale
               ? "The generation may have finished on another device, or something went wrong. You can try uploading again."
               : isActivelyProcessing
-              ? "Your lecture is being generated. View the progress or wait here — it'll appear automatically when ready."
+              ? "Your lecture is being generated in the background. This page auto-refreshes — close the tab and come back anytime, nothing will be lost."
               : "Upload a lecture recording or transcript to get started."}
           </p>
           {isStale ? (

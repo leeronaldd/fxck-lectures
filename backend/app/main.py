@@ -412,6 +412,37 @@ async def _update_session_status(
         print(f"  [status] PATCH {status} raised: {e}")
 
 
+async def _update_session_stage(session_id: str, stage: str | None) -> None:
+    """Write the current pipeline stage to Supabase so the reader can display
+    it while a run is in-flight. Called on every stage CHANGE (not every
+    progress tick) to avoid hammering Supabase.
+
+    When stage is None, clears the field — done on successful completion so
+    the UI stops showing a stage name.
+
+    Silent no-op if SUPABASE_SERVICE_KEY isn't configured (partial saves
+    already require it; if missing, the whole stage-telemetry feature
+    gracefully degrades to the old "Processing in background..." UX).
+    """
+    if not SUPABASE_SERVICE_KEY:
+        return
+    headers = _service_headers({
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal",
+    })
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            await client.patch(
+                f"{SUPABASE_URL}/rest/v1/sessions",
+                params={"id": f"eq.{session_id}"},
+                json={"current_stage": stage},
+                headers=headers,
+            )
+    except Exception as e:
+        # Non-fatal — stage telemetry is a nice-to-have, not critical path
+        print(f"  [stage] PATCH raised: {e}")
+
+
 async def _save_session_partial(
     user_id: str,
     session_id: str,
@@ -497,6 +528,7 @@ async def _save_session_direct(token: str, user_id: str, name: str, output: dict
                     "verification_report": output.get("verification_report", []),
                     "status": "ready",
                     "error_message": None,
+                    "current_stage": None,  # run is done — clear the stage label
                 },
                 headers=auth_for_patch,
             )
@@ -827,7 +859,7 @@ async def get_sessions(
             f"{SUPABASE_URL}/rest/v1/sessions",
             params={
                 "user_id": f"eq.{user['id']}",
-                "select": "id,name,created_at,status,error_message",
+                "select": "id,name,created_at,status,error_message,current_stage",
                 "order": "created_at.desc",
                 "limit": "20",
             },
@@ -1651,6 +1683,10 @@ async def run_pipeline_stream(
 
         last_progress = None
         pipeline_error: Exception | None = None
+        # Track the last persisted stage so we only PATCH Supabase when the
+        # stage name actually changes (progress ticks fire many times per
+        # stage; hammering Supabase on every one would waste quota).
+        last_persisted_stage: str | None = None
         # Accumulate streamed sections so a partial snapshot can be written to
         # Supabase as generation progresses. Without this, only the final
         # 'done' event triggers a save — so a crash or Cloud Run scale-down
@@ -1666,6 +1702,21 @@ async def run_pipeline_stream(
                 with lock:
                     events.append(progress)
                 last_progress = progress
+
+                # Persist stage name to Supabase when it changes so a reloaded
+                # reader can show the user which step the pipeline is on.
+                current_stage = progress.get("stage")
+                if (
+                    session_id
+                    and current_stage
+                    and current_stage != last_persisted_stage
+                    and progress.get("status") == "running"
+                ):
+                    try:
+                        _run_async(_update_session_stage(session_id, current_stage))
+                        last_persisted_stage = current_stage
+                    except Exception as e:
+                        print(f"  [worker] stage update raised: {e}")
 
                 # Accumulate section payloads for progressive persistence
                 section = progress.get("section")
