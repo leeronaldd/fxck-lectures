@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import type { SlideCard } from "@/lib/types";
+import AuthImage from "./AuthImage";
 
 /** Render inline markdown (bold, italic) to HTML */
 function inlineMarkdown(text: string): string {
@@ -13,14 +14,6 @@ function inlineMarkdown(text: string): string {
 
 function SlideImage({ src, alt, onClick }: { src: string; alt: string; onClick: () => void }) {
   const [status, setStatus] = useState<"loading" | "loaded" | "error">("loading");
-  const imgRef = React.useRef<HTMLImageElement>(null);
-
-  // Handle case where image loads before React hydration attaches onLoad
-  React.useEffect(() => {
-    if (imgRef.current?.complete && imgRef.current.naturalWidth > 0) {
-      setStatus("loaded");
-    }
-  }, [src]);
 
   if (status === "error") {
     return (
@@ -50,8 +43,7 @@ function SlideImage({ src, alt, onClick }: { src: string; alt: string; onClick: 
               style={{ borderColor: "var(--text-muted)", borderTopColor: "transparent" }} />
           </div>
         )}
-        <img
-          ref={imgRef}
+        <AuthImage
           src={src}
           alt={alt}
           className="w-full transition-opacity duration-200"
@@ -192,19 +184,32 @@ export function SlideCardGroup({
   cards: SlideCard[];
   onImageClick?: (src: string) => void;
 }) {
-  const [activeIdx, setActiveIdx] = useState(0);
-  const safeIdx = Math.min(activeIdx, cards.length - 1);
+  // Dedupe by slide_id — the backend sometimes emits the same slide twice
+  // (e.g. "25a" and "25a" both pointing at the same image), which surfaces
+  // as two identical tabs. Frontend-only guard: keep the first occurrence
+  // of each slide_id and drop the rest. Preserves legitimate 25a/25b/25c
+  // variations since those have distinct slide_ids.
+  const seen = new Set<string>();
+  const uniqueCards = cards.filter((c) => {
+    if (seen.has(c.slide_id)) return false;
+    seen.add(c.slide_id);
+    return true;
+  });
 
-  if (cards.length === 1) {
-    return <SlideCardComponent card={cards[0]} onImageClick={onImageClick} />;
+  const [activeIdx, setActiveIdx] = useState(0);
+  const safeIdx = Math.min(activeIdx, uniqueCards.length - 1);
+
+  if (uniqueCards.length === 0) return null;
+  if (uniqueCards.length === 1) {
+    return <SlideCardComponent card={uniqueCards[0]} onImageClick={onImageClick} />;
   }
 
   return (
     <div className="space-y-2">
-      <SlideCardComponent card={cards[safeIdx]} onImageClick={onImageClick} />
+      <SlideCardComponent card={uniqueCards[safeIdx]} onImageClick={onImageClick} />
       {/* Dot indicators */}
       <div className="flex items-center justify-center gap-2 py-1">
-        {cards.map((card, i) => (
+        {uniqueCards.map((card, i) => (
           <button
             key={card.slide_id}
             onClick={() => setActiveIdx(i)}
