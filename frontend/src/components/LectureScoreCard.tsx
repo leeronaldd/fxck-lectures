@@ -4,14 +4,15 @@ import { useState } from "react";
 import type { LectureScore, LectureScoreLabel, TranscriptSection } from "@/lib/types";
 
 interface Props {
-  // Preferred source of truth — Flash's scoring from the completeness checker.
-  // When present, the card shows LLM-judged scores, a personalised one-line
-  // comment, and Flash's time-saved estimate. When absent (older sessions or
-  // the completeness check was skipped), we fall back to a math-based
-  // approximation so the card still renders something useful.
+  // The only valid source — Flash's scoring from the completeness checker.
+  // When null (old sessions pre-scoring, or the completeness check was
+  // skipped) the card renders nothing. We'd rather hide the whole widget
+  // than show half-baked math with a "Flash couldn't review this" apology.
   lectureScore: LectureScore | null;
-  transcript: TranscriptSection[];
   sessionName: string;
+  // Kept for backward-compat with the /dev/score-preview mock page, where
+  // the card needs SOMETHING to display even without Flash output.
+  transcript?: TranscriptSection[];
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -41,52 +42,6 @@ function barColor(value: number): string {
   if (value < 70) return "#eab308";
   if (value < 85) return "#84cc16";
   return "#22c55e";
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Fallback scorer — used only when Flash's lectureScore is missing.
-// Produces plausible numbers from the generated document's properties so the
-// card never renders empty. Not meant to be accurate; accurate scoring lives
-// in the completeness checker now.
-// ═══════════════════════════════════════════════════════════════════════════
-
-function fallbackScore(
-  transcript: TranscriptSection[],
-  sessionName: string
-): LectureScore | null {
-  if (!transcript.length) return null;
-
-  const avgEI =
-    transcript.reduce((s, t) => s + (t.ei_percent ?? 50), 0) / transcript.length;
-  const variance =
-    transcript.reduce((s, t) => s + Math.pow((t.ei_percent ?? 50) - avgEI, 2), 0) /
-    transcript.length;
-
-  const clarity = Math.round(Math.max(20, Math.min(70, 60 - variance * 0.25)));
-  const focus = Math.round(Math.max(20, Math.min(70, 70 - transcript.length * 1.8)));
-  const avgLen =
-    transcript.reduce((s, t) => s + (t.narrative?.length ?? 0), 0) / transcript.length;
-  const efficiency = Math.round(Math.max(20, Math.min(70, 60 - avgLen / 140)));
-  const overall = Math.round((clarity + focus + efficiency) / 3);
-
-  const totalWords = transcript.reduce(
-    (s, t) => s + (t.narrative?.split(" ").length ?? 0),
-    0
-  );
-  const readMinutes = Math.round(totalWords / 200);
-  const timeSaved = Math.max(5, Math.round(readMinutes * 3.5) - readMinutes);
-
-  void sessionName; // kept in signature for future use
-
-  return {
-    overall,
-    clarity,
-    focus,
-    efficiency,
-    label: labelForScore(overall),
-    comment: "Score based on document structure — Flash couldn't review this run.",
-    time_saved_min: timeSaved,
-  };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -124,15 +79,15 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
 
 export default function LectureScoreCard({
   lectureScore,
-  transcript,
   sessionName,
 }: Props) {
   const [copied, setCopied] = useState(false);
-  const score = lectureScore ?? fallbackScore(transcript, sessionName);
-  if (!score) return null;
+  // No Flash score → hide the card entirely. Better than apologising with a
+  // half-baked math estimate that the student has no emotional investment in.
+  if (!lectureScore) return null;
 
   const { overall, clarity, focus, efficiency, label, comment, time_saved_min } =
-    score;
+    lectureScore;
   const overallColor = LABEL_COLORS[label];
 
   const ogParams = new URLSearchParams({

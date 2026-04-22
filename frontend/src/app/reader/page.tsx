@@ -511,15 +511,14 @@ export default function ReaderPage() {
           </div>
         ))}
 
-        {/* Lecture Score Card — shown once the full run is complete.
-            lectureScore comes from Flash via the completeness checker; it's
-            null for older sessions reloaded from the DB (we only stored it
-            in-memory for this iteration — persistence is a future task). */}
-        {store.markdown && transcript.length > 0 && (
+        {/* Lecture Score Card — only renders when Flash has produced an
+            actual score (via the completeness checker). Older sessions and
+            runs where Flash skipped scoring simply don't show the card, so
+            the reader never shows a half-baked math fallback or an apology. */}
+        {store.markdown && transcript.length > 0 && store.lectureScore && (
           <div className="mt-8 mb-4">
             <LectureScoreCard
               lectureScore={store.lectureScore}
-              transcript={transcript}
               sessionName={sessionName}
             />
           </div>

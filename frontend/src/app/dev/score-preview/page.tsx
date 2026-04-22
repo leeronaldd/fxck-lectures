@@ -6,20 +6,7 @@
 
 import { useState } from "react";
 import LectureScoreCard from "@/components/LectureScoreCard";
-import type { LectureScore, LectureScoreLabel, TranscriptSection } from "@/lib/types";
-
-// Minimal mock transcript — only used by the fallback scorer if Flash's
-// lecture_score is null. When we pass a real lectureScore below, this is
-// largely ignored.
-const mockTranscript: TranscriptSection[] = [
-  {
-    slide_number: 1,
-    title: "Intro",
-    narrative: "Placeholder narrative. ".repeat(40),
-    ei_percent: 70,
-    ei_reasoning: "",
-  },
-];
+import type { LectureScore, LectureScoreLabel } from "@/lib/types";
 
 const MOCKS: Record<LectureScoreLabel, LectureScore> = {
   rough: {
@@ -103,7 +90,6 @@ export default function ScorePreviewPage() {
         </div>
         <LectureScoreCard
           lectureScore={score}
-          transcript={mockTranscript}
           sessionName={`Microbiology Lecture 3 · ${label}`}
         />
       </div>
