@@ -26,10 +26,11 @@ export default function UploadPage() {
     activePipelineId,
   } = useAppStore();
 
-  // Get the active run for this page (the one we started, or any in-progress one)
-  const activeRun = activePipelineId
-    ? pipelineRuns[activePipelineId]
-    : Object.values(pipelineRuns).find((r) => r.isProcessing || r.isDone);
+  // Only show progress for the run the user explicitly activated. Falling
+  // back to "any run that's processing or done" makes stale persisted runs
+  // hijack the upload page after a New Session click — the upload form
+  // flashes, then a phantom background/ready screen takes over.
+  const activeRun = activePipelineId ? pipelineRuns[activePipelineId] : undefined;
 
   const isRunning = activeRun?.isProcessing ?? false;
   const isDone = activeRun?.isDone ?? false;

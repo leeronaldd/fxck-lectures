@@ -576,19 +576,29 @@ export const useAppStore = create<AppState>()(persist((set, get) => {
   updateSettings: (partial) =>
     set((state) => ({ settings: { ...state.settings, ...partial } })),
 
-  // Reset — clears upload state for a new session, but keeps running pipelines alive
+  // Reset — clears upload state for a new session. Drops stale finished/errored
+  // pipeline runs so they can't hijack /upload via the sidebar's Processing
+  // section. Genuinely in-flight runs (isProcessing && !isDone && !error) are
+  // preserved so a background SSE stream isn't orphaned.
   reset: () => {
-    set({
-      transcriptFile: null,
-      videoFile: null,
-      slidesFile: null,
-      slidesFiles: [],
-      activePipelineId: null,
-      activeSessionId: null,
-      markdown: "",
-      groups: [],
-      trustStats: { totalClaims: 0, correctClaims: 0, verifiedPercent: 0 },
-      lectureScore: null,
+    set((s) => {
+      const runs: Record<string, PipelineRun> = {};
+      for (const [id, run] of Object.entries(s.pipelineRuns)) {
+        if (run.isProcessing && !run.isDone && !run.error) runs[id] = run;
+      }
+      return {
+        transcriptFile: null,
+        videoFile: null,
+        slidesFile: null,
+        slidesFiles: [],
+        pipelineRuns: runs,
+        activePipelineId: null,
+        activeSessionId: null,
+        markdown: "",
+        groups: [],
+        trustStats: { totalClaims: 0, correctClaims: 0, verifiedPercent: 0 },
+        lectureScore: null,
+      };
     });
   },
   });
