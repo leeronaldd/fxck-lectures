@@ -185,6 +185,38 @@ export default function LandingPage() {
             <p className="mt-3 text-xs" style={{ color: "var(--text-muted)" }}>
               Free &middot; no card required
             </p>
+
+            {/* Coming-soon teaser → routes to signup, account auto-joins waitlist */}
+            <div className="mt-4 flex justify-center">
+              <button
+                type="button"
+                onClick={() => router.push("/quiz")}
+                className="group inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium transition-all hover:opacity-90"
+                style={{
+                  background: "var(--accent-dim)",
+                  color: "var(--accent)",
+                  border: "1px solid rgba(255, 107, 53, 0.2)",
+                }}
+              >
+                <span aria-hidden>🎬</span>
+                <span>Video explanations coming next — sign up to join waitlist</span>
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="transition-transform group-hover:translate-x-0.5"
+                  aria-hidden="true"
+                >
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </button>
+            </div>
+
             {/* Secondary low-commitment path — keeps browsers on the page */}
             <button
               type="button"
@@ -194,7 +226,7 @@ export default function LandingPage() {
                   block: "start",
                 });
               }}
-              className="read-sample-link mt-4 inline-flex items-center gap-1.5 text-sm font-medium transition-opacity hover:opacity-100"
+              className="read-sample-link mt-6 inline-flex items-center gap-1.5 text-sm font-medium transition-opacity hover:opacity-100"
               style={{ color: "var(--accent)", opacity: 0.85 }}
             >
               See it in action
