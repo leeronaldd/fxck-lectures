@@ -7,6 +7,7 @@ import rehypeRaw from "rehype-raw";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import type { TranscriptSection } from "@/lib/types";
+import ReadAloudButton from "./ReadAloudButton";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -56,6 +57,35 @@ function stripLeadingImage(md: string): string {
 }
 
 /**
+ * Plain-text version of the narrative for the Web Speech API. Strips every
+ * markdown construct so the TTS doesn't read "asterisk asterisk" or speak
+ * raw inline math. Mirrors what the pipeline's edge-tts gets fed when we
+ * pre-render audio for video reels.
+ */
+function narrativeToSpeech(md: string): string {
+  let s = stripLeadingImage(md);
+  // images inline -> drop entirely
+  s = s.replace(/!\[[^\]]*\]\([^)]*\)/g, "");
+  // links [text](url) -> text
+  s = s.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+  // **bold**, *italic*, `code`, ~~strike~~
+  s = s.replace(/\*\*([^*]+)\*\*/g, "$1");
+  s = s.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, "$1");
+  s = s.replace(/`([^`]+)`/g, "$1");
+  s = s.replace(/~~([^~]+)~~/g, "$1");
+  // inline math $...$ — keep contents (TTS is mediocre at equations but
+  // Klare prose mostly uses words around the math)
+  s = s.replace(/\$([^$]+)\$/g, "$1");
+  // <mark>x</mark> -> x (we use this for key terms in the narrative)
+  s = s.replace(/<mark[^>]*>([\s\S]*?)<\/mark>/g, "$1");
+  // any other inline html tag -> stripped
+  s = s.replace(/<[^>]+>/g, "");
+  // collapse whitespace
+  s = s.replace(/\s+/g, " ").trim();
+  return s;
+}
+
+/**
  * Renders a transcript section's narrative as markdown with KaTeX math.
  *
  * Previously this had its own inline regex-based renderer, which ignored
@@ -71,12 +101,15 @@ export default function NarrativeSection({
 }) {
   return (
     <div>
-      <h2
-        className="text-xl font-bold mb-6"
-        style={{ color: "var(--text-primary)" }}
-      >
-        {section.title}
-      </h2>
+      <div className="flex items-start justify-between gap-4 mb-6">
+        <h2
+          className="text-xl font-bold"
+          style={{ color: "var(--text-primary)" }}
+        >
+          {section.title}
+        </h2>
+        <ReadAloudButton text={narrativeToSpeech(section.narrative)} />
+      </div>
       <div
         className="leading-relaxed text-[15px]"
         style={{ color: "var(--text-primary)" }}
